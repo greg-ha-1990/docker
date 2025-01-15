@@ -1,5 +1,5 @@
-FROM dellzhui/aarch64-2dlogic-gateway:1.0.1
+FROM ghcr.io/home-assistant/home-assistant:2024.6.1
 
 
 COPY homeassistant /usr/src/homeassistant
-COPY config /config
+COPY homeassistant/config /config

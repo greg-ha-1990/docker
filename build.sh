@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMAGE_NAME="dellzhui/aarch64-2dlogic-gateway"
-IMAGE_VERSION="1.0.2"
+IMAGE_VERSION="2024.6.1"
 
 docker image rm -f "${IMAGE_NAME}:${IMAGE_VERSION}"
 
