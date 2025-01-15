@@ -86,7 +86,7 @@ class EntitySubscription:
 @callback
 def async_prepare_subscribe_topics(
     hass: HomeAssistant,
-    sub_state: dict[str, EntitySubscription] | None,
+    new_state: dict[str, EntitySubscription] | None,
     topics: dict[str, dict[str, Any]],
 ) -> dict[str, EntitySubscription]:
     """Prepare (re)subscribe to a set of MQTT topics.
@@ -101,9 +101,8 @@ def async_prepare_subscribe_topics(
     sets of topics. Every call to async_subscribe_topics must always
     contain _all_ the topics the subscription state should manage.
     """
-    current_subscriptions: dict[str, EntitySubscription]
-    current_subscriptions = sub_state if sub_state is not None else {}
-    sub_state = {}
+    current_subscriptions = new_state if new_state is not None else {}
+    new_state = {}
     for key, value in topics.items():
         # Extract the new requested subscription
         requested = EntitySubscription(
@@ -120,7 +119,7 @@ def async_prepare_subscribe_topics(
         # Get the current subscription state
         current = current_subscriptions.pop(key, None)
         requested.resubscribe_if_necessary(hass, current)
-        sub_state[key] = requested
+        new_state[key] = requested
 
     # Go through all remaining subscriptions and unsubscribe them
     for remaining in current_subscriptions.values():
@@ -133,7 +132,7 @@ def async_prepare_subscribe_topics(
                 remaining.entity_id,
             )
 
-    return sub_state
+    return new_state
 
 
 async def async_subscribe_topics(

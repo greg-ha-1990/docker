@@ -47,10 +47,6 @@
         "reply_to_message_id": {
           "name": "Reply to message id",
           "description": "Mark the message as a reply to a previous message."
-        },
-        "message_thread_id": {
-          "name": "Message thread id",
-          "description": "Unique identifier for the target message thread (topic) of the forum; for forum supergroups only."
         }
       }
     },
@@ -117,10 +113,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -183,10 +175,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -253,10 +241,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -323,10 +307,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -389,10 +369,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -459,10 +435,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -505,10 +477,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },
@@ -555,10 +523,6 @@
         "reply_to_message_id": {
           "name": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::name%]",
           "description": "[%key:component::telegram_bot::services::send_message::fields::reply_to_message_id::description%]"
-        },
-        "message_thread_id": {
-          "name": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::name%]",
-          "description": "[%key:component::telegram_bot::services::send_message::fields::message_thread_id::description%]"
         }
       }
     },

@@ -6,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Callable
 from enum import IntEnum
 import logging
-from typing import cast
 
 from mysensors import BaseAsyncGateway, Message
 from mysensors.sensor import ChildSensor
@@ -152,7 +151,7 @@ def get_child_schema(
 ) -> vol.Schema:
     """Return a child schema."""
     set_req = gateway.const.SetReq
-    child_schema = cast(vol.Schema, child.get_schema(gateway.protocol_version))
+    child_schema = child.get_schema(gateway.protocol_version)
     return child_schema.extend(
         {
             vol.Required(
@@ -168,9 +167,11 @@ def invalid_msg(
     gateway: BaseAsyncGateway, child: ChildSensor, value_type_name: ValueType
 ) -> str:
     """Return a message for an invalid child during schema validation."""
-    presentation = gateway.const.Presentation
+    pres = gateway.const.Presentation
     set_req = gateway.const.SetReq
-    return f"{presentation(child.type).name} requires value_type {set_req[value_type_name].name}"
+    return (
+        f"{pres(child.type).name} requires value_type {set_req[value_type_name].name}"
+    )
 
 
 def validate_set_msg(
@@ -200,10 +201,10 @@ def validate_child(
 ) -> defaultdict[Platform, list[DevId]]:
     """Validate a child. Returns a dict mapping hass platform names to list of DevId."""
     validated: defaultdict[Platform, list[DevId]] = defaultdict(list)
-    presentation: type[IntEnum] = gateway.const.Presentation
+    pres: type[IntEnum] = gateway.const.Presentation
     set_req: type[IntEnum] = gateway.const.SetReq
     child_type_name: SensorType | None = next(
-        (member.name for member in presentation if member.value == child.type), None
+        (member.name for member in pres if member.value == child.type), None
     )
     if not child_type_name:
         _LOGGER.warning("Child type %s is not supported", child.type)

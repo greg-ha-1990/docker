@@ -8,10 +8,7 @@ import logging
 
 import voluptuous as vol
 
-from homeassistant.components.notify import (
-    PLATFORM_SCHEMA as NOTIFY_PLATFORM_SCHEMA,
-    BaseNotificationService,
-)
+from homeassistant.components.notify import PLATFORM_SCHEMA, BaseNotificationService
 from homeassistant.const import CONF_ACCESS_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -21,9 +18,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 _LOGGER = logging.getLogger(__name__)
 _RESOURCE = "https://api.flock.com/hooks/sendMessage/"
 
-PLATFORM_SCHEMA = NOTIFY_PLATFORM_SCHEMA.extend(
-    {vol.Required(CONF_ACCESS_TOKEN): cv.string}
-)
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({vol.Required(CONF_ACCESS_TOKEN): cv.string})
 
 
 async def async_get_service(

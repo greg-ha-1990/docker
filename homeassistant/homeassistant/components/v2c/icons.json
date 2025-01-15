@@ -21,15 +21,6 @@
       },
       "battery_power": {
         "default": "mdi:home-battery"
-      },
-      "ssid": {
-        "default": "mdi:wifi"
-      },
-      "ip_address": {
-        "default": "mdi:ip"
-      },
-      "signal_status": {
-        "default": "mdi:signal"
       }
     },
     "switch": {

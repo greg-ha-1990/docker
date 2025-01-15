@@ -17,9 +17,8 @@ from homeassistant.components.cover import (
     ATTR_CURRENT_TILT_POSITION,
     ATTR_POSITION,
     ATTR_TILT_POSITION,
-    DOMAIN as COVER_DOMAIN,
+    DOMAIN,
     CoverEntityFeature,
-    CoverState,
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -29,7 +28,11 @@ from homeassistant.const import (
     SERVICE_SET_COVER_POSITION,
     SERVICE_SET_COVER_TILT_POSITION,
     SERVICE_STOP_COVER,
+    STATE_CLOSED,
+    STATE_CLOSING,
     STATE_ON,
+    STATE_OPEN,
+    STATE_OPENING,
 )
 from homeassistant.core import (
     Event,
@@ -69,10 +72,10 @@ from .const import (
 )
 
 DOOR_CURRENT_HASS_TO_HK = {
-    CoverState.OPEN: HK_DOOR_OPEN,
-    CoverState.CLOSED: HK_DOOR_CLOSED,
-    CoverState.OPENING: HK_DOOR_OPENING,
-    CoverState.CLOSING: HK_DOOR_CLOSING,
+    STATE_OPEN: HK_DOOR_OPEN,
+    STATE_CLOSED: HK_DOOR_CLOSED,
+    STATE_OPENING: HK_DOOR_OPENING,
+    STATE_CLOSING: HK_DOOR_CLOSING,
 }
 
 # HomeKit only has two states for
@@ -82,13 +85,13 @@ DOOR_CURRENT_HASS_TO_HK = {
 # Opening is mapped to 0 since the target is Open
 # Closing is mapped to 1 since the target is Closed
 DOOR_TARGET_HASS_TO_HK = {
-    CoverState.OPEN: HK_DOOR_OPEN,
-    CoverState.CLOSED: HK_DOOR_CLOSED,
-    CoverState.OPENING: HK_DOOR_OPEN,
-    CoverState.CLOSING: HK_DOOR_CLOSED,
+    STATE_OPEN: HK_DOOR_OPEN,
+    STATE_CLOSED: HK_DOOR_CLOSED,
+    STATE_OPENING: HK_DOOR_OPEN,
+    STATE_CLOSING: HK_DOOR_CLOSED,
 }
 
-MOVING_STATES = {CoverState.OPENING, CoverState.CLOSING}
+MOVING_STATES = {STATE_OPENING, STATE_CLOSING}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -178,16 +181,16 @@ class GarageDoorOpener(HomeAccessory):
         if value == HK_DOOR_OPEN:
             if self.char_current_state.value != value:
                 self.char_current_state.set_value(HK_DOOR_OPENING)
-            self.async_call_service(COVER_DOMAIN, SERVICE_OPEN_COVER, params)
+            self.async_call_service(DOMAIN, SERVICE_OPEN_COVER, params)
         elif value == HK_DOOR_CLOSED:
             if self.char_current_state.value != value:
                 self.char_current_state.set_value(HK_DOOR_CLOSING)
-            self.async_call_service(COVER_DOMAIN, SERVICE_CLOSE_COVER, params)
+            self.async_call_service(DOMAIN, SERVICE_CLOSE_COVER, params)
 
     @callback
     def async_update_state(self, new_state: State) -> None:
         """Update cover state after state changed."""
-        hass_state: CoverState = new_state.state  # type: ignore[assignment]
+        hass_state = new_state.state
         target_door_state = DOOR_TARGET_HASS_TO_HK.get(hass_state)
         current_door_state = DOOR_CURRENT_HASS_TO_HK.get(hass_state)
 
@@ -245,12 +248,12 @@ class OpeningDeviceBase(HomeAccessory):
         if value != 1:
             return
         self.async_call_service(
-            COVER_DOMAIN, SERVICE_STOP_COVER, {ATTR_ENTITY_ID: self.entity_id}
+            DOMAIN, SERVICE_STOP_COVER, {ATTR_ENTITY_ID: self.entity_id}
         )
 
     def set_tilt(self, value: float) -> None:
         """Set tilt to value if call came from HomeKit."""
-        _LOGGER.debug("%s: Set tilt to %d", self.entity_id, value)
+        _LOGGER.info("%s: Set tilt to %d", self.entity_id, value)
 
         # HomeKit sends values between -90 and 90.
         # We'll have to normalize to [0,100]
@@ -258,9 +261,7 @@ class OpeningDeviceBase(HomeAccessory):
 
         params = {ATTR_ENTITY_ID: self.entity_id, ATTR_TILT_POSITION: value}
 
-        self.async_call_service(
-            COVER_DOMAIN, SERVICE_SET_COVER_TILT_POSITION, params, value
-        )
+        self.async_call_service(DOMAIN, SERVICE_SET_COVER_TILT_POSITION, params, value)
 
     @callback
     def async_update_state(self, new_state: State) -> None:
@@ -321,7 +322,7 @@ class OpeningDevice(OpeningDeviceBase, HomeAccessory):
         """Move cover to value if call came from HomeKit."""
         _LOGGER.debug("%s: Set position to %d", self.entity_id, value)
         params = {ATTR_ENTITY_ID: self.entity_id, ATTR_POSITION: value}
-        self.async_call_service(COVER_DOMAIN, SERVICE_SET_COVER_POSITION, params, value)
+        self.async_call_service(DOMAIN, SERVICE_SET_COVER_POSITION, params, value)
 
     @callback
     def async_update_state(self, new_state: State) -> None:
@@ -422,7 +423,7 @@ class WindowCoveringBasic(OpeningDeviceBase, HomeAccessory):
             service, position = (SERVICE_STOP_COVER, 50)
 
         params = {ATTR_ENTITY_ID: self.entity_id}
-        self.async_call_service(COVER_DOMAIN, service, params)
+        self.async_call_service(DOMAIN, service, params)
 
         # Snap the current/target position to the expected final position.
         self.char_current_position.set_value(position)
@@ -431,11 +432,10 @@ class WindowCoveringBasic(OpeningDeviceBase, HomeAccessory):
     @callback
     def async_update_state(self, new_state: State) -> None:
         """Update cover position after state changed."""
-        position_mapping = {CoverState.OPEN: 100, CoverState.CLOSED: 0}
-        _state: CoverState = new_state.state  # type: ignore[assignment]
-        hk_position = position_mapping.get(_state)
+        position_mapping = {STATE_OPEN: 100, STATE_CLOSED: 0}
+        hk_position = position_mapping.get(new_state.state)
         if hk_position is not None:
-            is_moving = _state in MOVING_STATES
+            is_moving = new_state.state in MOVING_STATES
 
             if self.char_current_position.value != hk_position:
                 self.char_current_position.set_value(hk_position)
@@ -450,8 +450,8 @@ class WindowCoveringBasic(OpeningDeviceBase, HomeAccessory):
 
 def _hass_state_to_position_start(state: str) -> int:
     """Convert hass state to homekit position state."""
-    if state == CoverState.OPENING:
+    if state == STATE_OPENING:
         return HK_POSITION_GOING_TO_MAX
-    if state == CoverState.CLOSING:
+    if state == STATE_CLOSING:
         return HK_POSITION_GOING_TO_MIN
     return HK_POSITION_STOPPED

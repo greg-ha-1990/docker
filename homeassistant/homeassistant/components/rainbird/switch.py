@@ -8,34 +8,33 @@ from pyrainbird.exceptions import RainbirdApiException, RainbirdDeviceBusyExcept
 import voluptuous as vol
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import VolDictType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTR_DURATION, CONF_IMPORTED_NAMES, DOMAIN, MANUFACTURER
 from .coordinator import RainbirdUpdateCoordinator
-from .types import RainbirdConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_START_IRRIGATION = "start_irrigation"
 
-SERVICE_SCHEMA_IRRIGATION: VolDictType = {
+SERVICE_SCHEMA_IRRIGATION = {
     vol.Required(ATTR_DURATION): cv.positive_float,
 }
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: RainbirdConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up entry for a Rain Bird irrigation switches."""
-    coordinator = config_entry.runtime_data.coordinator
+    coordinator = hass.data[DOMAIN][config_entry.entry_id].coordinator
     async_add_entities(
         RainBirdSwitch(
             coordinator,

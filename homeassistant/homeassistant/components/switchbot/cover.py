@@ -16,11 +16,13 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .coordinator import SwitchbotConfigEntry, SwitchbotDataUpdateCoordinator
+from .const import DOMAIN
+from .coordinator import SwitchbotDataUpdateCoordinator
 from .entity import SwitchbotEntity
 
 # Initialize the logger
@@ -29,12 +31,10 @@ PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: SwitchbotConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up Switchbot curtain based on a config entry."""
-    coordinator = entry.runtime_data
+    coordinator: SwitchbotDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     if isinstance(coordinator.device, switchbot.SwitchbotBlindTilt):
         async_add_entities([SwitchBotBlindTiltEntity(coordinator)])
     else:

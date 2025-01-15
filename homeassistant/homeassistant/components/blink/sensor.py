@@ -10,18 +10,15 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import (
-    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    EntityCategory,
-    UnitOfTemperature,
-)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_BRAND, DOMAIN, TYPE_TEMPERATURE, TYPE_WIFI_STRENGTH
-from .coordinator import BlinkConfigEntry, BlinkUpdateCoordinator
+from .coordinator import BlinkUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,8 +33,6 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key=TYPE_WIFI_STRENGTH,
         translation_key="wifi_strength",
-        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
     ),
@@ -45,13 +40,11 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: BlinkConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, config: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Initialize a Blink sensor."""
 
-    coordinator = config_entry.runtime_data
+    coordinator: BlinkUpdateCoordinator = hass.data[DOMAIN][config.entry_id]
     entities = [
         BlinkSensor(coordinator, camera, description)
         for camera in coordinator.api.cameras

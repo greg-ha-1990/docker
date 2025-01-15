@@ -73,9 +73,11 @@ class EzvizUpdateEntity(EzvizEntity, UpdateEntity):
         return self.data["version"]
 
     @property
-    def in_progress(self) -> bool:
+    def in_progress(self) -> bool | int | None:
         """Update installation progress."""
-        return bool(self.data["upgrade_in_progress"])
+        if self.data["upgrade_in_progress"]:
+            return self.data["upgrade_percent"]
+        return False
 
     @property
     def latest_version(self) -> str | None:
@@ -89,13 +91,6 @@ class EzvizUpdateEntity(EzvizEntity, UpdateEntity):
         """Return full release notes."""
         if self.data["latest_firmware_info"]:
             return self.data["latest_firmware_info"].get("desc")
-        return None
-
-    @property
-    def update_percentage(self) -> int | None:
-        """Update installation progress."""
-        if self.data["upgrade_in_progress"]:
-            return self.data["upgrade_percent"]
         return None
 
     async def async_install(

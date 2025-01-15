@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import partial
 import logging
 
 from bthome_ble import BTHomeBluetoothDeviceData, SensorUpdate
@@ -13,6 +12,7 @@ from homeassistant.components.bluetooth import (
     BluetoothScanningMode,
     BluetoothServiceInfoBleak,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -29,7 +29,6 @@ from .const import (
     BTHomeBleEvent,
 )
 from .coordinator import BTHomePassiveBluetoothProcessorCoordinator
-from .types import BTHomeConfigEntry
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.EVENT, Platform.SENSOR]
 
@@ -38,14 +37,16 @@ _LOGGER = logging.getLogger(__name__)
 
 def process_service_info(
     hass: HomeAssistant,
-    entry: BTHomeConfigEntry,
-    device_registry: DeviceRegistry,
+    entry: ConfigEntry,
+    data: BTHomeBluetoothDeviceData,
     service_info: BluetoothServiceInfoBleak,
+    device_registry: DeviceRegistry,
 ) -> SensorUpdate:
     """Process a BluetoothServiceInfoBleak, running side effects and returning sensor data."""
-    coordinator = entry.runtime_data
-    data = coordinator.device_data
     update = data.update(service_info)
+    coordinator: BTHomePassiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     discovered_event_classes = coordinator.discovered_event_classes
     if entry.data.get(CONF_SLEEPY_DEVICE, False) != data.sleepy_device:
         hass.config_entries.async_update_entry(
@@ -116,7 +117,7 @@ def format_discovered_event_class(address: str) -> SignalType[str, BTHomeBleEven
     return SignalType(f"{DOMAIN}_discovered_event_class_{address}")
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: BTHomeConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up BTHome Bluetooth from a config entry."""
     address = entry.unique_id
     assert address is not None
@@ -127,26 +128,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: BTHomeConfigEntry) -> bo
     data = BTHomeBluetoothDeviceData(**kwargs)
 
     device_registry = dr.async_get(hass)
-    event_classes = set(entry.data.get(CONF_DISCOVERED_EVENT_CLASSES, ()))
-    coordinator = BTHomePassiveBluetoothProcessorCoordinator(
-        hass,
-        _LOGGER,
-        address=address,
-        mode=BluetoothScanningMode.PASSIVE,
-        update_method=partial(process_service_info, hass, entry, device_registry),
-        device_data=data,
-        discovered_event_classes=event_classes,
-        connectable=False,
-        entry=entry,
+    coordinator = hass.data.setdefault(DOMAIN, {})[entry.entry_id] = (
+        BTHomePassiveBluetoothProcessorCoordinator(
+            hass,
+            _LOGGER,
+            address=address,
+            mode=BluetoothScanningMode.PASSIVE,
+            update_method=lambda service_info: process_service_info(
+                hass, entry, data, service_info, device_registry
+            ),
+            device_data=data,
+            discovered_event_classes=set(
+                entry.data.get(CONF_DISCOVERED_EVENT_CLASSES, [])
+            ),
+            connectable=False,
+            entry=entry,
+        )
     )
-    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # only start after all platforms have had a chance to subscribe
-    entry.async_on_unload(coordinator.async_start())
+    entry.async_on_unload(
+        coordinator.async_start()
+    )  # only start after all platforms have had a chance to subscribe
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: BTHomeConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

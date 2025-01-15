@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from bring_api import (
-    Bring,
+from bring_api.bring import Bring
+from bring_api.exceptions import (
     BringAuthException,
     BringParseException,
     BringRequestException,
@@ -14,13 +14,13 @@ from bring_api import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN
 from .coordinator import BringDataUpdateCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.TODO]
+PLATFORMS: list[Platform] = [Platform.TODO]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BringConfigEntry) -> boo
 
     try:
         await bring.login()
+        await bring.load_lists()
     except BringRequestException as e:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
@@ -46,10 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BringConfigEntry) -> boo
     except BringParseException as e:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,
-            translation_key="setup_parse_exception",
+            translation_key="setup_request_exception",
         ) from e
     except BringAuthException as e:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryError(
             translation_domain=DOMAIN,
             translation_key="setup_authentication_exception",
             translation_placeholders={CONF_EMAIL: email},

@@ -7,14 +7,8 @@
     }
   },
   "services": {
-    "capture_image": {
-      "service": "mdi:camera"
-    },
-    "change_setting": {
-      "service": "mdi:cog"
-    },
-    "trigger_automation": {
-      "service": "mdi:play"
-    }
+    "capture_image": "mdi:camera",
+    "change_setting": "mdi:cog",
+    "trigger_automation": "mdi:play"
   }
 }

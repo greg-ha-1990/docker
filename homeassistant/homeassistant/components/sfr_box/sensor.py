@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from sfrbox_api.models import DslInfo, SystemInfo, WanInfo
 
@@ -130,7 +129,7 @@ DSL_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[DslInfo], ...] = (
             "unknown",
         ],
         translation_key="dsl_line_status",
-        value_fn=lambda x: _value_to_option(x.line_status),
+        value_fn=lambda x: x.line_status.lower().replace(" ", "_"),
     ),
     SFRBoxSensorEntityDescription[DslInfo](
         key="training",
@@ -150,7 +149,7 @@ DSL_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[DslInfo], ...] = (
             "unknown",
         ],
         translation_key="dsl_training",
-        value_fn=lambda x: _value_to_option(x.training),
+        value_fn=lambda x: x.training.lower().replace(" ", "_").replace(".", "_"),
     ),
 )
 SYSTEM_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[SystemInfo], ...] = (
@@ -182,7 +181,7 @@ SYSTEM_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[SystemInfo], ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        value_fn=lambda x: _get_temperature(x.temperature),
+        value_fn=lambda x: None if x.temperature is None else x.temperature / 1000,
     ),
 )
 WAN_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[WanInfo], ...] = (
@@ -204,38 +203,23 @@ WAN_SENSOR_TYPES: tuple[SFRBoxSensorEntityDescription[WanInfo], ...] = (
 )
 
 
-def _value_to_option(value: str | None) -> str | None:
-    if value is None:
-        return value
-    return value.lower().replace(" ", "_").replace(".", "_")
-
-
-def _get_temperature(value: float | None) -> float | None:
-    if value is None or value < 1000:
-        return value
-    return value / 1000
-
-
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the sensors."""
     data: DomainData = hass.data[DOMAIN][entry.entry_id]
-    system_info = data.system.data
-    if TYPE_CHECKING:
-        assert system_info is not None
 
     entities: list[SFRBoxSensor] = [
-        SFRBoxSensor(data.system, description, system_info)
+        SFRBoxSensor(data.system, description, data.system.data)
         for description in SYSTEM_SENSOR_TYPES
     ]
     entities.extend(
-        SFRBoxSensor(data.wan, description, system_info)
+        SFRBoxSensor(data.wan, description, data.system.data)
         for description in WAN_SENSOR_TYPES
     )
-    if system_info.net_infra == "adsl":
+    if data.system.data.net_infra == "adsl":
         entities.extend(
-            SFRBoxSensor(data.dsl, description, system_info)
+            SFRBoxSensor(data.dsl, description, data.system.data)
             for description in DSL_SENSOR_TYPES
         )
 
@@ -267,6 +251,4 @@ class SFRBoxSensor[_T](CoordinatorEntity[SFRDataUpdateCoordinator[_T]], SensorEn
     @property
     def native_value(self) -> StateType:
         """Return the native value of the device."""
-        if self.coordinator.data is None:
-            return None
         return self.entity_description.value_fn(self.coordinator.data)

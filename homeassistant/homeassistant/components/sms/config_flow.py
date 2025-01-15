@@ -1,12 +1,11 @@
 """Config flow for SMS integration."""
 
 import logging
-from typing import Any
 
 import gammu
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_DEVICE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -27,7 +26,7 @@ DATA_SCHEMA = vol.Schema(
 )
 
 
-async def get_imei_from_config(hass: HomeAssistant, data: dict[str, Any]) -> str:
+async def get_imei_from_config(hass: HomeAssistant, data):
     """Validate the user input allows us to connect.
 
     Data has the keys from DATA_SCHEMA with values provided by the user.
@@ -57,9 +56,7 @@ class SMSFlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
@@ -81,6 +78,10 @@ class SMSFlowHandler(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
         )
+
+    async def async_step_import(self, user_input):
+        """Handle import."""
+        return await self.async_step_user(user_input)
 
 
 class CannotConnect(HomeAssistantError):

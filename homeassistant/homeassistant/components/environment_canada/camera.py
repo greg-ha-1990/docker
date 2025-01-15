@@ -11,14 +11,13 @@ from homeassistant.helpers.entity_platform import (
     AddEntitiesCallback,
     async_get_current_platform,
 )
-from homeassistant.helpers.typing import VolDictType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import device_info
 from .const import ATTR_OBSERVATION_TIME, DOMAIN
 
 SERVICE_SET_RADAR_TYPE = "set_radar_type"
-SET_RADAR_TYPE_SCHEMA: VolDictType = {
+SET_RADAR_TYPE_SCHEMA = {
     vol.Required("radar_type"): vol.In(["Auto", "Rain", "Snow"]),
 }
 

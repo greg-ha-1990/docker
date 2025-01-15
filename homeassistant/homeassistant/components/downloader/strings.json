@@ -23,17 +23,23 @@
         },
         "subdir": {
           "name": "Subdirectory",
-          "description": "Relative download path."
+          "description": "Download into subdirectory."
         },
         "filename": {
           "name": "Filename",
-          "description": "Custom name for the downloaded file."
+          "description": "Determine the filename."
         },
         "overwrite": {
           "name": "Overwrite",
-          "description": "Overwrite file if it exists."
+          "description": "Whether to overwrite the file or not."
         }
       }
+    }
+  },
+  "issues": {
+    "directory_does_not_exist": {
+      "title": "The {integration_title} failed to import",
+      "description": "The {integration_title} integration failed to import because the configured directory does not exist.\n\nEnsure the directory exists and restart Home Assistant to try again or remove the {integration_title} configuration from your configuration.yaml file and continue to [set up the integration]({url}) manually."
     }
   }
 }

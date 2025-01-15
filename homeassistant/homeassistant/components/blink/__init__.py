@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 import logging
-from typing import Any
 
 from aiohttp import ClientError
 from blinkpy.auth import Auth
@@ -10,6 +9,7 @@ from blinkpy.blinkpy import Blink
 import voluptuous as vol
 
 from homeassistant.components import persistent_notification
+from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntry
 from homeassistant.const import (
     CONF_FILE_PATH,
     CONF_FILENAME,
@@ -24,7 +24,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
-from .coordinator import BlinkConfigEntry, BlinkUpdateCoordinator
+from .coordinator import BlinkUpdateCoordinator
 from .services import setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,11 +40,13 @@ SERVICE_SAVE_RECENT_CLIPS_SCHEMA = vol.Schema(
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-async def _reauth_flow_wrapper(
-    hass: HomeAssistant, entry: BlinkConfigEntry, data: dict[str, Any]
-) -> None:
+async def _reauth_flow_wrapper(hass, data):
     """Reauth flow wrapper."""
-    entry.async_start_reauth(hass, data=data)
+    hass.add_job(
+        hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_REAUTH}, data=data
+        )
+    )
     persistent_notification.async_create(
         hass,
         (
@@ -55,16 +57,16 @@ async def _reauth_flow_wrapper(
     )
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: BlinkConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle migration of a previous version config entry."""
     _LOGGER.debug("Migrating from version %s", entry.version)
     data = {**entry.data}
     if entry.version == 1:
         data.pop("login_response", None)
-        await _reauth_flow_wrapper(hass, entry, data)
+        await _reauth_flow_wrapper(hass, data)
         return False
     if entry.version == 2:
-        await _reauth_flow_wrapper(hass, entry, data)
+        await _reauth_flow_wrapper(hass, data)
         return False
     return True
 
@@ -77,8 +79,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: BlinkConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Blink via config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
     _async_import_options_from_data_if_missing(hass, entry)
     session = async_get_clientsession(hass)
     blink = Blink(session=session)
@@ -100,8 +104,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BlinkConfigEntry) -> boo
         raise ConfigEntryNotReady
 
     await coordinator.async_config_entry_first_refresh()
-
-    entry.runtime_data = coordinator
+    hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -110,7 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BlinkConfigEntry) -> boo
 
 @callback
 def _async_import_options_from_data_if_missing(
-    hass: HomeAssistant, entry: BlinkConfigEntry
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> None:
     options = dict(entry.options)
     if CONF_SCAN_INTERVAL not in entry.options:
@@ -120,6 +123,8 @@ def _async_import_options_from_data_if_missing(
         hass.config_entries.async_update_entry(entry, options=options)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: BlinkConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Blink entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+    return unload_ok

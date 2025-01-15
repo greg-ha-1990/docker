@@ -37,8 +37,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .const import ATTR_NEW, DOMAIN
-from .entity import CecEntity
+from . import ATTR_NEW, DOMAIN, CecEntity
 
 _LOGGER = logging.getLogger(__name__)
 

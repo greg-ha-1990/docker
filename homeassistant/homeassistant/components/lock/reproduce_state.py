@@ -12,20 +12,26 @@ from homeassistant.const import (
     SERVICE_LOCK,
     SERVICE_OPEN,
     SERVICE_UNLOCK,
+    STATE_LOCKED,
+    STATE_LOCKING,
+    STATE_OPEN,
+    STATE_OPENING,
+    STATE_UNLOCKED,
+    STATE_UNLOCKING,
 )
 from homeassistant.core import Context, HomeAssistant, State
 
-from . import DOMAIN, LockState
+from . import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 VALID_STATES = {
-    LockState.LOCKED,
-    LockState.LOCKING,
-    LockState.OPEN,
-    LockState.OPENING,
-    LockState.UNLOCKED,
-    LockState.UNLOCKING,
+    STATE_LOCKED,
+    STATE_LOCKING,
+    STATE_OPEN,
+    STATE_OPENING,
+    STATE_UNLOCKED,
+    STATE_UNLOCKING,
 }
 
 
@@ -53,11 +59,11 @@ async def _async_reproduce_state(
 
     service_data = {ATTR_ENTITY_ID: state.entity_id}
 
-    if state.state in {LockState.LOCKED, LockState.LOCKING}:
+    if state.state in {STATE_LOCKED, STATE_LOCKING}:
         service = SERVICE_LOCK
-    elif state.state in {LockState.UNLOCKED, LockState.UNLOCKING}:
+    elif state.state in {STATE_UNLOCKED, STATE_UNLOCKING}:
         service = SERVICE_UNLOCK
-    elif state.state in {LockState.OPEN, LockState.OPENING}:
+    elif state.state in {STATE_OPEN, STATE_OPENING}:
         service = SERVICE_OPEN
 
     await hass.services.async_call(

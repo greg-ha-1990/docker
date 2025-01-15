@@ -9,12 +9,7 @@ from typing import Any
 from haphilipsjs import ConnectionFailure, PairingFailure, PhilipsTV
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    SOURCE_REAUTH,
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import (
     CONF_API_VERSION,
     CONF_HOST,
@@ -80,13 +75,18 @@ class PhilipsJSConfigFlow(ConfigFlow, domain=DOMAIN):
         self._current: dict[str, Any] = {}
         self._hub: PhilipsTV | None = None
         self._pair_state: Any = None
+        self._entry: ConfigEntry | None = None
 
     async def _async_create_current(self) -> ConfigFlowResult:
         system = self._current[CONF_SYSTEM]
-        if self.source == SOURCE_REAUTH:
-            return self.async_update_reload_and_abort(
-                self._get_reauth_entry(), data_updates=self._current
+        if self._entry:
+            self.hass.config_entries.async_update_entry(
+                self._entry, data=self._entry.data | self._current
             )
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(self._entry.entry_id)
+            )
+            return self.async_abort(reason="reauth_successful")
 
         return self.async_create_entry(
             title=f"{system['name']} ({system['serialnumber']})",
@@ -150,6 +150,7 @@ class PhilipsJSConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle configuration by re-auth."""
+        self._entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         self._current[CONF_HOST] = entry_data[CONF_HOST]
         self._current[CONF_API_VERSION] = entry_data[CONF_API_VERSION]
         return await self.async_step_user()
@@ -174,7 +175,7 @@ class PhilipsJSConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 if serialnumber := hub.system.get("serialnumber"):
                     await self.async_set_unique_id(serialnumber)
-                    if self.source != SOURCE_REAUTH:
+                    if self._entry is None:
                         self._abort_if_unique_id_configured()
 
                 self._current[CONF_SYSTEM] = hub.system

@@ -8,15 +8,13 @@ from io import BytesIO
 import logging
 from typing import TYPE_CHECKING
 
-import aiohttp
-from pytrafikverket import (
-    CameraInfoModel,
+from pytrafikverket.exceptions import (
     InvalidAuthentication,
     MultipleCamerasFound,
     NoCameraFound,
-    TrafikverketCamera,
     UnknownError,
 )
+from pytrafikverket.trafikverket_camera import CameraInfo, TrafikverketCamera
 
 from homeassistant.const import CONF_API_KEY, CONF_ID
 from homeassistant.core import HomeAssistant
@@ -37,31 +35,32 @@ TIME_BETWEEN_UPDATES = timedelta(minutes=5)
 class CameraData:
     """Dataclass for Camera data."""
 
-    data: CameraInfoModel
+    data: CameraInfo
     image: bytes | None
 
 
 class TVDataUpdateCoordinator(DataUpdateCoordinator[CameraData]):
     """A Trafikverket Data Update Coordinator."""
 
-    def __init__(self, hass: HomeAssistant, config_entry: TVCameraConfigEntry) -> None:
+    config_entry: TVCameraConfigEntry
+
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the Trafikverket coordinator."""
         super().__init__(
             hass,
             _LOGGER,
-            config_entry=config_entry,
             name=DOMAIN,
             update_interval=TIME_BETWEEN_UPDATES,
         )
         self.session = async_get_clientsession(hass)
         self._camera_api = TrafikverketCamera(
-            self.session, config_entry.data[CONF_API_KEY]
+            self.session, self.config_entry.data[CONF_API_KEY]
         )
-        self._id = config_entry.data[CONF_ID]
+        self._id = self.config_entry.data[CONF_ID]
 
     async def _async_update_data(self) -> CameraData:
         """Fetch data from Trafikverket."""
-        camera_data: CameraInfoModel
+        camera_data: CameraInfo
         image: bytes | None = None
         try:
             camera_data = await self._camera_api.async_get_camera(self._id)
@@ -77,9 +76,7 @@ class TVDataUpdateCoordinator(DataUpdateCoordinator[CameraData]):
         if camera_data.fullsizephoto:
             image_url = f"{camera_data.photourl}?type=fullsize"
 
-        async with self.session.get(
-            image_url, timeout=aiohttp.ClientTimeout(total=10)
-        ) as get_image:
+        async with self.session.get(image_url, timeout=10) as get_image:
             if get_image.status not in range(200, 299):
                 raise UpdateFailed("Could not retrieve image")
             image = BytesIO(await get_image.read()).getvalue()

@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CURRENCY_EURO,
     PERCENTAGE,
@@ -26,11 +27,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SERVICE_TYPE_DEVICE_NAMES
-from .coordinator import (
-    EasyEnergyConfigEntry,
-    EasyEnergyData,
-    EasyEnergyDataUpdateCoordinator,
-)
+from .coordinator import EasyEnergyData, EasyEnergyDataUpdateCoordinator
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -211,12 +208,10 @@ def get_gas_price(data: EasyEnergyData, hours: int) -> float | None:
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: EasyEnergyConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up easyEnergy sensors based on a config entry."""
-    coordinator = entry.runtime_data
+    coordinator: EasyEnergyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         EasyEnergySensorEntity(coordinator=coordinator, description=description)
         for description in SENSORS

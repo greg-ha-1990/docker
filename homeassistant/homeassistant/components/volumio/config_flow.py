@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from pyvolumio import CannotConnectError, Volumio
 import voluptuous as vol
@@ -11,7 +10,7 @@ import voluptuous as vol
 from homeassistant.components import zeroconf
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_ID, CONF_NAME, CONF_PORT
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -25,7 +24,7 @@ DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, host: str, port: int) -> dict[str, Any]:
+async def validate_input(hass, host, port):
     """Validate the user input allows us to connect."""
     volumio = Volumio(host, port, async_get_clientsession(hass))
 
@@ -40,13 +39,15 @@ class VolumioConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _host: str
-    _port: int
-    _name: str
-    _uuid: str | None
+    def __init__(self) -> None:
+        """Initialize flow."""
+        self._host: str | None = None
+        self._port: int | None = None
+        self._name: str | None = None
+        self._uuid: str | None = None
 
     @callback
-    def _async_get_entry(self) -> ConfigFlowResult:
+    def _async_get_entry(self):
         return self.async_create_entry(
             title=self._name,
             data={
@@ -67,9 +68,7 @@ class VolumioConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
         if user_input is not None:
@@ -101,7 +100,7 @@ class VolumioConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle zeroconf discovery."""
         self._host = discovery_info.host
-        self._port = discovery_info.port or 3000
+        self._port = discovery_info.port
         self._name = discovery_info.properties["volumioName"]
         self._uuid = discovery_info.properties["UUID"]
 
@@ -109,9 +108,7 @@ class VolumioConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_discovery_confirm()
 
-    async def async_step_discovery_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_discovery_confirm(self, user_input=None):
         """Handle user-confirmation of discovered node."""
         if user_input is not None:
             try:

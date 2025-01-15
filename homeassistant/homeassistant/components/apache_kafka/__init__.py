@@ -16,6 +16,8 @@ from homeassistant.const import (
     CONF_USERNAME,
     EVENT_HOMEASSISTANT_STOP,
     EVENT_STATE_CHANGED,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -38,7 +40,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Required(CONF_TOPIC): cv.string,
                 vol.Optional(CONF_FILTER, default={}): FILTER_SCHEMA,
                 vol.Optional(CONF_SECURITY_PROTOCOL, default="PLAINTEXT"): vol.In(
-                    ["PLAINTEXT", "SSL", "SASL_SSL"]
+                    ["PLAINTEXT", "SASL_SSL"]
                 ),
                 vol.Optional(CONF_USERNAME): cv.string,
                 vol.Optional(CONF_PASSWORD): cv.string,
@@ -53,7 +55,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Activate the Apache Kafka integration."""
     conf = config[DOMAIN]
 
-    kafka = KafkaManager(
+    kafka = hass.data[DOMAIN] = KafkaManager(
         hass,
         conf[CONF_IP_ADDRESS],
         conf[CONF_PORT],
@@ -94,7 +96,7 @@ class KafkaManager:
         port: int,
         topic: str,
         entities_filter: EntityFilter,
-        security_protocol: Literal["PLAINTEXT", "SSL", "SASL_SSL"],
+        security_protocol: Literal["PLAINTEXT", "SASL_SSL"],
         username: str | None,
         password: str | None,
     ) -> None:
@@ -119,7 +121,7 @@ class KafkaManager:
         state = event.data["new_state"]
         if (
             state is None
-            or state.state == ""
+            or state.state in (STATE_UNKNOWN, "", STATE_UNAVAILABLE)
             or not self._entities_filter(state.entity_id)
         ):
             return None
@@ -139,8 +141,7 @@ class KafkaManager:
 
     async def write(self, event: Event[EventStateChangedData]) -> None:
         """Write a binary payload to Kafka."""
-        key = event.data["entity_id"].encode("utf-8")
         payload = self._encode_event(event)
 
         if payload:
-            await self._producer.send_and_wait(self._topic, payload, key)
+            await self._producer.send_and_wait(self._topic, payload)

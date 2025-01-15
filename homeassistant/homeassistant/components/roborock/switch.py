@@ -9,18 +9,18 @@ import logging
 from typing import Any
 
 from roborock.command_cache import CacheableAttribute
-from roborock.exceptions import RoborockException
 from roborock.version_1_apis.roborock_client_v1 import AttributeCache
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import slugify
 
-from . import DOMAIN, RoborockConfigEntry
+from .const import DOMAIN
 from .coordinator import RoborockDataUpdateCoordinator
-from .entity import RoborockEntityV1
+from .device import RoborockEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class RoborockSwitchDescription(SwitchEntityDescription):
     # Gets the status of the switch
     cache_key: CacheableAttribute
     # Sets the status of the switch
-    update_value: Callable[[AttributeCache, bool], Coroutine[Any, Any, None]]
+    update_value: Callable[[AttributeCache, bool], Coroutine[Any, Any, dict]]
     # Attribute from cache
     attribute: str
 
@@ -98,15 +98,18 @@ SWITCH_DESCRIPTIONS: list[RoborockSwitchDescription] = [
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: RoborockConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Roborock switch platform."""
+    coordinators: dict[str, RoborockDataUpdateCoordinator] = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
     possible_entities: list[
         tuple[RoborockDataUpdateCoordinator, RoborockSwitchDescription]
     ] = [
         (coordinator, description)
-        for coordinator in config_entry.runtime_data.v1
+        for coordinator in coordinators.values()
         for description in SWITCH_DESCRIPTIONS
     ]
     # We need to check if this function is supported by the device.
@@ -126,7 +129,7 @@ async def async_setup_entry(
         else:
             valid_entities.append(
                 RoborockSwitch(
-                    f"{description.key}_{coordinator.duid_slug}",
+                    f"{description.key}_{slugify(coordinator.roborock_device_info.device.duid)}",
                     coordinator,
                     description,
                 )
@@ -134,7 +137,7 @@ async def async_setup_entry(
     async_add_entities(valid_entities)
 
 
-class RoborockSwitch(RoborockEntityV1, SwitchEntity):
+class RoborockSwitch(RoborockEntity, SwitchEntity):
     """A class to let you turn functionality on Roborock devices on and off that does need a coordinator."""
 
     entity_description: RoborockSwitchDescription
@@ -151,34 +154,22 @@ class RoborockSwitch(RoborockEntityV1, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
-        try:
-            await self.entity_description.update_value(
-                self.get_cache(self.entity_description.cache_key), False
-            )
-        except RoborockException as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="update_options_failed",
-            ) from err
+        await self.entity_description.update_value(
+            self.get_cache(self.entity_description.cache_key), False
+        )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
-        try:
-            await self.entity_description.update_value(
-                self.get_cache(self.entity_description.cache_key), True
-            )
-        except RoborockException as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="update_options_failed",
-            ) from err
+        await self.entity_description.update_value(
+            self.get_cache(self.entity_description.cache_key), True
+        )
 
     @property
     def is_on(self) -> bool | None:
         """Return True if entity is on."""
-        status = self.get_cache(self.entity_description.cache_key).value.get(
-            self.entity_description.attribute
+        return (
+            self.get_cache(self.entity_description.cache_key).value.get(
+                self.entity_description.attribute
+            )
+            == 1
         )
-        if status is None:
-            return status
-        return bool(status)

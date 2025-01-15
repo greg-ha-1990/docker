@@ -44,7 +44,7 @@ def uninstall_osx():
     print("Home Assistant has been uninstalled.")
 
 
-def run(args: list[str]) -> int:
+def run(args):
     """Handle OSX commandline script."""
     commands = "install", "uninstall", "restart"
     if not args or args[0] not in commands:
@@ -63,5 +63,3 @@ def run(args: list[str]) -> int:
         time.sleep(0.5)
         install_osx()
         return 0
-
-    raise ValueError(f"Invalid command {args[0]}")

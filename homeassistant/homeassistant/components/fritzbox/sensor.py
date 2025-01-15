@@ -30,8 +30,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util.dt import utc_from_timestamp
 
+from . import FritzBoxDeviceEntity
 from .coordinator import FritzboxConfigEntry
-from .entity import FritzBoxDeviceEntity
 from .model import FritzEntityDescriptionMixinBase
 
 
@@ -83,36 +83,18 @@ def entity_category_temperature(device: FritzhomeDevice) -> EntityCategory | Non
     return None
 
 
-def value_nextchange_preset(device: FritzhomeDevice) -> str | None:
+def value_nextchange_preset(device: FritzhomeDevice) -> str:
     """Return native value for next scheduled preset sensor."""
-    if not device.nextchange_endperiod:
-        return None
     if device.nextchange_temperature == device.eco_temperature:
         return PRESET_ECO
     return PRESET_COMFORT
 
 
-def value_scheduled_preset(device: FritzhomeDevice) -> str | None:
+def value_scheduled_preset(device: FritzhomeDevice) -> str:
     """Return native value for current scheduled preset sensor."""
-    if not device.nextchange_endperiod:
-        return None
     if device.nextchange_temperature == device.eco_temperature:
         return PRESET_COMFORT
     return PRESET_ECO
-
-
-def value_nextchange_temperature(device: FritzhomeDevice) -> float | None:
-    """Return native value for next scheduled temperature time sensor."""
-    if device.nextchange_endperiod and isinstance(device.nextchange_temperature, float):
-        return device.nextchange_temperature
-    return None
-
-
-def value_nextchange_time(device: FritzhomeDevice) -> datetime | None:
-    """Return native value for next scheduled changed time sensor."""
-    if device.nextchange_endperiod:
-        return utc_from_timestamp(device.nextchange_endperiod)
-    return None
 
 
 SENSOR_TYPES: Final[tuple[FritzSensorEntityDescription, ...]] = (
@@ -199,7 +181,7 @@ SENSOR_TYPES: Final[tuple[FritzSensorEntityDescription, ...]] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.DIAGNOSTIC,
         suitable=suitable_nextchange_temperature,
-        native_value=value_nextchange_temperature,
+        native_value=lambda device: device.nextchange_temperature,
     ),
     FritzSensorEntityDescription(
         key="nextchange_time",
@@ -207,7 +189,7 @@ SENSOR_TYPES: Final[tuple[FritzSensorEntityDescription, ...]] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         suitable=suitable_nextchange_time,
-        native_value=value_nextchange_time,
+        native_value=lambda device: utc_from_timestamp(device.nextchange_endperiod),
     ),
     FritzSensorEntityDescription(
         key="nextchange_preset",

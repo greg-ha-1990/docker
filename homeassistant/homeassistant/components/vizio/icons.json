@@ -1,7 +1,5 @@
 {
   "services": {
-    "update_setting": {
-      "service": "mdi:cog"
-    }
+    "update_setting": "mdi:cog"
   }
 }

@@ -1,1 +1,1 @@
-"""Component to integrate the Cisco Webex cloud."""
+"""Component to integrate the Cisco Webex Teams cloud."""

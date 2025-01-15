@@ -27,17 +27,11 @@
       "reset_lifespan_side_brush": {
         "default": "mdi:broom"
       },
-      "reset_lifespan_station_filter": {
-        "default": "mdi:air-filter"
-      },
       "reset_lifespan_unit_care": {
         "default": "mdi:robot-vacuum"
       },
       "reset_lifespan_round_mop": {
         "default": "mdi:broom"
-      },
-      "station_action_empty_dustbin": {
-        "default": "mdi:delete-restore"
       }
     },
     "event": {
@@ -48,9 +42,6 @@
     "number": {
       "clean_count": {
         "default": "mdi:counter"
-      },
-      "cut_direction": {
-        "default": "mdi:angle-acute"
       },
       "volume": {
         "default": "mdi:volume-high",
@@ -78,9 +69,6 @@
       "lifespan_side_brush": {
         "default": "mdi:broom"
       },
-      "lifespan_station_filter": {
-        "default": "mdi:air-filter"
-      },
       "lifespan_unit_care": {
         "default": "mdi:robot-vacuum"
       },
@@ -95,9 +83,6 @@
       },
       "network_ssid": {
         "default": "mdi:wifi"
-      },
-      "station_state": {
-        "default": "mdi:home"
       },
       "stats_area": {
         "default": "mdi:floor-plan"
@@ -154,11 +139,6 @@
       "true_detect": {
         "default": "mdi:laser-pointer"
       }
-    }
-  },
-  "services": {
-    "raw_get_positions": {
-      "service": "mdi:map-marker-radius-outline"
     }
   }
 }

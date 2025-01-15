@@ -12,13 +12,15 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import slugify
 
-from . import RoborockConfigEntry
+from .const import DOMAIN
 from .coordinator import RoborockDataUpdateCoordinator
-from .entity import RoborockCoordinatedEntityV1
+from .device import RoborockCoordinatedEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -69,36 +71,38 @@ BINARY_SENSOR_DESCRIPTIONS = [
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: RoborockConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Roborock vacuum binary sensors."""
+    coordinators: dict[str, RoborockDataUpdateCoordinator] = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
     async_add_entities(
         RoborockBinarySensorEntity(
+            f"{description.key}_{slugify(device_id)}",
             coordinator,
             description,
         )
-        for coordinator in config_entry.runtime_data.v1
+        for device_id, coordinator in coordinators.items()
         for description in BINARY_SENSOR_DESCRIPTIONS
         if description.value_fn(coordinator.roborock_device_info.props) is not None
     )
 
 
-class RoborockBinarySensorEntity(RoborockCoordinatedEntityV1, BinarySensorEntity):
+class RoborockBinarySensorEntity(RoborockCoordinatedEntity, BinarySensorEntity):
     """Representation of a Roborock binary sensor."""
 
     entity_description: RoborockBinarySensorDescription
 
     def __init__(
         self,
+        unique_id: str,
         coordinator: RoborockDataUpdateCoordinator,
         description: RoborockBinarySensorDescription,
     ) -> None:
         """Initialize the entity."""
-        super().__init__(
-            f"{description.key}_{coordinator.duid_slug}",
-            coordinator,
-        )
+        super().__init__(unique_id, coordinator)
         self.entity_description = description
 
     @property

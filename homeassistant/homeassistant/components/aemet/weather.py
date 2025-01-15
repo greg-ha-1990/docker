@@ -27,8 +27,9 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONDITIONS_MAP
-from .coordinator import AemetConfigEntry, WeatherUpdateCoordinator
+from . import AemetConfigEntry
+from .const import ATTRIBUTION, CONDITIONS_MAP
+from .coordinator import WeatherUpdateCoordinator
 from .entity import AemetEntity
 
 
@@ -42,10 +43,10 @@ async def async_setup_entry(
     name = domain_data.name
     weather_coordinator = domain_data.coordinator
 
-    unique_id = config_entry.unique_id
-    assert unique_id is not None
-
-    async_add_entities([AemetWeather(name, unique_id, weather_coordinator)])
+    async_add_entities(
+        [AemetWeather(name, config_entry.unique_id, weather_coordinator)],
+        False,
+    )
 
 
 class AemetWeather(
@@ -54,6 +55,7 @@ class AemetWeather(
 ):
     """Implementation of an AEMET OpenData weather."""
 
+    _attr_attribution = ATTRIBUTION
     _attr_native_precipitation_unit = UnitOfPrecipitationDepth.MILLIMETERS
     _attr_native_pressure_unit = UnitOfPressure.HPA
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
@@ -61,16 +63,16 @@ class AemetWeather(
     _attr_supported_features = (
         WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
     )
-    _attr_name = None
 
     def __init__(
         self,
-        name: str,
-        unique_id: str,
+        name,
+        unique_id,
         coordinator: WeatherUpdateCoordinator,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, name, unique_id)
+        super().__init__(coordinator)
+        self._attr_name = name
         self._attr_unique_id = unique_id
 
     @property

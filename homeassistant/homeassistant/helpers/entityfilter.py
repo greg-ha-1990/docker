@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import fnmatch
-from functools import lru_cache, partial
-import operator
+from functools import lru_cache
 import re
 
 import voluptuous as vol
@@ -196,7 +195,7 @@ def _generate_filter_from_sets_and_pattern_lists(
     # Case 1 - No filter
     # - All entities included
     if not have_include and not have_exclude:
-        return bool
+        return lambda entity_id: True
 
     # Case 2 - Only includes
     # - Entity listed in entities include: include
@@ -281,4 +280,4 @@ def _generate_filter_from_sets_and_pattern_lists(
     # Case 6 - No Domain and/or glob includes or excludes
     # - Entity listed in entities include: include
     # - Otherwise: exclude
-    return partial(operator.contains, include_e)
+    return lambda entity_id: entity_id in include_e

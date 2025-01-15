@@ -125,6 +125,7 @@ async def async_setup_entry(
             unique_id = f"{config_entry.unique_id}-{receiver_zone.zone}"
         else:
             unique_id = f"{config_entry.entry_id}-{receiver_zone.zone}"
+        await receiver_zone.async_setup()
         entities.append(
             DenonDevice(
                 receiver_zone,
@@ -151,7 +152,7 @@ async def async_setup_entry(
     )
     platform.async_register_entity_service(
         SERVICE_UPDATE_AUDYSSEY,
-        None,
+        {},
         f"async_{SERVICE_UPDATE_AUDYSSEY}",
     )
 
@@ -232,7 +233,7 @@ def async_log_errors[_DenonDeviceT: DenonDevice, **_P, _R](
             )
         finally:
             if available and not self.available:
-                _LOGGER.warning(
+                _LOGGER.info(
                     "Denon AVR receiver at host %s is available again",
                     self._receiver.host,
                 )
@@ -300,8 +301,6 @@ class DenonDevice(MediaPlayerEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up the entity."""
-        if self._receiver.telnet_connected:
-            await self._receiver.async_telnet_disconnect()
         self._receiver.unregister_callback(ALL_TELNET_EVENTS, self._telnet_callback)
 
     @async_log_errors

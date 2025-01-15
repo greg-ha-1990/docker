@@ -29,12 +29,11 @@ class SensiboDataUpdateCoordinator(DataUpdateCoordinator[SensiboData]):
 
     config_entry: SensiboConfigEntry
 
-    def __init__(self, hass: HomeAssistant, config_entry: SensiboConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the Sensibo coordinator."""
         super().__init__(
             hass,
             LOGGER,
-            config_entry=config_entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
             # We don't want an immediate refresh since the device

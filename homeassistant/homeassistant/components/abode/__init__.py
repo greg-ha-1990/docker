@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import partial
-from pathlib import Path
 
 from jaraco.abode.client import Client as Abode
-import jaraco.abode.config
 from jaraco.abode.exceptions import (
     AuthenticationException as AbodeAuthenticationException,
     Exception as AbodeException,
@@ -94,9 +92,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     polling = entry.data[CONF_POLLING]
-
-    # Configure abode library to use config directory for storing data
-    jaraco.abode.config.paths.override(user_data=Path(hass.config.path("Abode")))
 
     # For previous config entries where unique_id is None
     if entry.unique_id is None:

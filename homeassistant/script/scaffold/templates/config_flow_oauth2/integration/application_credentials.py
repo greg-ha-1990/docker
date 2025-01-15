@@ -1,9 +1,11 @@
-"""Application credentials platform for the NEW_NAME integration."""
+"""application_credentials platform the NEW_NAME integration."""
 
 from homeassistant.components.application_credentials import AuthorizationServer
 from homeassistant.core import HomeAssistant
 
-from .const import OAUTH2_AUTHORIZE, OAUTH2_TOKEN
+# TODO Update with your own urls
+OAUTH2_AUTHORIZE = "https://www.example.com/auth/authorize"
+OAUTH2_TOKEN = "https://www.example.com/auth/token"
 
 
 async def async_get_authorization_server(hass: HomeAssistant) -> AuthorizationServer:

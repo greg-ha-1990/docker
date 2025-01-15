@@ -50,7 +50,6 @@ HOMEKIT_ACCESSORY_DISPATCH = {
     ServicesTypes.FAN_V2: "fan",
     ServicesTypes.OCCUPANCY_SENSOR: "binary_sensor",
     ServicesTypes.TELEVISION: "media_player",
-    ServicesTypes.FAUCET: "switch",
     ServicesTypes.VALVE: "switch",
     ServicesTypes.CAMERA_RTP_STREAM_MANAGEMENT: "camera",
     ServicesTypes.DOORBELL: "event",

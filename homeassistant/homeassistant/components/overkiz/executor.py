@@ -6,7 +6,7 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 from pyoverkiz.enums import OverkizCommand, Protocol
-from pyoverkiz.exceptions import BaseOverkizException
+from pyoverkiz.exceptions import OverkizException
 from pyoverkiz.models import Command, Device, StateDefinition
 from pyoverkiz.types import StateType as OverkizStateType
 
@@ -81,14 +81,8 @@ class OverkizExecutor:
 
         return None
 
-    async def async_execute_command(
-        self, command_name: str, *args: Any, refresh_afterwards: bool = True
-    ) -> None:
-        """Execute device command in async context.
-
-        :param refresh_afterwards: Whether to refresh the device state after the command is executed.
-        If several commands are executed, it will be refreshed only once.
-        """
+    async def async_execute_command(self, command_name: str, *args: Any) -> None:
+        """Execute device command in async context."""
         parameters = [arg for arg in args if arg is not None]
         # Set the execution duration to 0 seconds for RTS devices on supported commands
         # Default execution duration is 30 seconds and will block consecutive commands
@@ -105,7 +99,7 @@ class OverkizExecutor:
                 "Home Assistant",
             )
         # Catch Overkiz exceptions to support `continue_on_error` functionality
-        except BaseOverkizException as exception:
+        except OverkizException as exception:
             raise HomeAssistantError(exception) from exception
 
         # ExecutionRegisteredEvent doesn't contain the device_url, thus we need to register it here
@@ -113,8 +107,8 @@ class OverkizExecutor:
             "device_url": self.device.device_url,
             "command_name": command_name,
         }
-        if refresh_afterwards:
-            await self.coordinator.async_refresh()
+
+        await self.coordinator.async_refresh()
 
     async def async_cancel_command(
         self, commands_to_cancel: list[OverkizCommand]

@@ -32,7 +32,7 @@ from .const import (
     MODELS_VACUUM_WITH_MOP,
     MODELS_VACUUM_WITH_SEPARATE_MOP,
 )
-from .entity import XiaomiCoordinatedMiioEntity
+from .device import XiaomiCoordinatedMiioEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,13 +56,13 @@ class XiaomiMiioBinarySensorDescription(BinarySensorEntityDescription):
 BINARY_SENSOR_TYPES = (
     XiaomiMiioBinarySensorDescription(
         key=ATTR_NO_WATER,
-        translation_key=ATTR_NO_WATER,
+        name="Water tank empty",
         icon="mdi:water-off-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     XiaomiMiioBinarySensorDescription(
         key=ATTR_WATER_TANK_DETACHED,
-        translation_key=ATTR_WATER_TANK_DETACHED,
+        name="Water tank",
         icon="mdi:car-coolant-level",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         value=lambda value: not value,
@@ -70,13 +70,13 @@ BINARY_SENSOR_TYPES = (
     ),
     XiaomiMiioBinarySensorDescription(
         key=ATTR_PTC_STATUS,
-        translation_key=ATTR_PTC_STATUS,
+        name="Auxiliary heat status",
         device_class=BinarySensorDeviceClass.POWER,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     XiaomiMiioBinarySensorDescription(
         key=ATTR_POWERSUPPLY_ATTACHED,
-        translation_key=ATTR_POWERSUPPLY_ATTACHED,
+        name="Power supply",
         device_class=BinarySensorDeviceClass.PLUG,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -88,7 +88,7 @@ FAN_ZA5_BINARY_SENSORS = (ATTR_POWERSUPPLY_ATTACHED,)
 VACUUM_SENSORS = {
     ATTR_MOP_ATTACHED: XiaomiMiioBinarySensorDescription(
         key=ATTR_WATER_BOX_ATTACHED,
-        translation_key=ATTR_WATER_BOX_ATTACHED,
+        name="Mop attached",
         icon="mdi:square-rounded",
         parent_key=VacuumCoordinatorDataAttributes.status,
         entity_registry_enabled_default=True,
@@ -97,7 +97,7 @@ VACUUM_SENSORS = {
     ),
     ATTR_WATER_BOX_ATTACHED: XiaomiMiioBinarySensorDescription(
         key=ATTR_WATER_BOX_ATTACHED,
-        translation_key=ATTR_WATER_BOX_ATTACHED,
+        name="Water box attached",
         icon="mdi:water",
         parent_key=VacuumCoordinatorDataAttributes.status,
         entity_registry_enabled_default=True,
@@ -106,7 +106,7 @@ VACUUM_SENSORS = {
     ),
     ATTR_WATER_SHORTAGE: XiaomiMiioBinarySensorDescription(
         key=ATTR_WATER_SHORTAGE,
-        translation_key=ATTR_WATER_SHORTAGE,
+        name="Water shortage",
         icon="mdi:water",
         parent_key=VacuumCoordinatorDataAttributes.status,
         entity_registry_enabled_default=True,
@@ -119,7 +119,7 @@ VACUUM_SENSORS_SEPARATE_MOP = {
     **VACUUM_SENSORS,
     ATTR_MOP_ATTACHED: XiaomiMiioBinarySensorDescription(
         key=ATTR_MOP_ATTACHED,
-        translation_key=ATTR_MOP_ATTACHED,
+        name="Mop attached",
         icon="mdi:square-rounded",
         parent_key=VacuumCoordinatorDataAttributes.status,
         entity_registry_enabled_default=True,
@@ -190,8 +190,7 @@ async def async_setup_entry(
         elif model in MODELS_HUMIDIFIER_MJJSQ:
             sensors = HUMIDIFIER_MJJSQ_BINARY_SENSORS
         elif model in MODELS_VACUUM:
-            _setup_vacuum_sensors(hass, config_entry, async_add_entities)
-            return
+            return _setup_vacuum_sensors(hass, config_entry, async_add_entities)
 
         for description in BINARY_SENSOR_TYPES:
             if description.key not in sensors:

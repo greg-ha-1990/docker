@@ -12,7 +12,7 @@
           "longitude": "[%key:common::config_flow::data::longitude%]"
         }
       },
-      "reconfigure": {
+      "reconfigure_confirm": {
         "title": "Reconfigure your location in Sweden",
         "data": {
           "latitude": "[%key:common::config_flow::data::latitude%]",

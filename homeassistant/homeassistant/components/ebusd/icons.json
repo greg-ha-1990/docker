@@ -1,7 +1,5 @@
 {
   "services": {
-    "write": {
-      "service": "mdi:pencil"
-    }
+    "write": "mdi:pencil"
   }
 }

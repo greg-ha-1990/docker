@@ -15,6 +15,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -22,7 +23,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util.dt import utcnow
 
-from . import WhirlpoolConfigEntry
+from . import WhirlpoolData
 from .const import DOMAIN
 
 TANK_FILL = {
@@ -131,12 +132,12 @@ SENSOR_TIMER: tuple[SensorEntityDescription] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: WhirlpoolConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Config flow entry for Whrilpool Laundry."""
     entities: list = []
-    whirlpool_data = config_entry.runtime_data
+    whirlpool_data: WhirlpoolData = hass.data[DOMAIN][config_entry.entry_id]
     for appliance in whirlpool_data.appliances_manager.washer_dryers:
         _wd = WasherDryer(
             whirlpool_data.backend_selector,

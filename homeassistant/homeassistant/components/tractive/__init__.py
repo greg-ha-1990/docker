@@ -132,11 +132,11 @@ async def _generate_trackables(
     trackable = await trackable.details()
 
     # Check that the pet has tracker linked.
-    if not trackable.get("device_id"):
+    if not trackable["device_id"]:
         return None
 
     if "details" not in trackable:
-        _LOGGER.warning(
+        _LOGGER.info(
             "Tracker %s has no details and will be skipped. This happens for shared trackers",
             trackable["device_id"],
         )
@@ -149,9 +149,11 @@ async def _generate_trackables(
     )
 
     if not tracker_details.get("_id"):
-        raise ConfigEntryNotReady(
-            f"Tractive API returns incomplete data for tracker {trackable['device_id']}",
+        _LOGGER.info(
+            "Tractive API returns incomplete data for tracker %s",
+            trackable["device_id"],
         )
+        raise ConfigEntryNotReady
 
     return Trackables(tracker, trackable, tracker_details, hw_info, pos_report)
 

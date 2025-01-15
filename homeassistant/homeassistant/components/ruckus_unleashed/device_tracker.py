@@ -1,10 +1,10 @@
-"""Support for Ruckus devices."""
+"""Support for Ruckus Unleashed devices."""
 
 from __future__ import annotations
 
 import logging
 
-from homeassistant.components.device_tracker import ScannerEntity
+from homeassistant.components.device_tracker import ScannerEntity, SourceType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -19,7 +19,7 @@ from .const import (
     KEY_SYS_CLIENTS,
     UNDO_UPDATE_LISTENERS,
 )
-from .coordinator import RuckusDataUpdateCoordinator
+from .coordinator import RuckusUnleashedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -27,7 +27,7 @@ _LOGGER = logging.getLogger(__package__)
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up device tracker for Ruckus component."""
+    """Set up device tracker for Ruckus Unleashed component."""
     coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
 
     tracked: set[str] = set()
@@ -58,7 +58,9 @@ def add_new_entities(coordinator, async_add_entities, tracked):
 
         device = coordinator.data[KEY_SYS_CLIENTS][mac]
         _LOGGER.debug("adding new device: [%s] %s", mac, device[API_CLIENT_HOSTNAME])
-        new_tracked.append(RuckusDevice(coordinator, mac, device[API_CLIENT_HOSTNAME]))
+        new_tracked.append(
+            RuckusUnleashedDevice(coordinator, mac, device[API_CLIENT_HOSTNAME])
+        )
         tracked.add(mac)
 
     async_add_entities(new_tracked)
@@ -67,13 +69,13 @@ def add_new_entities(coordinator, async_add_entities, tracked):
 @callback
 def restore_entities(
     registry: er.EntityRegistry,
-    coordinator: RuckusDataUpdateCoordinator,
+    coordinator: RuckusUnleashedDataUpdateCoordinator,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
     tracked: set[str],
 ) -> None:
     """Restore clients that are not a part of active clients list."""
-    missing: list[RuckusDevice] = []
+    missing: list[RuckusUnleashedDevice] = []
 
     for entity in registry.entities.get_entries_for_config_entry_id(entry.entry_id):
         if (
@@ -81,7 +83,9 @@ def restore_entities(
             and entity.unique_id not in coordinator.data[KEY_SYS_CLIENTS]
         ):
             missing.append(
-                RuckusDevice(coordinator, entity.unique_id, entity.original_name)
+                RuckusUnleashedDevice(
+                    coordinator, entity.unique_id, entity.original_name
+                )
             )
             tracked.add(entity.unique_id)
 
@@ -89,11 +93,11 @@ def restore_entities(
     async_add_entities(missing)
 
 
-class RuckusDevice(CoordinatorEntity, ScannerEntity):
-    """Representation of a Ruckus client."""
+class RuckusUnleashedDevice(CoordinatorEntity, ScannerEntity):
+    """Representation of a Ruckus Unleashed client."""
 
     def __init__(self, coordinator, mac, name) -> None:
-        """Initialize a Ruckus client."""
+        """Initialize a Ruckus Unleashed client."""
         super().__init__(coordinator)
         self._mac = mac
         self._name = name
@@ -121,3 +125,8 @@ class RuckusDevice(CoordinatorEntity, ScannerEntity):
     def is_connected(self) -> bool:
         """Return true if the device is connected to the network."""
         return self._mac in self.coordinator.data[KEY_SYS_CLIENTS]
+
+    @property
+    def source_type(self) -> SourceType:
+        """Return the source type."""
+        return SourceType.ROUTER

@@ -17,9 +17,6 @@
       },
       "power_failure_alarm_beep": {
         "default": "mdi:bullhorn"
-      },
-      "water_meter_reading": {
-        "default": "mdi:gauge"
       }
     },
     "switch": {
@@ -29,8 +26,6 @@
     }
   },
   "services": {
-    "play_on_speaker_hub": {
-      "service": "mdi:speaker"
-    }
+    "play_on_speaker_hub": "mdi:speaker"
   }
 }

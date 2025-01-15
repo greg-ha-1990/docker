@@ -15,9 +15,3 @@ DEFAULT_PORT = 8060
 
 # Services
 SERVICE_SEARCH = "search"
-
-# Config
-CONF_PLAY_MEDIA_APP_ID = "play_media_app_id"
-
-# Defaults
-DEFAULT_PLAY_MEDIA_APP_ID = "15985"

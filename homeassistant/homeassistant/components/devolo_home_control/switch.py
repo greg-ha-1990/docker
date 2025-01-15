@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DevoloHomeControlConfigEntry
-from .entity import DevoloDeviceEntity
+from .devolo_device import DevoloDeviceEntity
 
 
 async def async_setup_entry(

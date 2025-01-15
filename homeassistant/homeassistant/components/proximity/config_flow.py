@@ -23,7 +23,6 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
 )
-from homeassistant.helpers.typing import VolDictType
 from homeassistant.util import slugify
 
 from .const import (
@@ -38,7 +37,7 @@ from .const import (
 RESULT_SUCCESS = "success"
 
 
-def _base_schema(user_input: dict[str, Any]) -> VolDictType:
+def _base_schema(user_input: dict[str, Any]) -> vol.Schema:
     return {
         vol.Required(
             CONF_TRACKED_ENTITIES, default=user_input.get(CONF_TRACKED_ENTITIES, [])
@@ -89,7 +88,7 @@ class ProximityConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return ProximityOptionsFlow()
+        return ProximityOptionsFlow(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -117,9 +116,19 @@ class ProximityConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._user_form_schema(user_input),
         )
 
+    async def async_step_import(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Import a yaml config entry."""
+        return await self.async_step_user(user_input)
+
 
 class ProximityOptionsFlow(OptionsFlow):
     """Handle a option flow."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
 
     def _user_form_schema(self, user_input: dict[str, Any]) -> vol.Schema:
         return vol.Schema(_base_schema(user_input))

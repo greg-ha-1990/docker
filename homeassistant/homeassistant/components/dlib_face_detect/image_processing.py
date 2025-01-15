@@ -6,16 +6,15 @@ import io
 
 import face_recognition
 
-from homeassistant.components.image_processing import (
-    PLATFORM_SCHEMA as IMAGE_PROCESSING_PLATFORM_SCHEMA,
-    ImageProcessingFaceEntity,
-)
+from homeassistant.components.image_processing import ImageProcessingFaceEntity
 from homeassistant.const import ATTR_LOCATION, CONF_ENTITY_ID, CONF_NAME, CONF_SOURCE
 from homeassistant.core import HomeAssistant, split_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-PLATFORM_SCHEMA = IMAGE_PROCESSING_PLATFORM_SCHEMA
+from homeassistant.components.image_processing import (  # noqa: F401, isort:skip
+    PLATFORM_SCHEMA,
+)
 
 
 def setup_platform(

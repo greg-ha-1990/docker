@@ -23,7 +23,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CURRENCY_EUR, DOMAIN, VOLUME_CM3, VOLUME_LMIN
 from .coordinator import ToonDataUpdateCoordinator
-from .entity import (
+from .models import (
     ToonBoilerDeviceEntity,
     ToonDisplayDeviceEntity,
     ToonElectricityMeterDeviceEntity,

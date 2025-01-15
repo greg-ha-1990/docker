@@ -102,7 +102,15 @@ class AbodeFlowHandler(ConfigFlow, domain=DOMAIN):
         existing_entry = await self.async_set_unique_id(self._username)
 
         if existing_entry:
-            return self.async_update_reload_and_abort(existing_entry, data=config_data)
+            self.hass.config_entries.async_update_entry(
+                existing_entry, data=config_data
+            )
+            # Reload the Abode config entry otherwise devices will remain unavailable
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(existing_entry.entry_id)
+            )
+
+            return self.async_abort(reason="reauth_successful")
 
         return self.async_create_entry(
             title=cast(str, self._username), data=config_data
@@ -112,6 +120,9 @@ class AbodeFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
+
         if user_input is None:
             return self.async_show_form(
                 step_id="user", data_schema=vol.Schema(self.data_schema)

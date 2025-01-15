@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from asyncio import timeout
-from dataclasses import dataclass
 from datetime import timedelta
 import logging
 from typing import Any, Final, cast
@@ -20,7 +19,6 @@ from aemet_opendata.helpers import dict_nested_value
 from aemet_opendata.interface import AEMET
 
 from homeassistant.components.weather import Forecast
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -31,16 +29,6 @@ _LOGGER = logging.getLogger(__name__)
 API_TIMEOUT: Final[int] = 120
 WEATHER_UPDATE_INTERVAL = timedelta(minutes=10)
 
-type AemetConfigEntry = ConfigEntry[AemetData]
-
-
-@dataclass
-class AemetData:
-    """Aemet runtime data."""
-
-    name: str
-    coordinator: WeatherUpdateCoordinator
-
 
 class WeatherUpdateCoordinator(DataUpdateCoordinator):
     """Weather data update coordinator."""
@@ -48,7 +36,6 @@ class WeatherUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: AemetConfigEntry,
         aemet: AEMET,
     ) -> None:
         """Initialize coordinator."""
@@ -57,7 +44,6 @@ class WeatherUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            config_entry=entry,
             name=DOMAIN,
             update_interval=WEATHER_UPDATE_INTERVAL,
         )

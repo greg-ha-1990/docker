@@ -21,8 +21,6 @@ from .coordinator import PlugwiseDataUpdateCoordinator
 from .entity import PlugwiseEntity
 from .util import plugwise_command
 
-PARALLEL_UPDATES = 0
-
 
 @dataclass(frozen=True)
 class PlugwiseSwitchEntityDescription(SwitchEntityDescription):
@@ -50,6 +48,7 @@ SWITCHES: tuple[PlugwiseSwitchEntityDescription, ...] = (
     PlugwiseSwitchEntityDescription(
         key="cooling_ena_switch",
         translation_key="cooling_ena_switch",
+        name="Cooling",
         entity_category=EntityCategory.CONFIG,
     ),
 )
@@ -69,16 +68,22 @@ async def async_setup_entry(
         if not coordinator.new_devices:
             return
 
-        async_add_entities(
-            PlugwiseSwitchEntity(coordinator, device_id, description)
-            for device_id in coordinator.new_devices
-            if (switches := coordinator.data.devices[device_id].get("switches"))
-            for description in SWITCHES
-            if description.key in switches
-        )
+        entities: list[PlugwiseSwitchEntity] = []
+        for device_id, device in coordinator.data.devices.items():
+            if not (switches := device.get("switches")):
+                continue
+            for description in SWITCHES:
+                if description.key not in switches:
+                    continue
+                entities.append(
+                    PlugwiseSwitchEntity(coordinator, device_id, description)
+                )
+
+        async_add_entities(entities)
+
+    entry.async_on_unload(coordinator.async_add_listener(_add_entities))
 
     _add_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_entities))
 
 
 class PlugwiseSwitchEntity(PlugwiseEntity, SwitchEntity):
@@ -94,8 +99,8 @@ class PlugwiseSwitchEntity(PlugwiseEntity, SwitchEntity):
     ) -> None:
         """Set up the Plugwise API."""
         super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{device_id}-{description.key}"
         self.entity_description = description
+        self._attr_unique_id = f"{device_id}-{description.key}"
 
     @property
     def is_on(self) -> bool:

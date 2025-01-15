@@ -1,7 +1,5 @@
 {
   "services": {
-    "transfer": {
-      "service": "mdi:monitor-multiple"
-    }
+    "transfer": "mdi:monitor-multiple"
   }
 }

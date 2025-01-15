@@ -18,7 +18,7 @@ from .const import (
     MODEL_AIRQUALITYMONITOR_S1,
     MODEL_AIRQUALITYMONITOR_V1,
 )
-from .entity import XiaomiMiioEntity
+from .device import XiaomiMiioEntity
 
 _LOGGER = logging.getLogger(__name__)
 

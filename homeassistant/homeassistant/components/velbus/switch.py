@@ -5,26 +5,23 @@ from typing import Any
 from velbusaio.channels import Relay as VelbusRelay
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import VelbusConfigEntry
+from .const import DOMAIN
 from .entity import VelbusEntity, api_call
-
-PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: VelbusConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Velbus switch based on config_entry."""
-    await entry.runtime_data.scan_task
-    async_add_entities(
-        VelbusSwitch(channel)
-        for channel in entry.runtime_data.controller.get_all_switch()
-    )
+    await hass.data[DOMAIN][entry.entry_id]["tsk"]
+    cntrl = hass.data[DOMAIN][entry.entry_id]["cntrl"]
+    async_add_entities(VelbusSwitch(channel) for channel in cntrl.get_all("switch"))
 
 
 class VelbusSwitch(VelbusEntity, SwitchEntity):

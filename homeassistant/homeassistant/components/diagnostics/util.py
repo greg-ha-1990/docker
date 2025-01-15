@@ -11,7 +11,8 @@ from .const import REDACTED
 
 
 @overload
-def async_redact_data(data: Mapping, to_redact: Iterable[Any]) -> dict: ...
+def async_redact_data(data: Mapping, to_redact: Iterable[Any]) -> dict:  # type: ignore[overload-overlap]
+    ...
 
 
 @overload

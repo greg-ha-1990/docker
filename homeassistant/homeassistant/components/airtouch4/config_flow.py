@@ -1,11 +1,9 @@
 """Config flow for AirTouch4."""
 
-from typing import Any
-
 from airtouch4pyapi import AirTouch, AirTouchStatus
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_HOST
 
 from .const import DOMAIN
@@ -18,9 +16,7 @@ class AirtouchConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)

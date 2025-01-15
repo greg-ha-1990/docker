@@ -5,14 +5,8 @@
     }
   },
   "services": {
-    "toggle": {
-      "service": "mdi:lightbulb"
-    },
-    "turn_off": {
-      "service": "mdi:lightbulb-off"
-    },
-    "turn_on": {
-      "service": "mdi:lightbulb-on"
-    }
+    "toggle": "mdi:lightbulb",
+    "turn_off": "mdi:lightbulb-off",
+    "turn_on": "mdi:lightbulb-on"
   }
 }

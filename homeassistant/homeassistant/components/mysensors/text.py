@@ -9,9 +9,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import setup_mysensors_platform
+from .. import mysensors
 from .const import MYSENSORS_DISCOVERY, DiscoveryInfo
-from .entity import MySensorsChildEntity
+from .device import MySensorsChildEntity
 from .helpers import on_unload
 
 
@@ -25,7 +25,7 @@ async def async_setup_entry(
     @callback
     def async_discover(discovery_info: DiscoveryInfo) -> None:
         """Discover and add a MySensors text entity."""
-        setup_mysensors_platform(
+        mysensors.setup_mysensors_platform(
             hass,
             Platform.TEXT,
             discovery_info,

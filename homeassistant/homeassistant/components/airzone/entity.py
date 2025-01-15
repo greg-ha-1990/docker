@@ -31,7 +31,6 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import AirzoneConfigEntry
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import AirzoneUpdateCoordinator
 
@@ -54,7 +53,7 @@ class AirzoneSystemEntity(AirzoneEntity):
     def __init__(
         self,
         coordinator: AirzoneUpdateCoordinator,
-        entry: AirzoneConfigEntry,
+        entry: ConfigEntry,
         system_data: dict[str, Any],
     ) -> None:
         """Initialize."""

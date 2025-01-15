@@ -54,8 +54,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up climate device."""
     if get_device_entry_gen(config_entry) in RPC_GENERATIONS:
-        async_setup_rpc_entry(hass, config_entry, async_add_entities)
-        return
+        return async_setup_rpc_entry(hass, config_entry, async_add_entities)
 
     coordinator = config_entry.runtime_data.block
     assert coordinator
@@ -172,6 +171,7 @@ class BlockSleepingClimate(
     )
     _attr_target_temperature_step = SHTRV_01_TEMPERATURE_SETTINGS["step"]
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self,
@@ -455,6 +455,7 @@ class RpcClimate(ShellyRpcEntity, ClimateEntity):
     )
     _attr_target_temperature_step = RPC_THERMOSTAT_SETTINGS["step"]
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, coordinator: ShellyRpcCoordinator, id_: int) -> None:
         """Initialize."""
@@ -467,10 +468,6 @@ class RpcClimate(ShellyRpcEntity, ClimateEntity):
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL]
         else:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-        self._humidity_key: str | None = None
-        # Check if there is a corresponding humidity key for the thermostat ID
-        if (humidity_key := f"humidity:{id_}") in self.coordinator.device.status:
-            self._humidity_key = humidity_key
 
     @property
     def target_temperature(self) -> float | None:
@@ -481,14 +478,6 @@ class RpcClimate(ShellyRpcEntity, ClimateEntity):
     def current_temperature(self) -> float | None:
         """Return current temperature."""
         return cast(float, self.status["current_C"])
-
-    @property
-    def current_humidity(self) -> float | None:
-        """Return current humidity."""
-        if self._humidity_key is None:
-            return None
-
-        return cast(float, self.coordinator.device.status[self._humidity_key]["rh"])
 
     @property
     def hvac_mode(self) -> HVACMode:

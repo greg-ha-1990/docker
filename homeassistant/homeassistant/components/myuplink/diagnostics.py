@@ -4,22 +4,25 @@ from __future__ import annotations
 
 from typing import Any
 
+from myuplink import MyUplinkAPI
+
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import MyUplinkConfigEntry
+from .const import DOMAIN
 
 TO_REDACT = {"access_token", "refresh_token", "serialNumber"}
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, config_entry: MyUplinkConfigEntry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry.
 
     Pick up fresh data from API and dump it.
     """
-    api = config_entry.runtime_data.api
+    api: MyUplinkAPI = hass.data[DOMAIN][config_entry.entry_id].api
     myuplink_data = {}
     myuplink_data["my_systems"] = await api.async_get_systems_json()
     myuplink_data["my_systems"]["devices"] = []

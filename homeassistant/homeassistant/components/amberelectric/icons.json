@@ -13,14 +13,6 @@
       "renewables": {
         "default": "mdi:solar-power"
       }
-    },
-    "binary_sensor": {
-      "demand_window": {
-        "default": "mdi:meter-electric",
-        "state": {
-          "off": "mdi:meter-electric-outline"
-        }
-      }
     }
   }
 }

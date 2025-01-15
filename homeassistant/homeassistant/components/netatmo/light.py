@@ -173,9 +173,7 @@ class NetatmoLight(NetatmoModuleEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn light on."""
         if ATTR_BRIGHTNESS in kwargs:
-            await self.device.async_set_brightness(
-                round(kwargs[ATTR_BRIGHTNESS] / 2.55)
-            )
+            await self.device.async_set_brightness(kwargs[ATTR_BRIGHTNESS])
 
         else:
             await self.device.async_on()
@@ -196,6 +194,6 @@ class NetatmoLight(NetatmoModuleEntity, LightEntity):
 
         if (brightness := self.device.brightness) is not None:
             # Netatmo uses a range of [0, 100] to control brightness
-            self._attr_brightness = round(brightness * 2.55)
+            self._attr_brightness = round((brightness / 100) * 255)
         else:
             self._attr_brightness = None

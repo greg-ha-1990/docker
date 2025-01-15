@@ -55,6 +55,7 @@ COMPONENTS_WITH_CONFIG_ENTRY_DEMO_PLATFORM = [
 
 COMPONENTS_WITH_DEMO_PLATFORM = [
     Platform.TTS,
+    Platform.MAILBOX,
     Platform.IMAGE_PROCESSING,
     Platform.DEVICE_TRACKER,
 ]
@@ -64,11 +65,12 @@ CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the demo environment."""
-    hass.async_create_task(
-        hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_IMPORT}, data={}
+    if not hass.config_entries.async_entries(DOMAIN):
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": config_entries.SOURCE_IMPORT}, data={}
+            )
         )
-    )
 
     if DOMAIN not in config:
         return True

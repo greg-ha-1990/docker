@@ -1,7 +1,5 @@
 {
   "services": {
-    "download_file": {
-      "service": "mdi:download"
-    }
+    "download_file": "mdi:download"
   }
 }

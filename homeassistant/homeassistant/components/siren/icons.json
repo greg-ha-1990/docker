@@ -5,14 +5,8 @@
     }
   },
   "services": {
-    "toggle": {
-      "service": "mdi:bullhorn"
-    },
-    "turn_off": {
-      "service": "mdi:bullhorn"
-    },
-    "turn_on": {
-      "service": "mdi:bullhorn"
-    }
+    "toggle": "mdi:bullhorn",
+    "turn_off": "mdi:bullhorn",
+    "turn_on": "mdi:bullhorn"
   }
 }

@@ -48,7 +48,6 @@ set_options:
       required: true
       example: '["Item A", "Item B", "Item C"]'
       selector:
-        text:
-          multiple: true
+        object:
 
 reload:

@@ -62,14 +62,6 @@
     }
   },
   "entity": {
-    "button": {
-      "go_favorite": {
-        "name": "Go to favorite position"
-      },
-      "set_favorite": {
-        "name": "Set current position as favorite"
-      }
-    },
     "cover": {
       "top": {
         "name": "Top"

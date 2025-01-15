@@ -5,8 +5,6 @@
     }
   },
   "services": {
-    "set_value": {
-      "service": "mdi:form-textbox"
-    }
+    "set_value": "mdi:form-textbox"
   }
 }

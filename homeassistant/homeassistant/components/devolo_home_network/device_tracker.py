@@ -8,18 +8,19 @@ from devolo_plc_api.device_api import ConnectedStationInfo
 from homeassistant.components.device_tracker import (
     DOMAIN as DEVICE_TRACKER_DOMAIN,
     ScannerEntity,
+    SourceType,
 )
 from homeassistant.const import STATE_UNKNOWN, UnitOfFrequency
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from . import DevoloHomeNetworkConfigEntry
 from .const import CONNECTED_WIFI_CLIENTS, DOMAIN, WIFI_APTYPE, WIFI_BANDS
-from .coordinator import DevoloDataUpdateCoordinator
-
-PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -29,7 +30,7 @@ async def async_setup_entry(
 ) -> None:
     """Get all devices and sensors and setup them via config entry."""
     device = entry.runtime_data.device
-    coordinators: dict[str, DevoloDataUpdateCoordinator[list[ConnectedStationInfo]]] = (
+    coordinators: dict[str, DataUpdateCoordinator[list[ConnectedStationInfo]]] = (
         entry.runtime_data.coordinators
     )
     registry = er.async_get(hass)
@@ -49,7 +50,7 @@ async def async_setup_entry(
                 )
             )
             tracked.add(station.mac_address)
-        async_add_entities(new_entities)
+            async_add_entities(new_entities)
 
     @callback
     def restore_entities() -> None:
@@ -81,23 +82,21 @@ async def async_setup_entry(
     )
 
 
-# The pylint disable is needed because of https://github.com/pylint-dev/pylint/issues/9138
-class DevoloScannerEntity(  # pylint: disable=hass-enforce-class-module
-    CoordinatorEntity[DevoloDataUpdateCoordinator[list[ConnectedStationInfo]]],
-    ScannerEntity,
+class DevoloScannerEntity(
+    CoordinatorEntity[DataUpdateCoordinator[list[ConnectedStationInfo]]], ScannerEntity
 ):
     """Representation of a devolo device tracker."""
 
     def __init__(
         self,
-        coordinator: DevoloDataUpdateCoordinator[list[ConnectedStationInfo]],
+        coordinator: DataUpdateCoordinator[list[ConnectedStationInfo]],
         device: Device,
         mac: str,
     ) -> None:
         """Initialize entity."""
         super().__init__(coordinator)
         self._device = device
-        self._attr_mac_address = mac
+        self._mac = mac
 
     @property
     def extra_state_attributes(self) -> dict[str, str]:
@@ -140,6 +139,16 @@ class DevoloScannerEntity(  # pylint: disable=hass-enforce-class-module
         )
 
     @property
+    def mac_address(self) -> str:
+        """Return mac_address."""
+        return self._mac
+
+    @property
+    def source_type(self) -> SourceType:
+        """Return tracker source type."""
+        return SourceType.ROUTER
+
+    @property
     def unique_id(self) -> str:
         """Return unique ID of the entity."""
-        return f"{self._device.serial_number}_{self.mac_address}"
+        return f"{self._device.serial_number}_{self._mac}"

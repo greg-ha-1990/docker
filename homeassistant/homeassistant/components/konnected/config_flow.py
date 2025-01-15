@@ -177,9 +177,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     # class variable to store/share discovered host information
-    DISCOVERED_HOSTS: dict[str, dict[str, Any]] = {}
-
-    unique_id: str
+    discovered_hosts: dict[str, dict[str, Any]] = {}
 
     def __init__(self) -> None:
         """Initialize the Konnected flow."""
@@ -204,24 +202,24 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
             random.choices(f"{string.ascii_uppercase}{string.digits}", k=20)
         )
 
-    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+    async def async_step_import(self, device_config):
         """Import a configuration.yaml config.
 
         This flow is triggered by `async_setup` for configured panels.
         """
-        _LOGGER.debug(import_data)
+        _LOGGER.debug(device_config)
 
         # save the data and confirm connection via user step
-        await self.async_set_unique_id(import_data["id"])
-        self.options = import_data[CONF_DEFAULT_OPTIONS]
+        await self.async_set_unique_id(device_config["id"])
+        self.options = device_config[CONF_DEFAULT_OPTIONS]
 
         # config schema ensures we have port if we have host
-        if import_data.get(CONF_HOST):
+        if device_config.get(CONF_HOST):
             # automatically connect if we have host info
             return await self.async_step_user(
                 user_input={
-                    CONF_HOST: import_data[CONF_HOST],
-                    CONF_PORT: import_data[CONF_PORT],
+                    CONF_HOST: device_config[CONF_HOST],
+                    CONF_PORT: device_config[CONF_PORT],
                 }
             )
 
@@ -229,9 +227,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         return await self.async_step_import_confirm()
 
-    async def async_step_import_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_import_confirm(self, user_input=None):
         """Confirm the user wants to import the config entry."""
         if user_input is None:
             return self.async_show_form(
@@ -240,13 +236,13 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
             )
 
         # if we have ssdp discovered applicable host info use it
-        if KonnectedFlowHandler.DISCOVERED_HOSTS.get(self.unique_id):
+        if KonnectedFlowHandler.discovered_hosts.get(self.unique_id):
             return await self.async_step_user(
                 user_input={
-                    CONF_HOST: KonnectedFlowHandler.DISCOVERED_HOSTS[self.unique_id][
+                    CONF_HOST: KonnectedFlowHandler.discovered_hosts[self.unique_id][
                         CONF_HOST
                     ],
-                    CONF_PORT: KonnectedFlowHandler.DISCOVERED_HOSTS[self.unique_id][
+                    CONF_PORT: KonnectedFlowHandler.discovered_hosts[self.unique_id][
                         CONF_PORT
                     ],
                 }
@@ -299,7 +295,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
             self.data[CONF_ID] = status.get("chipId", status["mac"].replace(":", ""))
             self.data[CONF_MODEL] = status.get("model", KONN_MODEL)
 
-            KonnectedFlowHandler.DISCOVERED_HOSTS[self.data[CONF_ID]] = {
+            KonnectedFlowHandler.discovered_hosts[self.data[CONF_ID]] = {
                 CONF_HOST: self.data[CONF_HOST],
                 CONF_PORT: self.data[CONF_PORT],
             }
@@ -307,9 +303,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_abort(reason="unknown")
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Connect to panel and get config."""
         errors = {}
         if user_input:
@@ -332,7 +326,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
                 self.data[CONF_MODEL] = status.get("model", KONN_MODEL)
 
                 # save off our discovered host info
-                KonnectedFlowHandler.DISCOVERED_HOSTS[self.data[CONF_ID]] = {
+                KonnectedFlowHandler.discovered_hosts[self.data[CONF_ID]] = {
                     CONF_HOST: self.data[CONF_HOST],
                     CONF_PORT: self.data[CONF_PORT],
                 }
@@ -353,9 +347,7 @@ class KonnectedFlowHandler(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_confirm(self, user_input=None):
         """Attempt to link with the Konnected panel.
 
         Given a configured host, will ask the user to confirm and finalize
@@ -402,14 +394,13 @@ class OptionsFlowHandler(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
-        self.model = config_entry.data[CONF_MODEL]
-        self.current_opt = (
-            config_entry.options or config_entry.data[CONF_DEFAULT_OPTIONS]
-        )
+        self.entry = config_entry
+        self.model = self.entry.data[CONF_MODEL]
+        self.current_opt = self.entry.options or self.entry.data[CONF_DEFAULT_OPTIONS]
 
         # as config proceeds we'll build up new options and then replace what's in the config entry
-        self.new_opt: dict[str, Any] = {CONF_IO: {}}
-        self.active_cfg: str | None = None
+        self.new_opt: dict[str, dict[str, Any]] = {CONF_IO: {}}
+        self.active_cfg = None
         self.io_cfg: dict[str, Any] = {}
         self.current_states: list[dict[str, Any]] = []
         self.current_state = 1
@@ -426,17 +417,13 @@ class OptionsFlowHandler(OptionsFlow):
             {},
         )
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input=None):
         """Handle options flow."""
         return await self.async_step_options_io()
 
-    async def async_step_options_io(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_io(self, user_input=None):
         """Configure legacy panel IO or first half of pro IO."""
-        errors: dict[str, str] = {}
+        errors = {}
         current_io = self.current_opt.get(CONF_IO, {})
 
         if user_input is not None:
@@ -476,7 +463,7 @@ class OptionsFlowHandler(OptionsFlow):
                 ),
                 description_placeholders={
                     "model": KONN_PANEL_MODEL_NAMES[self.model],
-                    "host": self.config_entry.data[CONF_HOST],
+                    "host": self.entry.data[CONF_HOST],
                 },
                 errors=errors,
             )
@@ -512,18 +499,16 @@ class OptionsFlowHandler(OptionsFlow):
                 ),
                 description_placeholders={
                     "model": KONN_PANEL_MODEL_NAMES[self.model],
-                    "host": self.config_entry.data[CONF_HOST],
+                    "host": self.entry.data[CONF_HOST],
                 },
                 errors=errors,
             )
 
         return self.async_abort(reason="not_konn_panel")
 
-    async def async_step_options_io_ext(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_io_ext(self, user_input=None):
         """Allow the user to configure the extended IO for pro."""
-        errors: dict[str, str] = {}
+        errors = {}
         current_io = self.current_opt.get(CONF_IO, {})
 
         if user_input is not None:
@@ -572,19 +557,17 @@ class OptionsFlowHandler(OptionsFlow):
                 ),
                 description_placeholders={
                     "model": KONN_PANEL_MODEL_NAMES[self.model],
-                    "host": self.config_entry.data[CONF_HOST],
+                    "host": self.entry.data[CONF_HOST],
                 },
                 errors=errors,
             )
 
         return self.async_abort(reason="not_konn_panel")
 
-    async def async_step_options_binary(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_binary(self, user_input=None):
         """Allow the user to configure the IO options for binary sensors."""
-        errors: dict[str, str] = {}
-        if user_input is not None and self.active_cfg is not None:
+        errors = {}
+        if user_input is not None:
             zone = {"zone": self.active_cfg}
             zone.update(user_input)
             self.new_opt[CONF_BINARY_SENSORS] = [
@@ -617,7 +600,7 @@ class OptionsFlowHandler(OptionsFlow):
                 description_placeholders={
                     "zone": f"Zone {self.active_cfg}"
                     if len(self.active_cfg) < 3
-                    else self.active_cfg.upper()
+                    else self.active_cfg.upper
                 },
                 errors=errors,
             )
@@ -650,19 +633,17 @@ class OptionsFlowHandler(OptionsFlow):
                     description_placeholders={
                         "zone": f"Zone {self.active_cfg}"
                         if len(self.active_cfg) < 3
-                        else self.active_cfg.upper()
+                        else self.active_cfg.upper
                     },
                     errors=errors,
                 )
 
         return await self.async_step_options_digital()
 
-    async def async_step_options_digital(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_digital(self, user_input=None):
         """Allow the user to configure the IO options for digital sensors."""
-        errors: dict[str, str] = {}
-        if user_input is not None and self.active_cfg is not None:
+        errors = {}
+        if user_input is not None:
             zone = {"zone": self.active_cfg}
             zone.update(user_input)
             self.new_opt[CONF_SENSORS] = [*self.new_opt.get(CONF_SENSORS, []), zone]
@@ -727,12 +708,10 @@ class OptionsFlowHandler(OptionsFlow):
 
         return await self.async_step_options_switch()
 
-    async def async_step_options_switch(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_switch(self, user_input=None):
         """Allow the user to configure the IO options for switches."""
-        errors: dict[str, str] = {}
-        if user_input is not None and self.active_cfg is not None:
+        errors = {}
+        if user_input is not None:
             zone = {"zone": self.active_cfg}
             zone.update(user_input)
             del zone[CONF_MORE_STATES]
@@ -844,9 +823,7 @@ class OptionsFlowHandler(OptionsFlow):
 
         return await self.async_step_options_misc()
 
-    async def async_step_options_misc(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_options_misc(self, user_input=None):
         """Allow the user to configure the LED behavior."""
         errors = {}
         if user_input is not None:

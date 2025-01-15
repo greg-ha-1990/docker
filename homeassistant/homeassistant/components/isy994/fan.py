@@ -48,11 +48,7 @@ async def async_setup_entry(
 class ISYFanEntity(ISYNodeEntity, FanEntity):
     """Representation of an ISY fan device."""
 
-    _attr_supported_features = (
-        FanEntityFeature.SET_SPEED
-        | FanEntityFeature.TURN_OFF
-        | FanEntityFeature.TURN_ON
-    )
+    _attr_supported_features = FanEntityFeature.SET_SPEED
 
     @property
     def percentage(self) -> int | None:

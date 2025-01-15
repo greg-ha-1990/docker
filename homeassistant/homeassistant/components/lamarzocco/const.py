@@ -4,4 +4,6 @@ from typing import Final
 
 DOMAIN: Final = "lamarzocco"
 
-CONF_USE_BLUETOOTH: Final = "use_bluetooth"
+CONF_MACHINE: Final = "machine"
+
+CONF_USE_BLUETOOTH = "use_bluetooth"

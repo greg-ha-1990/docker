@@ -1,7 +1,9 @@
 {
-  "entity_component": {
-    "_": {
-      "default": "mdi:tag-outline"
+  "entity": {
+    "tag": {
+      "tag": {
+        "default": "mdi:tag-outline"
+      }
     }
   }
 }

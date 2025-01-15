@@ -19,8 +19,6 @@
     }
   },
   "services": {
-    "set_radar_type": {
-      "service": "mdi:radar"
-    }
+    "set_radar_type": "mdi:radar"
   }
 }

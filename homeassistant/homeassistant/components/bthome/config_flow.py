@@ -15,7 +15,7 @@ from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_discovered_service_info,
 )
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 
 from .const import DOMAIN
@@ -161,6 +161,9 @@ class BTHomeConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle a flow initialized by a reauth event."""
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        assert entry is not None
+
         device: DeviceData = entry_data["device"]
         self._discovered_device = device
 
@@ -179,10 +182,10 @@ class BTHomeConfigFlow(ConfigFlow, domain=DOMAIN):
         if bindkey:
             data["bindkey"] = bindkey
 
-        if self.source == SOURCE_REAUTH:
-            return self.async_update_reload_and_abort(
-                self._get_reauth_entry(), data=data
-            )
+        if entry_id := self.context.get("entry_id"):
+            entry = self.hass.config_entries.async_get_entry(entry_id)
+            assert entry is not None
+            return self.async_update_reload_and_abort(entry, data=data)
 
         return self.async_create_entry(
             title=self.context["title_placeholders"]["name"],

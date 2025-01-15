@@ -225,7 +225,7 @@ class FreeboxRouter:
             fbx_raids: list[dict[str, Any]] = await self._api.storage.get_raids() or []
         except HttpRequestError:
             self.supports_raid = False
-            _LOGGER.warning(
+            _LOGGER.info(
                 "Router %s API does not support RAID",
                 self.name,
             )

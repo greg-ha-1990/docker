@@ -4,25 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import JellyfinConfigEntry, JellyfinDataUpdateCoordinator
-from .entity import JellyfinServerEntity
+from .const import DOMAIN
+from .coordinator import JellyfinDataT
+from .entity import JellyfinEntity
+from .models import JellyfinData
 
 
 @dataclass(frozen=True, kw_only=True)
 class JellyfinSensorEntityDescription(SensorEntityDescription):
     """Describes Jellyfin sensor entity."""
 
-    value_fn: Callable[[dict[str, dict[str, Any]]], StateType]
+    value_fn: Callable[[JellyfinDataT], StateType]
 
 
-def _count_now_playing(data: dict[str, dict[str, Any]]) -> int:
+def _count_now_playing(data: JellyfinDataT) -> int:
     """Count the number of now playing."""
     session_ids = [
         sid for (sid, session) in data.items() if "NowPlayingItem" in session
@@ -31,42 +33,35 @@ def _count_now_playing(data: dict[str, dict[str, Any]]) -> int:
     return len(session_ids)
 
 
-SENSOR_TYPES: tuple[JellyfinSensorEntityDescription, ...] = (
-    JellyfinSensorEntityDescription(
+SENSOR_TYPES: dict[str, JellyfinSensorEntityDescription] = {
+    "sessions": JellyfinSensorEntityDescription(
         key="watching",
         translation_key="watching",
+        name=None,
+        native_unit_of_measurement="Watching",
         value_fn=_count_now_playing,
-    ),
-)
+    )
+}
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: JellyfinConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Jellyfin sensor based on a config entry."""
-    coordinator = entry.runtime_data
+    jellyfin_data: JellyfinData = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
-        JellyfinServerSensor(coordinator, description) for description in SENSOR_TYPES
+        JellyfinSensor(jellyfin_data.coordinators[coordinator_type], description)
+        for coordinator_type, description in SENSOR_TYPES.items()
     )
 
 
-class JellyfinServerSensor(JellyfinServerEntity, SensorEntity):
+class JellyfinSensor(JellyfinEntity, SensorEntity):
     """Defines a Jellyfin sensor entity."""
 
     entity_description: JellyfinSensorEntityDescription
-
-    def __init__(
-        self,
-        coordinator: JellyfinDataUpdateCoordinator,
-        description: JellyfinSensorEntityDescription,
-    ) -> None:
-        """Initialize Jellyfin sensor."""
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_unique_id = f"{coordinator.server_id}-{description.key}"
 
     @property
     def native_value(self) -> StateType:

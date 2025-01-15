@@ -8,10 +8,8 @@ from typing import Any
 from uuid import uuid4
 
 from aiohttp import ClientError, web_exceptions
-from pydaikin.daikin_base import Appliance
+from pydaikin.daikin_base import Appliance, DaikinException
 from pydaikin.discovery import Discovery
-from pydaikin.exceptions import DaikinException
-from pydaikin.factory import DaikinFactory
 import voluptuous as vol
 
 from homeassistant.components import zeroconf
@@ -84,7 +82,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
         try:
             async with asyncio.timeout(TIMEOUT):
-                device: Appliance = await DaikinFactory(
+                device = await Appliance.factory(
                     host,
                     async_get_clientsession(self.hass),
                     key=key,

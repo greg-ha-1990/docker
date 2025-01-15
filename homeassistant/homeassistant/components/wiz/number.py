@@ -13,11 +13,12 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import WizConfigEntry
+from .const import DOMAIN
 from .entity import WizEntity
 from .models import WizData
 
@@ -67,16 +68,15 @@ NUMBERS: tuple[WizNumberEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: WizConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the wiz speed number."""
+    wiz_data: WizData = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
-        WizSpeedNumber(entry.runtime_data, entry.title, description)
+        WizSpeedNumber(wiz_data, entry.title, description)
         for description in NUMBERS
-        if getattr(
-            entry.runtime_data.bulb.bulbtype.features, description.required_feature
-        )
+        if getattr(wiz_data.bulb.bulbtype.features, description.required_feature)
     )
 
 

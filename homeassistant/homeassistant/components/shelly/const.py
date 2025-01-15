@@ -27,8 +27,6 @@ from aioshelly.const import (
     MODEL_WALL_DISPLAY,
 )
 
-from homeassistant.components.number import NumberMode
-
 DOMAIN: Final = "shelly"
 
 LOGGER: Logger = getLogger(__package__)
@@ -85,9 +83,11 @@ REST_SENSORS_UPDATE_INTERVAL: Final = 60
 # Refresh interval for RPC polling sensors
 RPC_SENSORS_POLLING_INTERVAL: Final = 60
 
+# Multiplier used to calculate the "update_interval" for sleeping devices.
+SLEEP_PERIOD_MULTIPLIER: Final = 1.2
 CONF_SLEEP_PERIOD: Final = "sleep_period"
 
-# Multiplier used to calculate the "update_interval" for shelly devices.
+# Multiplier used to calculate the "update_interval" for non-sleeping devices.
 UPDATE_PERIOD_MULTIPLIER: Final = 2.2
 
 # Reconnect interval for GEN2 devices
@@ -239,21 +239,4 @@ DEVICES_WITHOUT_FIRMWARE_CHANGELOG = (
 
 CONF_GEN = "gen"
 
-VIRTUAL_COMPONENTS_MAP = {
-    "binary_sensor": {"types": ["boolean"], "modes": ["label"]},
-    "number": {"types": ["number"], "modes": ["field", "slider"]},
-    "select": {"types": ["enum"], "modes": ["dropdown"]},
-    "sensor": {"types": ["enum", "number", "text"], "modes": ["label"]},
-    "switch": {"types": ["boolean"], "modes": ["toggle"]},
-    "text": {"types": ["text"], "modes": ["field"]},
-}
-
-VIRTUAL_NUMBER_MODE_MAP = {
-    "field": NumberMode.BOX,
-    "slider": NumberMode.SLIDER,
-}
-
-
-API_WS_URL = "/api/shelly/ws"
-
-COMPONENT_ID_PATTERN = re.compile(r"[a-z\d]+:\d+")
+SHELLY_PLUS_RGBW_CHANNELS = 4

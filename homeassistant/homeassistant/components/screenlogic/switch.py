@@ -1,22 +1,26 @@
 """Support for a ScreenLogic 'circuit' switch."""
 
 from dataclasses import dataclass
+import logging
 
 from screenlogicpy.const.data import ATTR, DEVICE
 from screenlogicpy.const.msg import CODE
 from screenlogicpy.device_const.circuit import GENERIC_CIRCUIT_NAMES, INTERFACE
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import LIGHT_CIRCUIT_FUNCTIONS
+from .const import DOMAIN as SL_DOMAIN, LIGHT_CIRCUIT_FUNCTIONS
+from .coordinator import ScreenlogicDataUpdateCoordinator
 from .entity import (
     ScreenLogicCircuitEntity,
     ScreenLogicPushEntityDescription,
     ScreenLogicSwitchingEntity,
 )
-from .types import ScreenLogicConfigEntry
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,12 +32,14 @@ class ScreenLogicCircuitSwitchDescription(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ScreenLogicConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up entry."""
     entities: list[ScreenLogicSwitchingEntity] = []
-    coordinator = config_entry.runtime_data
+    coordinator: ScreenlogicDataUpdateCoordinator = hass.data[SL_DOMAIN][
+        config_entry.entry_id
+    ]
     gateway = coordinator.gateway
     for circuit_index, circuit_data in gateway.get_data(DEVICE.CIRCUIT).items():
         if (

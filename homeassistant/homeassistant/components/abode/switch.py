@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from jaraco.abode.devices.switch import Switch
+from jaraco.abode.helpers.constants import TYPE_SWITCH, TYPE_VALVE
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -16,7 +17,7 @@ from . import AbodeSystem
 from .const import DOMAIN
 from .entity import AbodeAutomation, AbodeDevice
 
-DEVICE_TYPES = ["switch", "valve"]
+DEVICE_TYPES = [TYPE_SWITCH, TYPE_VALVE]
 
 
 async def async_setup_entry(
@@ -88,4 +89,4 @@ class AbodeAutomationSwitch(AbodeAutomation, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return True if the automation is enabled."""
-        return bool(self._automation.enabled)
+        return bool(self._automation.is_enabled)

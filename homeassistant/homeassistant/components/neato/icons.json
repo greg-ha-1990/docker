@@ -1,7 +1,5 @@
 {
   "services": {
-    "custom_cleaning": {
-      "service": "mdi:broom"
-    }
+    "custom_cleaning": "mdi:broom"
   }
 }

@@ -8,6 +8,7 @@ from xiaomi_ble.parser import (
     SensorUpdate,
 )
 
+from homeassistant import config_entries
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -21,9 +22,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
 
-from .coordinator import XiaomiPassiveBluetoothDataProcessor
+from .const import DOMAIN
+from .coordinator import (
+    XiaomiActiveBluetoothProcessorCoordinator,
+    XiaomiPassiveBluetoothDataProcessor,
+)
 from .device import device_key_to_bluetooth_entity_key
-from .types import XiaomiBLEConfigEntry
 
 BINARY_SENSOR_DESCRIPTIONS = {
     XiaomiBinarySensorDeviceClass.BATTERY: BinarySensorEntityDescription(
@@ -49,10 +53,6 @@ BINARY_SENSOR_DESCRIPTIONS = {
     XiaomiBinarySensorDeviceClass.MOTION: BinarySensorEntityDescription(
         key=XiaomiBinarySensorDeviceClass.MOTION,
         device_class=BinarySensorDeviceClass.MOTION,
-    ),
-    XiaomiBinarySensorDeviceClass.OCCUPANCY: BinarySensorEntityDescription(
-        key=XiaomiBinarySensorDeviceClass.OCCUPANCY,
-        device_class=BinarySensorDeviceClass.OCCUPANCY,
     ),
     XiaomiBinarySensorDeviceClass.OPENING: BinarySensorEntityDescription(
         key=XiaomiBinarySensorDeviceClass.OPENING,
@@ -134,11 +134,13 @@ def sensor_update_to_bluetooth_data_update(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: XiaomiBLEConfigEntry,
+    entry: config_entries.ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi BLE sensors."""
-    coordinator = entry.runtime_data
+    coordinator: XiaomiActiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     processor = XiaomiPassiveBluetoothDataProcessor(
         sensor_update_to_bluetooth_data_update
     )

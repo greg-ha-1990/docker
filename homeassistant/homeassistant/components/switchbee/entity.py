@@ -88,7 +88,7 @@ class SwitchBeeDeviceEntity[_DeviceTypeT: SwitchBeeBaseDevice](
     def _check_if_became_online(self) -> None:
         """Check if the device was offline (now online) and bring it back."""
         if not self._is_online:
-            _LOGGER.warning(
+            _LOGGER.info(
                 "%s device is now responding",
                 self.name,
             )

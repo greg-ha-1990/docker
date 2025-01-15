@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from xknx import XKNX
 from xknx.devices import BinarySensor as XknxBinarySensor
 
 from homeassistant import config_entries
@@ -22,9 +23,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.typing import ConfigType
 
-from . import KNXModule
-from .const import ATTR_COUNTER, ATTR_SOURCE, KNX_MODULE_KEY
-from .entity import KnxYamlEntity
+from .const import ATTR_COUNTER, ATTR_SOURCE, DATA_KNX_CONFIG, DOMAIN
+from .knx_entity import KnxEntity
 from .schema import BinarySensorSchema
 
 
@@ -34,25 +34,25 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the KNX binary sensor platform."""
-    knx_module = hass.data[KNX_MODULE_KEY]
-    config: list[ConfigType] = knx_module.config_yaml[Platform.BINARY_SENSOR]
+    xknx: XKNX = hass.data[DOMAIN].xknx
+    config: ConfigType = hass.data[DATA_KNX_CONFIG]
 
     async_add_entities(
-        KNXBinarySensor(knx_module, entity_config) for entity_config in config
+        KNXBinarySensor(xknx, entity_config)
+        for entity_config in config[Platform.BINARY_SENSOR]
     )
 
 
-class KNXBinarySensor(KnxYamlEntity, BinarySensorEntity, RestoreEntity):
+class KNXBinarySensor(KnxEntity, BinarySensorEntity, RestoreEntity):
     """Representation of a KNX binary sensor."""
 
     _device: XknxBinarySensor
 
-    def __init__(self, knx_module: KNXModule, config: ConfigType) -> None:
+    def __init__(self, xknx: XKNX, config: ConfigType) -> None:
         """Initialize of KNX binary sensor."""
         super().__init__(
-            knx_module=knx_module,
             device=XknxBinarySensor(
-                xknx=knx_module.xknx,
+                xknx,
                 name=config[CONF_NAME],
                 group_address_state=config[BinarySensorSchema.CONF_STATE_ADDRESS],
                 invert=config[BinarySensorSchema.CONF_INVERT],
@@ -62,7 +62,7 @@ class KNXBinarySensor(KnxYamlEntity, BinarySensorEntity, RestoreEntity):
                 ],
                 context_timeout=config.get(BinarySensorSchema.CONF_CONTEXT_TIMEOUT),
                 reset_after=config.get(BinarySensorSchema.CONF_RESET_AFTER),
-            ),
+            )
         )
         self._attr_entity_category = config.get(CONF_ENTITY_CATEGORY)
         self._attr_device_class = config.get(CONF_DEVICE_CLASS)
@@ -75,7 +75,7 @@ class KNXBinarySensor(KnxYamlEntity, BinarySensorEntity, RestoreEntity):
         if (
             last_state := await self.async_get_last_state()
         ) and last_state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-            self._device.remote_value.update_value(last_state.state == STATE_ON)
+            await self._device.remote_value.update_value(last_state.state == STATE_ON)
 
     @property
     def is_on(self) -> bool:

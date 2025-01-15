@@ -1,7 +1,5 @@
 {
   "services": {
-    "set_room_temperature": {
-      "service": "mdi:thermometer"
-    }
+    "set_room_temperature": "mdi:thermometer"
   }
 }

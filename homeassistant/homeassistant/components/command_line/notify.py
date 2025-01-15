@@ -21,10 +21,8 @@ def get_service(
     hass: HomeAssistant,
     config: ConfigType,
     discovery_info: DiscoveryInfoType | None = None,
-) -> CommandLineNotificationService | None:
+) -> CommandLineNotificationService:
     """Get the Command Line notification service."""
-    if not discovery_info:
-        return None
 
     discovery_info = cast(DiscoveryInfoType, discovery_info)
     notify_config = discovery_info
@@ -44,12 +42,12 @@ class CommandLineNotificationService(BaseNotificationService):
 
     def send_message(self, message: str = "", **kwargs: Any) -> None:
         """Send a message to a command line."""
-        with subprocess.Popen(  # noqa: S602 # shell by design
+        with subprocess.Popen(
             self.command,
             universal_newlines=True,
             stdin=subprocess.PIPE,
             close_fds=False,  # required for posix_spawn
-            shell=True,
+            shell=True,  # noqa: S602 # shell by design
         ) as proc:
             try:
                 proc.communicate(input=message, timeout=self._timeout)

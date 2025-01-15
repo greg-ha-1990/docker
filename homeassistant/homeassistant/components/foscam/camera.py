@@ -129,7 +129,7 @@ class HassFoscamCamera(FoscamEntity, Camera):
         )
 
         if ret == -3:
-            LOGGER.warning(
+            LOGGER.info(
                 (
                     "Can't get motion detection status, camera %s configured with"
                     " non-admin user"
@@ -171,7 +171,7 @@ class HassFoscamCamera(FoscamEntity, Camera):
 
             if ret != 0:
                 if ret == -3:
-                    LOGGER.warning(
+                    LOGGER.info(
                         (
                             "Can't set motion detection status, camera %s configured"
                             " with non-admin user"
@@ -197,7 +197,7 @@ class HassFoscamCamera(FoscamEntity, Camera):
 
             if ret != 0:
                 if ret == -3:
-                    LOGGER.warning(
+                    LOGGER.info(
                         (
                             "Can't set motion detection status, camera %s configured"
                             " with non-admin user"

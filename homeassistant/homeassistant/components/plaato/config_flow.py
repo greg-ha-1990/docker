@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pyplaato.plaato import PlaatoDeviceType
 import voluptuous as vol
 
 from homeassistant.components import cloud, webhook
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TOKEN, CONF_WEBHOOK_ID
 from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
@@ -38,13 +31,11 @@ class PlaatoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize."""
-        self._init_info: dict[str, Any] = {}
+        self._init_info = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle user step."""
 
         if user_input is not None:
@@ -71,9 +62,7 @@ class PlaatoConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         )
 
-    async def async_step_api_method(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_api_method(self, user_input=None):
         """Handle device type step."""
 
         device_type = self._init_info[CONF_DEVICE_TYPE]
@@ -92,9 +81,7 @@ class PlaatoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return await self._show_api_method_form(device_type)
 
-    async def async_step_webhook(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_webhook(self, user_input=None):
         """Validate config step."""
 
         use_webhook = self._init_info[CONF_USE_WEBHOOK]
@@ -140,8 +127,8 @@ class PlaatoConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def _show_api_method_form(
-        self, device_type: PlaatoDeviceType, errors: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+        self, device_type: PlaatoDeviceType, errors: dict | None = None
+    ):
         data_schema = vol.Schema({vol.Optional(CONF_TOKEN, default=""): str})
 
         if device_type == PlaatoDeviceType.Airlock:
@@ -176,27 +163,29 @@ class PlaatoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: ConfigEntry,
-    ) -> PlaatoOptionsFlowHandler:
+    def async_get_options_flow(config_entry: ConfigEntry) -> PlaatoOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return PlaatoOptionsFlowHandler()
+        return PlaatoOptionsFlowHandler(config_entry)
 
 
 class PlaatoOptionsFlowHandler(OptionsFlow):
     """Handle Plaato options."""
 
-    async def async_step_init(self, user_input: None = None) -> ConfigFlowResult:
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize domain options flow."""
+        super().__init__()
+
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
         """Manage the options."""
-        use_webhook = self.config_entry.data.get(CONF_USE_WEBHOOK, False)
+        use_webhook = self._config_entry.data.get(CONF_USE_WEBHOOK, False)
         if use_webhook:
             return await self.async_step_webhook()
 
         return await self.async_step_user()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -207,7 +196,7 @@ class PlaatoOptionsFlowHandler(OptionsFlow):
                 {
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): cv.positive_int
@@ -215,14 +204,12 @@ class PlaatoOptionsFlowHandler(OptionsFlow):
             ),
         )
 
-    async def async_step_webhook(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_webhook(self, user_input=None):
         """Manage the options for webhook device."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        webhook_id = self.config_entry.data.get(CONF_WEBHOOK_ID, None)
+        webhook_id = self._config_entry.data.get(CONF_WEBHOOK_ID, None)
         webhook_url = (
             ""
             if webhook_id is None

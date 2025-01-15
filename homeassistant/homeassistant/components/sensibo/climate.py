@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_left
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
@@ -22,7 +22,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
@@ -108,7 +108,7 @@ AC_STATE_TO_DATA = {
 }
 
 
-def _find_valid_target_temp(target: float, valid_targets: list[int]) -> int:
+def _find_valid_target_temp(target: int, valid_targets: list[int]) -> int:
     if target <= valid_targets[0]:
         return valid_targets[0]
     if target >= valid_targets[-1]:
@@ -194,6 +194,7 @@ class SensiboClimate(SensiboDeviceBaseEntity, ClimateEntity):
     _attr_name = None
     _attr_precision = PRECISION_TENTHS
     _attr_translation_key = "climate_device"
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self, coordinator: SensiboDataUpdateCoordinator, device_id: str
@@ -231,9 +232,10 @@ class SensiboClimate(SensiboDeviceBaseEntity, ClimateEntity):
     @property
     def hvac_modes(self) -> list[HVACMode]:
         """Return the list of available hvac operation modes."""
-        if not self.device_data.hvac_modes:
-            return [HVACMode.OFF]
-        return [SENSIBO_TO_HA[mode] for mode in self.device_data.hvac_modes]
+        if TYPE_CHECKING:
+            assert self.device_data.hvac_modes
+        hvac_modes = [SENSIBO_TO_HA[mode] for mode in self.device_data.hvac_modes]
+        return hvac_modes if hvac_modes else [HVACMode.OFF]
 
     @property
     def current_temperature(self) -> float | None:
@@ -258,42 +260,52 @@ class SensiboClimate(SensiboDeviceBaseEntity, ClimateEntity):
     @property
     def target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        return self.device_data.target_temp
+        target_temp: int | None = self.device_data.target_temp
+        return target_temp
 
     @property
     def target_temperature_step(self) -> float | None:
         """Return the supported step of target temperature."""
-        return self.device_data.temp_step
+        target_temp_step: int = self.device_data.temp_step
+        return target_temp_step
 
     @property
     def fan_mode(self) -> str | None:
         """Return the fan setting."""
-        return self.device_data.fan_mode
+        fan_mode: str | None = self.device_data.fan_mode
+        return fan_mode
 
     @property
     def fan_modes(self) -> list[str] | None:
         """Return the list of available fan modes."""
-        return self.device_data.fan_modes
+        if self.device_data.fan_modes:
+            return self.device_data.fan_modes
+        return None
 
     @property
     def swing_mode(self) -> str | None:
         """Return the swing setting."""
-        return self.device_data.swing_mode
+        swing_mode: str | None = self.device_data.swing_mode
+        return swing_mode
 
     @property
     def swing_modes(self) -> list[str] | None:
         """Return the list of available swing modes."""
-        return self.device_data.swing_modes
+        if self.device_data.swing_modes:
+            return self.device_data.swing_modes
+        return None
 
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature."""
-        return self.device_data.temp_list[0]
+        min_temp: int = self.device_data.temp_list[0]
+        return min_temp
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature."""
-        return self.device_data.temp_list[-1]
+        max_temp: int = self.device_data.temp_list[-1]
+        return max_temp
 
     @property
     def available(self) -> bool:
@@ -308,7 +320,12 @@ class SensiboClimate(SensiboDeviceBaseEntity, ClimateEntity):
                 translation_key="no_target_temperature_in_features",
             )
 
-        temperature: float = kwargs[ATTR_TEMPERATURE]
+        if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="no_target_temperature",
+            )
+
         if temperature == self.target_temperature:
             return
 

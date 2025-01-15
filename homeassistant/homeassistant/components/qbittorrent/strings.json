@@ -26,7 +26,7 @@
       "upload_speed": {
         "name": "Upload speed"
       },
-      "current_status": {
+      "transmission_status": {
         "name": "Status",
         "state": {
           "idle": "[%key:common::state::idle%]",
@@ -36,25 +36,16 @@
         }
       },
       "active_torrents": {
-        "name": "Active torrents",
-        "unit_of_measurement": "torrents"
+        "name": "Active torrents"
       },
       "inactive_torrents": {
-        "name": "Inactive torrents",
-        "unit_of_measurement": "[%key:component::qbittorrent::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Inactive torrents"
       },
       "paused_torrents": {
-        "name": "Paused torrents",
-        "unit_of_measurement": "[%key:component::qbittorrent::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Paused torrents"
       },
       "all_torrents": {
-        "name": "All torrents",
-        "unit_of_measurement": "[%key:component::qbittorrent::entity::sensor::active_torrents::unit_of_measurement%]"
-      }
-    },
-    "switch": {
-      "alternative_speed": {
-        "name": "Alternative speed"
+        "name": "All torrents"
       }
     }
   },
@@ -93,9 +84,6 @@
     },
     "login_error": {
       "message": "A login error occured. Please check you username and password."
-    },
-    "cannot_connect": {
-      "message": "Can't connect to QBittorrent, please check your configuration."
     }
   }
 }

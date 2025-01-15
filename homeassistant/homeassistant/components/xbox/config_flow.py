@@ -1,9 +1,7 @@
 """Config flow for xbox."""
 
 import logging
-from typing import Any
 
-from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers import config_entry_oauth2_flow
 
 from .const import DOMAIN
@@ -27,9 +25,7 @@ class OAuth2FlowHandler(
         scopes = ["Xboxlive.signin", "Xboxlive.offline_access"]
         return {"scope": " ".join(scopes)}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow start."""
         await self.async_set_unique_id(DOMAIN)
 

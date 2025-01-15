@@ -7,11 +7,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import MOTION_ACTIVE
-from .coordinator import AndroidIPCamConfigEntry, AndroidIPCamDataUpdateCoordinator
+from .const import DOMAIN, MOTION_ACTIVE
+from .coordinator import AndroidIPCamDataUpdateCoordinator
 from .entity import AndroidIPCamBaseEntity
 
 BINARY_SENSOR_DESCRIPTION = BinarySensorEntityDescription(
@@ -23,12 +24,16 @@ BINARY_SENSOR_DESCRIPTION = BinarySensorEntityDescription(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: AndroidIPCamConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the IP Webcam sensors from config entry."""
 
-    async_add_entities([IPWebcamBinarySensor(config_entry.runtime_data)])
+    coordinator: AndroidIPCamDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
+
+    async_add_entities([IPWebcamBinarySensor(coordinator)])
 
 
 class IPWebcamBinarySensor(AndroidIPCamBaseEntity, BinarySensorEntity):

@@ -6,7 +6,7 @@ from collections.abc import Callable
 import logging
 
 from xknx import XKNX
-from xknx.devices import DateDevice, DateTimeDevice, ExposeSensor, TimeDevice
+from xknx.devices import DateTime, ExposeSensor
 from xknx.dpt import DPTNumeric, DPTString
 from xknx.exceptions import ConversionError
 from xknx.remote_value import RemoteValueSensor
@@ -60,7 +60,6 @@ def create_knx_exposure(
             xknx=xknx,
             config=config,
         )
-    exposure.async_register()
     return exposure
 
 
@@ -84,25 +83,29 @@ class KNXExposeSensor:
         self.expose_default = config.get(ExposeSchema.CONF_KNX_EXPOSE_DEFAULT)
         self.expose_type: int | str = config[ExposeSchema.CONF_KNX_EXPOSE_TYPE]
         self.value_template: Template | None = config.get(CONF_VALUE_TEMPLATE)
+        if self.value_template is not None:
+            self.value_template.hass = hass
 
         self._remove_listener: Callable[[], None] | None = None
-        self.device: ExposeSensor = ExposeSensor(
+        self.device: ExposeSensor = self.async_register(config)
+        self._init_expose_state()
+
+    @callback
+    def async_register(self, config: ConfigType) -> ExposeSensor:
+        """Register listener."""
+        name = f"{self.entity_id}__{self.expose_attribute or "state"}"
+        device = ExposeSensor(
             xknx=self.xknx,
-            name=f"{self.entity_id}__{self.expose_attribute or "state"}",
+            name=name,
             group_address=config[KNX_ADDRESS],
             respond_to_read=config[CONF_RESPOND_TO_READ],
             value_type=self.expose_type,
             cooldown=config[ExposeSchema.CONF_KNX_EXPOSE_COOLDOWN],
         )
-
-    @callback
-    def async_register(self) -> None:
-        """Register listener."""
         self._remove_listener = async_track_state_change_event(
             self.hass, [self.entity_id], self._async_entity_changed
         )
-        self.xknx.devices.async_add(self.device)
-        self._init_expose_state()
+        return device
 
     @callback
     def _init_expose_state(self) -> None:
@@ -115,18 +118,16 @@ class KNXExposeSensor:
             _LOGGER.exception("Error during sending of expose sensor value")
 
     @callback
-    def async_remove(self) -> None:
+    def shutdown(self) -> None:
         """Prepare for deletion."""
         if self._remove_listener is not None:
             self._remove_listener()
             self._remove_listener = None
-        self.xknx.devices.async_remove(self.device)
+        self.device.shutdown()
 
     def _get_expose_value(self, state: State | None) -> bool | int | float | str | None:
         """Extract value from state."""
         if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-            if self.expose_default is None:
-                return None
             value = self.expose_default
         elif self.expose_attribute is not None:
             _attr = state.attributes.get(self.expose_attribute)
@@ -156,22 +157,12 @@ class KNXExposeSensor:
         if value is not None and (
             isinstance(self.device.sensor_value, RemoteValueSensor)
         ):
-            try:
-                if issubclass(self.device.sensor_value.dpt_class, DPTNumeric):
-                    return float(value)
-                if issubclass(self.device.sensor_value.dpt_class, DPTString):
-                    # DPT 16.000 only allows up to 14 Bytes
-                    return str(value)[:14]
-            except (ValueError, TypeError) as err:
-                _LOGGER.warning(
-                    'Could not expose %s %s value "%s" to KNX: Conversion failed: %s',
-                    self.entity_id,
-                    self.expose_attribute or "state",
-                    value,
-                    err,
-                )
-                return None
-        return value  # type: ignore[no-any-return]
+            if issubclass(self.device.sensor_value.dpt_class, DPTNumeric):
+                return float(value)
+            if issubclass(self.device.sensor_value.dpt_class, DPTString):
+                # DPT 16.000 only allows up to 14 Bytes
+                return str(value)[:14]
+        return value
 
     async def _async_entity_changed(self, event: Event[EventStateChangedData]) -> None:
         """Handle entity change."""
@@ -205,28 +196,21 @@ class KNXExposeTime:
     def __init__(self, xknx: XKNX, config: ConfigType) -> None:
         """Initialize of Expose class."""
         self.xknx = xknx
+        self.device: DateTime = self.async_register(config)
+
+    @callback
+    def async_register(self, config: ConfigType) -> DateTime:
+        """Register listener."""
         expose_type = config[ExposeSchema.CONF_KNX_EXPOSE_TYPE]
-        xknx_device_cls: type[DateDevice | DateTimeDevice | TimeDevice]
-        match expose_type:
-            case ExposeSchema.CONF_DATE:
-                xknx_device_cls = DateDevice
-            case ExposeSchema.CONF_DATETIME:
-                xknx_device_cls = DateTimeDevice
-            case ExposeSchema.CONF_TIME:
-                xknx_device_cls = TimeDevice
-        self.device = xknx_device_cls(
+        return DateTime(
             self.xknx,
             name=expose_type.capitalize(),
+            broadcast_type=expose_type.upper(),
             localtime=True,
             group_address=config[KNX_ADDRESS],
         )
 
     @callback
-    def async_register(self) -> None:
-        """Register listener."""
-        self.xknx.devices.async_add(self.device)
-
-    @callback
-    def async_remove(self) -> None:
+    def shutdown(self) -> None:
         """Prepare for deletion."""
-        self.xknx.devices.async_remove(self.device)
+        self.device.shutdown()

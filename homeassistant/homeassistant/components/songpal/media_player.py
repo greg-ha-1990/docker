@@ -140,12 +140,7 @@ class SongpalEntity(MediaPlayerEntity):
 
     async def _get_sound_modes_info(self):
         """Get available sound modes and the active one."""
-        for settings in await self._dev.get_sound_settings():
-            if settings.target == "soundField":
-                break
-        else:
-            return None, {}
-
+        settings = await self._dev.get_sound_settings("soundField")
         if isinstance(settings, Setting):
             settings = [settings]
 
@@ -167,7 +162,7 @@ class SongpalEntity(MediaPlayerEntity):
 
     async def async_activate_websocket(self):
         """Activate websocket for listening if wanted."""
-        _LOGGER.debug("Activating websocket connection")
+        _LOGGER.info("Activating websocket connection")
 
         async def _volume_changed(volume: VolumeChange):
             _LOGGER.debug("Volume changed: %s", volume)

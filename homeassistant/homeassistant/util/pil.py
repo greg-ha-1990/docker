@@ -28,7 +28,7 @@ def draw_box(
     """
 
     line_width = 3
-    font_height = 20
+    font_height = 8
     y_min, x_min, y_max, x_max = box
     (left, right, top, bottom) = (
         x_min * img_width,
@@ -43,8 +43,5 @@ def draw_box(
     )
     if text:
         draw.text(
-            (left + line_width, abs(top - line_width - font_height)),
-            text,
-            fill=color,
-            font_size=font_height,
+            (left + line_width, abs(top - line_width - font_height)), text, fill=color
         )

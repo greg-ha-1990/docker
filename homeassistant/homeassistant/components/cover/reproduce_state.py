@@ -15,6 +15,10 @@ from homeassistant.const import (
     SERVICE_OPEN_COVER_TILT,
     SERVICE_SET_COVER_POSITION,
     SERVICE_SET_COVER_TILT_POSITION,
+    STATE_CLOSED,
+    STATE_CLOSING,
+    STATE_OPEN,
+    STATE_OPENING,
 )
 from homeassistant.core import Context, HomeAssistant, State
 
@@ -24,17 +28,11 @@ from . import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
     DOMAIN,
-    CoverState,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-VALID_STATES = {
-    CoverState.CLOSED,
-    CoverState.CLOSING,
-    CoverState.OPEN,
-    CoverState.OPENING,
-}
+VALID_STATES = {STATE_CLOSED, STATE_CLOSING, STATE_OPEN, STATE_OPENING}
 
 
 async def _async_reproduce_state(
@@ -74,9 +72,9 @@ async def _async_reproduce_state(
         == state.attributes.get(ATTR_CURRENT_POSITION)
     ):
         # Open/Close
-        if state.state in [CoverState.CLOSED, CoverState.CLOSING]:
+        if state.state in [STATE_CLOSED, STATE_CLOSING]:
             service = SERVICE_CLOSE_COVER
-        elif state.state in [CoverState.OPEN, CoverState.OPENING]:
+        elif state.state in [STATE_OPEN, STATE_OPENING]:
             if (
                 ATTR_CURRENT_POSITION in cur_state.attributes
                 and ATTR_CURRENT_POSITION in state.attributes

@@ -17,12 +17,13 @@ from homeassistant.components.light import (
     brightness_supported,
     color_supported,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import FibaroConfigEntry
-from .entity import FibaroEntity
+from . import FibaroController, FibaroDevice
+from .const import DOMAIN
 
 PARALLEL_UPDATES = 2
 
@@ -50,18 +51,18 @@ def scaleto99(value: int | None) -> int:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: FibaroConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Perform the setup for Fibaro controller devices."""
-    controller = entry.runtime_data
+    controller: FibaroController = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [FibaroLight(device) for device in controller.fibaro_devices[Platform.LIGHT]],
         True,
     )
 
 
-class FibaroLight(FibaroEntity, LightEntity):
+class FibaroLight(FibaroDevice, LightEntity):
     """Representation of a Fibaro Light, including dimmable."""
 
     def __init__(self, fibaro_device: DeviceModel) -> None:
@@ -130,25 +131,32 @@ class FibaroLight(FibaroEntity, LightEntity):
         """Turn the light off."""
         self.call_turn_off()
 
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if device is on.
+
+        Dimmable and RGB lights can be on based on different
+        properties, so we need to check here several values.
+
+        JSON for HC2 uses always string, HC3 uses int for integers.
+        """
+        if self.current_binary_state:
+            return True
+        with suppress(TypeError):
+            if self.fibaro_device.brightness != 0:
+                return True
+        with suppress(TypeError):
+            if self.fibaro_device.current_program != 0:
+                return True
+        with suppress(TypeError):
+            if self.fibaro_device.current_program_id != 0:
+                return True
+
+        return False
+
     def update(self) -> None:
         """Update the state."""
         super().update()
-
-        # Dimmable and RGB lights can be on based on different
-        # properties, so we need to check here several values
-        # to see if the light is on.
-        light_is_on = self.current_binary_state
-        with suppress(TypeError):
-            if self.fibaro_device.brightness != 0:
-                light_is_on = True
-        with suppress(TypeError):
-            if self.fibaro_device.current_program != 0:
-                light_is_on = True
-        with suppress(TypeError):
-            if self.fibaro_device.current_program_id != 0:
-                light_is_on = True
-        self._attr_is_on = light_is_on
-
         # Brightness handling
         if brightness_supported(self.supported_color_modes):
             self._attr_brightness = scaleto255(self.fibaro_device.value.int_value())
@@ -163,7 +171,7 @@ class FibaroLight(FibaroEntity, LightEntity):
             if rgbw == (0, 0, 0, 0) and self.fibaro_device.last_color_set.has_color:
                 rgbw = self.fibaro_device.last_color_set.rgbw_color
 
-            if self.color_mode == ColorMode.RGB:
+            if self._attr_color_mode == ColorMode.RGB:
                 self._attr_rgb_color = rgbw[:3]
             else:
                 self._attr_rgbw_color = rgbw

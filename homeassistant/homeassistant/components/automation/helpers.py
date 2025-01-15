@@ -28,14 +28,6 @@ async def _reload_blueprint_automations(
 @callback
 def async_get_blueprints(hass: HomeAssistant) -> blueprint.DomainBlueprints:
     """Get automation blueprints."""
-    # pylint: disable-next=import-outside-toplevel
-    from .config import AUTOMATION_BLUEPRINT_SCHEMA
-
     return blueprint.DomainBlueprints(
-        hass,
-        DOMAIN,
-        LOGGER,
-        _blueprint_in_use,
-        _reload_blueprint_automations,
-        AUTOMATION_BLUEPRINT_SCHEMA,
+        hass, DOMAIN, LOGGER, _blueprint_in_use, _reload_blueprint_automations
     )

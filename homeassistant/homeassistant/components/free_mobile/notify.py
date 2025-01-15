@@ -8,10 +8,7 @@ import logging
 from freesms import FreeClient
 import voluptuous as vol
 
-from homeassistant.components.notify import (
-    PLATFORM_SCHEMA as NOTIFY_PLATFORM_SCHEMA,
-    BaseNotificationService,
-)
+from homeassistant.components.notify import PLATFORM_SCHEMA, BaseNotificationService
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -19,7 +16,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORM_SCHEMA = NOTIFY_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {vol.Required(CONF_USERNAME): cv.string, vol.Required(CONF_ACCESS_TOKEN): cv.string}
 )
 

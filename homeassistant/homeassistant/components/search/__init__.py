@@ -43,7 +43,6 @@ class ItemType(StrEnum):
     ENTITY = "entity"
     FLOOR = "floor"
     GROUP = "group"
-    INTEGRATION = "integration"
     LABEL = "label"
     PERSON = "person"
     SCENE = "scene"
@@ -546,9 +545,6 @@ class Searcher:
                 self._async_resolve_up_area(device_entry.area_id)
 
             self._add(ItemType.CONFIG_ENTRY, device_entry.config_entries)
-            for config_entry_id in device_entry.config_entries:
-                if entry := self.hass.config_entries.async_get_entry(config_entry_id):
-                    self._add(ItemType.INTEGRATION, entry.domain)
 
         return device_entry
 
@@ -577,19 +573,10 @@ class Searcher:
             self._add(ItemType.DEVICE, entity_entry.device_id)
 
             # Add config entry that provided this entity
-            if entity_entry.config_entry_id:
-                self._add(ItemType.CONFIG_ENTRY, entity_entry.config_entry_id)
-
-                if entry := self.hass.config_entries.async_get_entry(
-                    entity_entry.config_entry_id
-                ):
-                    # Add integration that provided this entity
-                    self._add(ItemType.INTEGRATION, entry.domain)
-
+            self._add(ItemType.CONFIG_ENTRY, entity_entry.config_entry_id)
         elif source := self._entity_sources.get(entity_id):
             # Add config entry that provided this entity
             self._add(ItemType.CONFIG_ENTRY, source.get("config_entry"))
-            self._add(ItemType.INTEGRATION, source["domain"])
 
         return entity_entry
 

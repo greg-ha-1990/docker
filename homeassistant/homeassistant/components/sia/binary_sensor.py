@@ -28,7 +28,7 @@ from .const import (
     KEY_SMOKE,
     SIA_HUB_ZONE,
 )
-from .entity import SIABaseEntity, SIAEntityDescription
+from .sia_entity_base import SIABaseEntity, SIAEntityDescription
 
 _LOGGER = logging.getLogger(__name__)
 

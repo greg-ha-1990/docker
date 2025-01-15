@@ -24,6 +24,7 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_TEMPERATURE,
     PRECISION_TENTHS,
@@ -36,10 +37,10 @@ from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DEVICE_LIST, DOMAIN
 from .entity import ViCareEntity
-from .types import HeatingProgram, ViCareConfigEntry, ViCareDevice
-from .utils import get_burners, get_circuits, get_compressors, get_device_serial
+from .types import HeatingProgram, ViCareDevice
+from .utils import get_burners, get_circuits, get_compressors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,10 +87,10 @@ def _build_entities(
     """Create ViCare climate entities for a device."""
     return [
         ViCareClimate(
-            get_device_serial(device.api),
-            device.config,
             device.api,
             circuit,
+            device.config,
+            "heating",
         )
         for device in device_list
         for circuit in get_circuits(device.api)
@@ -98,22 +99,25 @@ def _build_entities(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ViCareConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the ViCare climate platform."""
 
     platform = entity_platform.async_get_current_platform()
+
     platform.async_register_entity_service(
         SERVICE_SET_VICARE_MODE,
         {vol.Required(SERVICE_SET_VICARE_MODE_ATTR_MODE): cv.string},
         "set_vicare_mode",
     )
 
+    device_list = hass.data[DOMAIN][config_entry.entry_id][DEVICE_LIST]
+
     async_add_entities(
         await hass.async_add_executor_job(
             _build_entities,
-            config_entry.runtime_data.devices,
+            device_list,
         )
     )
 
@@ -132,25 +136,25 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
     _attr_min_temp = VICARE_TEMP_HEATING_MIN
     _attr_max_temp = VICARE_TEMP_HEATING_MAX
     _attr_target_temperature_step = PRECISION_WHOLE
-    _attr_translation_key = "heating"
     _current_action: bool | None = None
     _current_mode: str | None = None
-    _current_program: str | None = None
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self,
-        device_serial: str | None,
-        device_config: PyViCareDeviceConfig,
-        device: PyViCareDevice,
+        api: PyViCareDevice,
         circuit: PyViCareHeatingCircuit,
+        device_config: PyViCareDeviceConfig,
+        translation_key: str,
     ) -> None:
         """Initialize the climate device."""
-        super().__init__(
-            self._attr_translation_key, device_serial, device_config, device, circuit
-        )
-        self._device = device
+        super().__init__(device_config, api, circuit.id)
+        self._circuit = circuit
         self._attributes: dict[str, Any] = {}
-        self._attributes["vicare_programs"] = self._api.getPrograms()
+        self._current_program = None
+        self._attr_translation_key = translation_key
+
+        self._attributes["vicare_programs"] = self._circuit.getPrograms()
         self._attr_preset_modes = [
             preset
             for heating_program in self._attributes["vicare_programs"]
@@ -162,13 +166,11 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
         try:
             _room_temperature = None
             with suppress(PyViCareNotSupportedFeatureError):
-                self._attributes["room_temperature"] = _room_temperature = (
-                    self._api.getRoomTemperature()
-                )
+                _room_temperature = self._circuit.getRoomTemperature()
 
             _supply_temperature = None
             with suppress(PyViCareNotSupportedFeatureError):
-                _supply_temperature = self._api.getSupplyTemperature()
+                _supply_temperature = self._circuit.getSupplyTemperature()
 
             if _room_temperature is not None:
                 self._attr_current_temperature = _room_temperature
@@ -178,39 +180,44 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
                 self._attr_current_temperature = None
 
             with suppress(PyViCareNotSupportedFeatureError):
-                self._attributes["active_vicare_program"] = self._current_program = (
-                    self._api.getActiveProgram()
+                self._current_program = self._circuit.getActiveProgram()
+
+            with suppress(PyViCareNotSupportedFeatureError):
+                self._attr_target_temperature = (
+                    self._circuit.getCurrentDesiredTemperature()
                 )
 
             with suppress(PyViCareNotSupportedFeatureError):
-                self._attr_target_temperature = self._api.getCurrentDesiredTemperature()
+                self._current_mode = self._circuit.getActiveMode()
 
-            with suppress(PyViCareNotSupportedFeatureError):
-                self._attributes["active_vicare_mode"] = self._current_mode = (
-                    self._api.getActiveMode()
-                )
+            # Update the generic device attributes
+            self._attributes = {
+                "room_temperature": _room_temperature,
+                "active_vicare_program": self._current_program,
+                "active_vicare_mode": self._current_mode,
+            }
 
             with suppress(PyViCareNotSupportedFeatureError):
                 self._attributes["heating_curve_slope"] = (
-                    self._api.getHeatingCurveSlope()
+                    self._circuit.getHeatingCurveSlope()
                 )
 
             with suppress(PyViCareNotSupportedFeatureError):
                 self._attributes["heating_curve_shift"] = (
-                    self._api.getHeatingCurveShift()
+                    self._circuit.getHeatingCurveShift()
                 )
 
             with suppress(PyViCareNotSupportedFeatureError):
-                self._attributes["vicare_modes"] = self._api.getModes()
+                self._attributes["vicare_modes"] = self._circuit.getModes()
 
             self._current_action = False
             # Update the specific device attributes
             with suppress(PyViCareNotSupportedFeatureError):
-                for burner in get_burners(self._device):
+                for burner in get_burners(self._api):
                     self._current_action = self._current_action or burner.getActive()
 
             with suppress(PyViCareNotSupportedFeatureError):
-                for compressor in get_compressors(self._device):
+                for compressor in get_compressors(self._api):
                     self._current_action = (
                         self._current_action or compressor.getActive()
                     )
@@ -241,9 +248,9 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
             raise ValueError(f"Cannot set invalid hvac mode: {hvac_mode}")
 
         _LOGGER.debug("Setting hvac mode to %s / %s", hvac_mode, vicare_mode)
-        self._api.setMode(vicare_mode)
+        self._circuit.setMode(vicare_mode)
 
-    def vicare_mode_from_hvac_mode(self, hvac_mode) -> str | None:
+    def vicare_mode_from_hvac_mode(self, hvac_mode):
         """Return the corresponding vicare mode for an hvac_mode."""
         if "vicare_modes" not in self._attributes:
             return None
@@ -279,7 +286,7 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
     def set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperatures."""
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is not None:
-            self._api.setProgramTemperature(self._current_program, temp)
+            self._circuit.setProgramTemperature(self._current_program, temp)
             self._attr_target_temperature = temp
 
     @property
@@ -308,7 +315,7 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
         ):
             _LOGGER.debug("deactivating %s", self._current_program)
             try:
-                self._api.deactivateProgram(self._current_program)
+                self._circuit.deactivateProgram(self._current_program)
             except PyViCareCommandError as err:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
@@ -322,7 +329,7 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
         if target_program in CHANGABLE_HEATING_PROGRAMS:
             _LOGGER.debug("activating %s", target_program)
             try:
-                self._api.activateProgram(target_program)
+                self._circuit.activateProgram(target_program)
             except PyViCareCommandError as err:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
@@ -333,13 +340,13 @@ class ViCareClimate(ViCareEntity, ClimateEntity):
                 ) from err
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
+    def extra_state_attributes(self):
         """Show Device Attributes."""
         return self._attributes
 
-    def set_vicare_mode(self, vicare_mode) -> None:
+    def set_vicare_mode(self, vicare_mode):
         """Service function to set vicare modes directly."""
         if vicare_mode not in self._attributes["vicare_modes"]:
             raise ValueError(f"Cannot set invalid vicare mode: {vicare_mode}.")
 
-        self._api.setMode(vicare_mode)
+        self._circuit.setMode(vicare_mode)

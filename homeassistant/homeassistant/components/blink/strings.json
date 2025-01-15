@@ -11,7 +11,7 @@
       "2fa": {
         "title": "Two-factor authentication",
         "data": {
-          "pin": "Two-factor code"
+          "2fa": "Two-factor code"
         },
         "description": "Enter the PIN sent via email or SMS"
       }
@@ -55,6 +55,16 @@
     }
   },
   "services": {
+    "blink_update": {
+      "name": "Update",
+      "description": "Forces a refresh.",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "The Blink device id."
+        }
+      }
+    },
     "record": {
       "name": "Record",
       "description": "Requests camera to record a clip."
@@ -84,16 +94,16 @@
       }
     },
     "send_pin": {
-      "name": "Send PIN",
-      "description": "Sends a new PIN to Blink for 2FA.",
+      "name": "Send pin",
+      "description": "Sends a new PIN to blink for 2FA.",
       "fields": {
         "pin": {
-          "name": "PIN",
-          "description": "PIN received from Blink. Leave empty if you only received a verification email."
+          "name": "Pin",
+          "description": "PIN received from blink. Leave empty if you only received a verification email."
         },
         "config_entry_id": {
           "name": "Integration ID",
-          "description": "The Blink Integration ID."
+          "description": "The Blink Integration id."
         }
       }
     }

@@ -28,9 +28,7 @@ class DialogFlowError(HomeAssistantError):
     """Raised when a DialogFlow error happens."""
 
 
-async def handle_webhook(
-    hass: HomeAssistant, webhook_id: str, request: web.Request
-) -> web.Response | None:
+async def handle_webhook(hass, webhook_id, request):
     """Handle incoming webhook with Dialogflow requests."""
     message = await request.json()
 
@@ -38,7 +36,7 @@ async def handle_webhook(
 
     try:
         response = await async_handle_message(hass, message)
-        return None if response is None else web.json_response(response)
+        return b"" if response is None else web.json_response(response)
 
     except DialogFlowError as err:
         _LOGGER.warning(str(err))
@@ -102,8 +100,6 @@ def get_api_version(message):
         return V1
     if message.get("responseId") is not None:
         return V2
-
-    raise ValueError(f"Unable to extract API version from message: {message}")
 
 
 async def async_handle_message(hass, message):
@@ -175,5 +171,3 @@ class DialogflowResponse:
 
         if self.api_version is V2:
             return {"fulfillmentText": self.speech, "source": SOURCE}
-
-        raise ValueError(f"Invalid API version: {self.api_version}")

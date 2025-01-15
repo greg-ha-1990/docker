@@ -8,17 +8,9 @@
     }
   },
   "services": {
-    "toggle": {
-      "service": "mdi:toggle-switch"
-    },
-    "turn_off": {
-      "service": "mdi:toggle-switch-off"
-    },
-    "turn_on": {
-      "service": "mdi:toggle-switch"
-    },
-    "reload": {
-      "service": "mdi:reload"
-    }
+    "toggle": "mdi:toggle-switch",
+    "turn_off": "mdi:toggle-switch-off",
+    "turn_on": "mdi:toggle-switch",
+    "reload": "mdi:reload"
   }
 }

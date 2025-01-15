@@ -88,8 +88,6 @@
     }
   },
   "services": {
-    "set_vicare_mode": {
-      "service": "mdi:cog"
-    }
+    "set_vicare_mode": "mdi:cog"
   }
 }

@@ -7,22 +7,23 @@ from typing import Any
 
 from aiohttp.hdrs import METH_POST
 from aiohttp.web import Request, Response
-from aiotedee.exception import TedeeDataUpdateException, TedeeWebhookException
+from pytedee_async.exception import TedeeDataUpdateException, TedeeWebhookException
 
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.webhook import (
     async_generate_id as webhook_generate_id,
-    async_generate_url as webhook_generate_url,
+    async_generate_path as webhook_generate_path,
     async_register as webhook_register,
     async_unregister as webhook_unregister,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_WEBHOOK_ID, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.network import get_url
 
 from .const import DOMAIN, NAME
-from .coordinator import TedeeApiCoordinator, TedeeConfigEntry
+from .coordinator import TedeeApiCoordinator
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -32,11 +33,13 @@ PLATFORMS = [
 
 _LOGGER = logging.getLogger(__name__)
 
+type TedeeConfigEntry = ConfigEntry[TedeeApiCoordinator]
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: TedeeConfigEntry) -> bool:
     """Integration setup."""
 
-    coordinator = TedeeApiCoordinator(hass, entry)
+    coordinator = TedeeApiCoordinator(hass)
 
     await coordinator.async_config_entry_first_refresh()
 
@@ -63,9 +66,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: TedeeConfigEntry) -> boo
             await coordinator.tedee_client.cleanup_webhooks_by_host(instance_url)
         except (TedeeDataUpdateException, TedeeWebhookException) as ex:
             _LOGGER.warning("Failed to cleanup Tedee webhooks by host: %s", ex)
-
-        webhook_url = webhook_generate_url(
-            hass, entry.data[CONF_WEBHOOK_ID], allow_external=False, allow_ip=True
+        webhook_url = (
+            f"{instance_url}{webhook_generate_path(entry.data[CONF_WEBHOOK_ID])}"
         )
         webhook_name = "Tedee"
         if entry.title != NAME:
@@ -98,7 +100,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TedeeConfigEntry) -> boo
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: TedeeConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
@@ -130,9 +132,7 @@ def get_webhook_handler(
     return async_webhook_handler
 
 
-async def async_migrate_entry(
-    hass: HomeAssistant, config_entry: TedeeConfigEntry
-) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Migrate old entry."""
     if config_entry.version > 1:
         # This means the user has downgraded from a future version

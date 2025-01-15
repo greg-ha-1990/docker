@@ -55,19 +55,19 @@ def generate_and_validate(integrations: dict[str, Integration]) -> str:
 
     # HomeKit models are matched on starting string, make sure none overlap.
     warned = set()
-    for key, value in homekit_dict.items():
+    for key in homekit_dict:
         if key in warned:
             continue
 
         # n^2 yoooo
-        for key_2, value_2 in homekit_dict.items():
+        for key_2 in homekit_dict:
             if key == key_2 or key_2 in warned:
                 continue
 
             if key.startswith(key_2) or key_2.startswith(key):
                 integration.add_error(
                     "zeroconf",
-                    f"Integrations {value} and {value_2} "
+                    f"Integrations {homekit_dict[key]} and {homekit_dict[key_2]} "
                     "have overlapping HomeKit models",
                 )
                 warned.add(key)
@@ -90,15 +90,19 @@ def validate(integrations: dict[str, Integration], config: Config) -> None:
     if config.specific_integrations:
         return
 
-    if zeroconf_path.read_text() != content:
-        config.add_error(
-            "zeroconf",
-            "File zeroconf.py is not up to date. Run python3 -m script.hassfest",
-            fixable=True,
-        )
+    with open(str(zeroconf_path)) as fp:
+        current = fp.read()
+        if current != content:
+            config.add_error(
+                "zeroconf",
+                "File zeroconf.py is not up to date. Run python3 -m script.hassfest",
+                fixable=True,
+            )
+        return
 
 
 def generate(integrations: dict[str, Integration], config: Config) -> None:
     """Generate zeroconf file."""
     zeroconf_path = config.root / "homeassistant/generated/zeroconf.py"
-    zeroconf_path.write_text(f"{config.cache['zeroconf']}")
+    with open(str(zeroconf_path), "w") as fp:
+        fp.write(f"{config.cache['zeroconf']}")

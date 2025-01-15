@@ -22,6 +22,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.group import (
     expand_entity_ids as _expand_entity_ids,
     get_entity_ids as _get_entity_ids,
@@ -48,13 +49,12 @@ from .const import (  # noqa: F401
     ATTR_ORDER,
     ATTR_REMOVE_ENTITIES,
     CONF_HIDE_MEMBERS,
-    DATA_COMPONENT,
     DOMAIN,
     GROUP_ORDER,
     REG_KEY,
 )
 from .entity import Group, async_get_component
-from .registry import async_setup as async_setup_registry
+from .registry import GroupIntegrationRegistry, async_setup as async_setup_registry
 
 CONF_ALL = "all"
 
@@ -110,7 +110,8 @@ def is_on(hass: HomeAssistant, entity_id: str) -> bool:
         return False
 
     if (state := hass.states.get(entity_id)) is not None:
-        return state.state in hass.data[REG_KEY].on_off_mapping
+        registry: GroupIntegrationRegistry = hass.data[REG_KEY]
+        return state.state in registry.on_off_mapping
 
     return False
 
@@ -131,7 +132,7 @@ def groups_with_entity(hass: HomeAssistant, entity_id: str) -> list[str]:
 
     return [
         group.entity_id
-        for group in hass.data[DATA_COMPONENT].entities
+        for group in hass.data[DOMAIN].entities
         if entity_id in group.tracking
     ]
 
@@ -178,7 +179,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up all groups found defined in the configuration."""
-    component = async_get_component(hass)
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = EntityComponent[Group](_LOGGER, DOMAIN, hass)
+
+    component: EntityComponent[Group] = hass.data[DOMAIN]
 
     await async_setup_registry(hass)
 
@@ -261,16 +265,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             if ATTR_ADD_ENTITIES in service.data:
                 delta = service.data[ATTR_ADD_ENTITIES]
                 entity_ids = set(group.tracking) | set(delta)
-                group.async_update_tracked_entity_ids(entity_ids)
+                await group.async_update_tracked_entity_ids(entity_ids)
 
             if ATTR_REMOVE_ENTITIES in service.data:
                 delta = service.data[ATTR_REMOVE_ENTITIES]
                 entity_ids = set(group.tracking) - set(delta)
-                group.async_update_tracked_entity_ids(entity_ids)
+                await group.async_update_tracked_entity_ids(entity_ids)
 
             if ATTR_ENTITIES in service.data:
                 entity_ids = service.data[ATTR_ENTITIES]
-                group.async_update_tracked_entity_ids(entity_ids)
+                await group.async_update_tracked_entity_ids(entity_ids)
 
             if ATTR_NAME in service.data:
                 group.set_name(service.data[ATTR_NAME])
@@ -334,7 +338,7 @@ async def _async_process_config(hass: HomeAssistant, config: ConfigType) -> None
         entity_ids: Collection[str] = conf.get(CONF_ENTITIES) or []
         icon: str | None = conf.get(CONF_ICON)
         mode = bool(conf.get(CONF_ALL))
-        order = hass.data[GROUP_ORDER]
+        order: int = hass.data[GROUP_ORDER]
 
         # We keep track of the order when we are creating the tasks
         # in the same way that async_create_group does to make

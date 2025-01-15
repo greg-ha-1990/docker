@@ -3,7 +3,11 @@
 from dataclasses import dataclass
 from typing import Any
 
-from deebot_client.capabilities import CapabilitySetEnable
+from deebot_client.capabilities import (
+    Capabilities,
+    CapabilitySetEnable,
+    VacuumCapabilities,
+)
 from deebot_client.events import EnableEvent
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
@@ -13,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import EcovacsConfigEntry
 from .entity import (
+    CapabilityDevice,
     EcovacsCapabilityEntityDescription,
     EcovacsDescriptionEntity,
     EcovacsEntity,
@@ -23,76 +28,86 @@ from .util import get_supported_entitites
 @dataclass(kw_only=True, frozen=True)
 class EcovacsSwitchEntityDescription(
     SwitchEntityDescription,
-    EcovacsCapabilityEntityDescription[CapabilitySetEnable],
+    EcovacsCapabilityEntityDescription[CapabilityDevice, CapabilitySetEnable],
 ):
     """Ecovacs switch entity description."""
 
 
 ENTITY_DESCRIPTIONS: tuple[EcovacsSwitchEntityDescription, ...] = (
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.advanced_mode,
         key="advanced_mode",
         translation_key="advanced_mode",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[VacuumCapabilities](
+        device_capabilities=VacuumCapabilities,
         capability_fn=lambda c: c.clean.continuous,
         key="continuous_cleaning",
         translation_key="continuous_cleaning",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[VacuumCapabilities](
+        device_capabilities=VacuumCapabilities,
         capability_fn=lambda c: c.settings.carpet_auto_fan_boost,
         key="carpet_auto_fan_boost",
         translation_key="carpet_auto_fan_boost",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[VacuumCapabilities](
+        device_capabilities=VacuumCapabilities,
         capability_fn=lambda c: c.clean.preference,
         key="clean_preference",
         translation_key="clean_preference",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.true_detect,
         key="true_detect",
         translation_key="true_detect",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.border_switch,
         key="border_switch",
         translation_key="border_switch",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.child_lock,
         key="child_lock",
         translation_key="child_lock",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.moveup_warning,
         key="move_up_warning",
         translation_key="move_up_warning",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.cross_map_border_warning,
         key="cross_map_border_warning",
         translation_key="cross_map_border_warning",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.CONFIG,
     ),
-    EcovacsSwitchEntityDescription(
+    EcovacsSwitchEntityDescription[Capabilities](
+        device_capabilities=Capabilities,
         capability_fn=lambda c: c.settings.safe_protect,
         key="safe_protect",
         translation_key="safe_protect",
@@ -117,7 +132,7 @@ async def async_setup_entry(
 
 
 class EcovacsSwitchEntity(
-    EcovacsDescriptionEntity[CapabilitySetEnable],
+    EcovacsDescriptionEntity[CapabilityDevice, CapabilitySetEnable],
     SwitchEntity,
 ):
     """Ecovacs switch entity."""
@@ -131,7 +146,7 @@ class EcovacsSwitchEntity(
         await super().async_added_to_hass()
 
         async def on_event(event: EnableEvent) -> None:
-            self._attr_is_on = event.enabled
+            self._attr_is_on = event.enable
             self.async_write_ha_state()
 
         self._subscribe(self._capability.event, on_event)

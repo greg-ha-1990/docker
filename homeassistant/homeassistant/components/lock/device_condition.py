@@ -11,6 +11,13 @@ from homeassistant.const import (
     CONF_DOMAIN,
     CONF_ENTITY_ID,
     CONF_TYPE,
+    STATE_JAMMED,
+    STATE_LOCKED,
+    STATE_LOCKING,
+    STATE_OPEN,
+    STATE_OPENING,
+    STATE_UNLOCKED,
+    STATE_UNLOCKING,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import (
@@ -21,7 +28,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.config_validation import DEVICE_CONDITION_BASE_SCHEMA
 from homeassistant.helpers.typing import ConfigType, TemplateVarsType
 
-from . import DOMAIN, LockState
+from . import DOMAIN
 
 # mypy: disallow-any-generics
 
@@ -74,19 +81,19 @@ def async_condition_from_config(
 ) -> condition.ConditionCheckerType:
     """Create a function to test a device condition."""
     if config[CONF_TYPE] == "is_jammed":
-        state = LockState.JAMMED
+        state = STATE_JAMMED
     elif config[CONF_TYPE] == "is_opening":
-        state = LockState.OPENING
+        state = STATE_OPENING
     elif config[CONF_TYPE] == "is_locking":
-        state = LockState.LOCKING
+        state = STATE_LOCKING
     elif config[CONF_TYPE] == "is_open":
-        state = LockState.OPEN
+        state = STATE_OPEN
     elif config[CONF_TYPE] == "is_unlocking":
-        state = LockState.UNLOCKING
+        state = STATE_UNLOCKING
     elif config[CONF_TYPE] == "is_locked":
-        state = LockState.LOCKED
+        state = STATE_LOCKED
     else:
-        state = LockState.UNLOCKED
+        state = STATE_UNLOCKED
 
     registry = er.async_get(hass)
     entity_id = er.async_resolve_entity_id(registry, config[ATTR_ENTITY_ID])

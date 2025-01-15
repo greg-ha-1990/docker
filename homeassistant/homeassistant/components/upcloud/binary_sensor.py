@@ -9,8 +9,7 @@ from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DATA_UPCLOUD
-from .entity import UpCloudServerEntity
+from . import DATA_UPCLOUD, UpCloudServerEntity
 
 
 async def async_setup_entry(

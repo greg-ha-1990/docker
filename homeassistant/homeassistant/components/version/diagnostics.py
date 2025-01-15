@@ -6,18 +6,20 @@ from typing import Any
 
 from attr import asdict
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
-from . import VersionConfigEntry
+from .const import DOMAIN
+from .coordinator import VersionDataUpdateCoordinator
 
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
-    config_entry: VersionConfigEntry,
+    config_entry: ConfigEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator = config_entry.runtime_data
+    coordinator: VersionDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
 

@@ -54,7 +54,6 @@ from .const import (
     MODEL_AIRPURIFIER_M2,
     MODEL_AIRPURIFIER_MA2,
     MODEL_AIRPURIFIER_PROH,
-    MODEL_AIRPURIFIER_PROH_EU,
     MODEL_AIRPURIFIER_ZA1,
     MODEL_FAN_SA1,
     MODEL_FAN_V2,
@@ -63,7 +62,7 @@ from .const import (
     MODEL_FAN_ZA3,
     MODEL_FAN_ZA4,
 )
-from .entity import XiaomiCoordinatedMiioEntity
+from .device import XiaomiCoordinatedMiioEntity
 
 ATTR_DISPLAY_ORIENTATION = "display_orientation"
 ATTR_LED_BRIGHTNESS = "led_brightness"
@@ -136,9 +135,6 @@ MODEL_TO_ATTR_MAP: dict[str, list] = {
         AttributeEnumMapping(ATTR_LED_BRIGHTNESS, AirpurifierLedBrightness)
     ],
     MODEL_AIRPURIFIER_PROH: [
-        AttributeEnumMapping(ATTR_LED_BRIGHTNESS, AirpurifierMiotLedBrightness)
-    ],
-    MODEL_AIRPURIFIER_PROH_EU: [
         AttributeEnumMapping(ATTR_LED_BRIGHTNESS, AirpurifierMiotLedBrightness)
     ],
     MODEL_FAN_SA1: [AttributeEnumMapping(ATTR_LED_BRIGHTNESS, FanLedBrightness)],

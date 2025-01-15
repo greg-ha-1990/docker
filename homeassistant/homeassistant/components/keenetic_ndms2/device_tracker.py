@@ -9,6 +9,7 @@ from ndms2_client import Device
 from homeassistant.components.device_tracker import (
     DOMAIN as DEVICE_TRACKER_DOMAIN,
     ScannerEntity,
+    SourceType,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -103,6 +104,11 @@ class KeeneticTracker(ScannerEntity):
         )
 
     @property
+    def source_type(self) -> SourceType:
+        """Return the source type of the client."""
+        return SourceType.ROUTER
+
+    @property
     def name(self) -> str:
         """Return the name of the device."""
         return self._device.name or self._device.mac
@@ -113,7 +119,7 @@ class KeeneticTracker(ScannerEntity):
         return f"{self._device.mac}_{self._router.config_entry.entry_id}"
 
     @property
-    def ip_address(self) -> str | None:
+    def ip_address(self) -> str:
         """Return the primary ip address of the device."""
         return self._device.ip if self.is_connected else None
 

@@ -11,8 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
-from .entity import VeluxEntity
+from . import DOMAIN, VeluxEntity
 
 PARALLEL_UPDATES = 1
 
@@ -24,7 +23,7 @@ async def async_setup_entry(
     module = hass.data[DOMAIN][config.entry_id]
 
     async_add_entities(
-        VeluxLight(node, config.entry_id)
+        VeluxLight(node)
         for node in module.pyvlx.nodes
         if isinstance(node, LighteningDevice)
     )

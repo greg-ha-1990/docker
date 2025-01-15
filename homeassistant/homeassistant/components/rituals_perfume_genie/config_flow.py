@@ -45,7 +45,6 @@ class RitualsPerfumeGenieConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             await account.authenticate()
         except ClientResponseError:
-            _LOGGER.exception("Unexpected response")
             errors["base"] = "cannot_connect"
         except AuthenticationException:
             errors["base"] = "invalid_auth"

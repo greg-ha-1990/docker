@@ -3,24 +3,15 @@
     "step": {
       "user": {
         "data": {
-          "url": "[%key:common::config_flow::data::url%]",
+          "url": "URL in the format http://HOST/api/",
           "username": "[%key:common::config_flow::data::username%]",
           "password": "[%key:common::config_flow::data::password%]",
-          "import_plugins": "Import entities from fibaro plugins / quickapps"
-        },
-        "data_description": {
-          "url": "The URL of the Fibaro hub in the format `http(s)://IP`.",
-          "username": "The username of the Fibaro hub user.",
-          "password": "The password of the Fibaro hub user.",
-          "import_plugins": "Select if entities from Fibaro plugins / quickapps should be imported."
+          "import_plugins": "Import entities from fibaro plugins?"
         }
       },
       "reauth_confirm": {
         "data": {
           "password": "[%key:common::config_flow::data::password%]"
-        },
-        "data_description": {
-          "password": "[%key:component::fibaro::config::step::user::data_description::password%]"
         },
         "title": "[%key:common::config_flow::title::reauth%]",
         "description": "Please update your password for {username}"

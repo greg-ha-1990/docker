@@ -55,7 +55,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 
 from .config_flow import SystemBridgeConfigFlow
-from .const import DATA_WAIT_TIMEOUT, DOMAIN, MODULES
+from .const import DOMAIN, MODULES
 from .coordinator import SystemBridgeDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ async def async_setup_entry(
     )
     supported = False
     try:
-        async with asyncio.timeout(DATA_WAIT_TIMEOUT):
+        async with asyncio.timeout(10):
             supported = await version.check_supported()
     except AuthenticationException as exception:
         _LOGGER.error("Authentication failed for %s: %s", entry.title, exception)
@@ -161,9 +161,8 @@ async def async_setup_entry(
         _LOGGER,
         entry=entry,
     )
-
     try:
-        async with asyncio.timeout(DATA_WAIT_TIMEOUT):
+        async with asyncio.timeout(10):
             await coordinator.async_get_data(MODULES)
     except AuthenticationException as exception:
         _LOGGER.error("Authentication failed for %s: %s", entry.title, exception)
@@ -196,6 +195,26 @@ async def async_setup_entry(
 
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
+
+    try:
+        # Wait for initial data
+        async with asyncio.timeout(10):
+            while not coordinator.is_ready:
+                _LOGGER.debug(
+                    "Waiting for initial data from %s (%s)",
+                    entry.title,
+                    entry.data[CONF_HOST],
+                )
+                await asyncio.sleep(1)
+    except TimeoutError as exception:
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="timeout",
+            translation_placeholders={
+                "title": entry.title,
+                "host": entry.data[CONF_HOST],
+            },
+        ) from exception
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -277,11 +296,11 @@ async def async_setup_entry(
         coordinator: SystemBridgeDataUpdateCoordinator = hass.data[DOMAIN][
             service_call.data[CONF_BRIDGE]
         ]
-
+        processes: list[Process] = coordinator.data.processes
         # Find processes from list
         items: list[dict[str, Any]] = [
             asdict(process)
-            for process in coordinator.data.processes
+            for process in processes
             if process.name is not None
             and service_call.data[CONF_NAME].lower() in process.name.lower()
         ]

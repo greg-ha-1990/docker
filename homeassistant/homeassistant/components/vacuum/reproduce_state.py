@@ -11,8 +11,10 @@ from homeassistant.const import (
     ATTR_ENTITY_ID,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
+    STATE_IDLE,
     STATE_OFF,
     STATE_ON,
+    STATE_PAUSED,
 )
 from homeassistant.core import Context, HomeAssistant, State
 
@@ -24,18 +26,20 @@ from . import (
     SERVICE_SET_FAN_SPEED,
     SERVICE_START,
     SERVICE_STOP,
-    VacuumActivity,
+    STATE_CLEANING,
+    STATE_DOCKED,
+    STATE_RETURNING,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 VALID_STATES_TOGGLE = {STATE_ON, STATE_OFF}
 VALID_STATES_STATE = {
-    VacuumActivity.CLEANING,
-    VacuumActivity.DOCKED,
-    VacuumActivity.IDLE,
-    VacuumActivity.PAUSED,
-    VacuumActivity.RETURNING,
+    STATE_CLEANING,
+    STATE_DOCKED,
+    STATE_IDLE,
+    STATE_PAUSED,
+    STATE_RETURNING,
 }
 
 
@@ -71,13 +75,13 @@ async def _async_reproduce_state(
             service = SERVICE_TURN_ON
         elif state.state == STATE_OFF:
             service = SERVICE_TURN_OFF
-        elif state.state == VacuumActivity.CLEANING:
+        elif state.state == STATE_CLEANING:
             service = SERVICE_START
-        elif state.state in [VacuumActivity.DOCKED, VacuumActivity.RETURNING]:
+        elif state.state in [STATE_DOCKED, STATE_RETURNING]:
             service = SERVICE_RETURN_TO_BASE
-        elif state.state == VacuumActivity.IDLE:
+        elif state.state == STATE_IDLE:
             service = SERVICE_STOP
-        elif state.state == VacuumActivity.PAUSED:
+        elif state.state == STATE_PAUSED:
             service = SERVICE_PAUSE
 
         await hass.services.async_call(

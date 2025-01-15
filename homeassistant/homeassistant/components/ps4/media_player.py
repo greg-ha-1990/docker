@@ -96,10 +96,11 @@ class PS4Device(MediaPlayerEntity):
         self._retry = 0
         self._disconnected = False
 
+    @callback
     def status_callback(self) -> None:
         """Handle status callback. Parse status."""
         self._parse_status()
-        self.schedule_update_ha_state()
+        self.async_write_ha_state()
 
     @callback
     def subscribe_to_protocol(self) -> None:
@@ -117,7 +118,7 @@ class PS4Device(MediaPlayerEntity):
         """Display logger msg if region is deprecated."""
         # Non-Breaking although data returned may be inaccurate.
         if self._region in deprecated_regions:
-            _LOGGER.warning(
+            _LOGGER.info(
                 """Region: %s has been deprecated.
                             Please remove PS4 integration
                             and Re-configure again to utilize
@@ -156,7 +157,7 @@ class PS4Device(MediaPlayerEntity):
             self._ps4.ddp_protocol = self.hass.data[PS4_DATA].protocol
             self.subscribe_to_protocol()
 
-        await self.hass.async_add_executor_job(self._parse_status)
+        self._parse_status()
 
     def _parse_status(self) -> None:
         """Parse status."""
@@ -339,7 +340,7 @@ class PS4Device(MediaPlayerEntity):
         """Set device info for registry."""
         # If cannot get status on startup, assume info from registry.
         if status is None:
-            _LOGGER.debug("Assuming status from registry")
+            _LOGGER.info("Assuming status from registry")
             e_registry = er.async_get(self.hass)
             d_registry = dr.async_get(self.hass)
 

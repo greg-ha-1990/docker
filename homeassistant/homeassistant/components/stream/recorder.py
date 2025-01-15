@@ -9,7 +9,6 @@ import os
 from typing import TYPE_CHECKING
 
 import av
-import av.container
 
 from homeassistant.core import HomeAssistant, callback
 
@@ -106,23 +105,24 @@ class RecorderOutput(StreamOutput):
 
             # Create output on first segment
             if not output:
-                container_options: dict[str, str] = {
-                    "video_track_timescale": str(int(1 / source_v.time_base)),  # type: ignore[operator]
-                    "movflags": "frag_keyframe+empty_moov",
-                    "min_frag_duration": str(self.stream_settings.min_segment_duration),
-                }
                 output = av.open(
                     self.video_path + ".tmp",
                     "w",
                     format=RECORDER_CONTAINER_FORMAT,
-                    container_options=container_options,
+                    container_options={
+                        "video_track_timescale": str(int(1 / source_v.time_base)),
+                        "movflags": "frag_keyframe+empty_moov",
+                        "min_frag_duration": str(
+                            self.stream_settings.min_segment_duration
+                        ),
+                    },
                 )
 
             # Add output streams if necessary
             if not output_v:
                 output_v = output.add_stream(template=source_v)
                 context = output_v.codec_context
-                context.global_header = True
+                context.flags |= "GLOBAL_HEADER"
             if source_a and not output_a:
                 output_a = output.add_stream(template=source_a)
 
@@ -132,23 +132,21 @@ class RecorderOutput(StreamOutput):
                 last_stream_id = segment.stream_id
                 pts_adjuster["video"] = int(
                     (running_duration - source.start_time)
-                    / (av.time_base * source_v.time_base)  # type: ignore[operator]
+                    / (av.time_base * source_v.time_base)
                 )
                 if source_a:
                     pts_adjuster["audio"] = int(
                         (running_duration - source.start_time)
-                        / (av.time_base * source_a.time_base)  # type: ignore[operator]
+                        / (av.time_base * source_a.time_base)
                     )
 
             # Remux video
             for packet in source.demux():
-                if packet.pts is None:
+                if packet.dts is None:
                     continue
-                packet.pts += pts_adjuster[packet.stream.type]  # type: ignore[operator]
-                packet.dts += pts_adjuster[packet.stream.type]  # type: ignore[operator]
-                stream = output_v if packet.stream.type == "video" else output_a
-                assert stream
-                packet.stream = stream
+                packet.pts += pts_adjuster[packet.stream.type]
+                packet.dts += pts_adjuster[packet.stream.type]
+                packet.stream = output_v if packet.stream.type == "video" else output_a
                 output.mux(packet)
 
             running_duration += source.duration - source.start_time
@@ -171,9 +169,7 @@ class RecorderOutput(StreamOutput):
             os.remove(video_path + ".tmp")
 
         def finish_writing(
-            segments: deque[Segment],
-            output: av.container.OutputContainer | None,
-            video_path: str,
+            segments: deque[Segment], output: av.OutputContainer, video_path: str
         ) -> None:
             """Finish writing output."""
             # Should only have 0 or 1 segments, but loop through just in case

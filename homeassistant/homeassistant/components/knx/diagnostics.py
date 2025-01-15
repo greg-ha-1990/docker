@@ -18,7 +18,6 @@ from .const import (
     CONF_KNX_SECURE_DEVICE_AUTHENTICATION,
     CONF_KNX_SECURE_USER_PASSWORD,
     DOMAIN,
-    KNX_MODULE_KEY,
 )
 
 TO_REDACT = {
@@ -34,7 +33,7 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     diag: dict[str, Any] = {}
-    knx_module = hass.data[KNX_MODULE_KEY]
+    knx_module = hass.data[DOMAIN]
     diag["xknx"] = {
         "version": knx_module.xknx.version,
         "current_address": str(knx_module.xknx.current_address),

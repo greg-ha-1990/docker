@@ -1,9 +1,5 @@
 """Constants for Stream component."""
 
-from __future__ import annotations
-
-from typing import Final
-
 DOMAIN = "stream"
 
 ATTR_ENDPOINTS = "endpoints"
@@ -15,8 +11,8 @@ RECORDER_PROVIDER = "recorder"
 
 OUTPUT_FORMATS = [HLS_PROVIDER]
 
-SEGMENT_CONTAINER_FORMAT: Final = "mp4"  # format for segments
-RECORDER_CONTAINER_FORMAT: Final = "mp4"  # format for recorder output
+SEGMENT_CONTAINER_FORMAT = "mp4"  # format for segments
+RECORDER_CONTAINER_FORMAT = "mp4"  # format for recorder output
 AUDIO_CODECS = {"aac", "mp3"}
 
 FORMAT_CONTENT_TYPE = {HLS_PROVIDER: "application/vnd.apple.mpegurl"}

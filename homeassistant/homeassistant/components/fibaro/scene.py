@@ -7,22 +7,23 @@ from typing import Any
 from pyfibaro.fibaro_scene import SceneModel
 
 from homeassistant.components.scene import Scene
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import slugify
 
-from . import FibaroConfigEntry, FibaroController
+from . import FibaroController
 from .const import DOMAIN
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: FibaroConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Perform the setup for Fibaro scenes."""
-    controller = entry.runtime_data
+    controller: FibaroController = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [FibaroScene(scene, controller) for scene in controller.read_scenes()],
         True,

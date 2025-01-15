@@ -13,14 +13,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE, CONF_VALUE_TEMPLATE
 from homeassistant.core import HassJobType, HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.service_info.mqtt import ReceivePayloadType
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from . import subscription
 from .config import MQTT_BASE_SCHEMA
 from .const import ATTR_DISCOVERY_HASH, CONF_QOS, CONF_TOPIC
 from .discovery import MQTTDiscoveryPayload
-from .entity import (
+from .mixins import (
     MqttDiscoveryDeviceUpdateMixin,
     async_handle_schema_error,
     async_setup_non_entity_entry_helper,
@@ -32,6 +31,7 @@ from .models import (
     MqttValueTemplate,
     MqttValueTemplateException,
     ReceiveMessage,
+    ReceivePayloadType,
 )
 from .schemas import MQTT_ENTITY_DEVICE_INFO_SCHEMA
 from .subscription import EntitySubscription
@@ -118,7 +118,8 @@ class MQTTTagScanner(MqttDiscoveryDeviceUpdateMixin):
         self.hass = hass
         self._sub_state: dict[str, EntitySubscription] | None = None
         self._value_template = MqttValueTemplate(
-            config.get(CONF_VALUE_TEMPLATE)
+            config.get(CONF_VALUE_TEMPLATE),
+            hass=self.hass,
         ).async_render_with_possible_json_value
 
         MqttDiscoveryDeviceUpdateMixin.__init__(
@@ -135,7 +136,8 @@ class MQTTTagScanner(MqttDiscoveryDeviceUpdateMixin):
             return
         self._config = config
         self._value_template = MqttValueTemplate(
-            config.get(CONF_VALUE_TEMPLATE)
+            config.get(CONF_VALUE_TEMPLATE),
+            hass=self.hass,
         ).async_render_with_possible_json_value
         update_device(self.hass, self._config_entry, config)
         await self.subscribe_topics()
@@ -178,6 +180,5 @@ class MQTTTagScanner(MqttDiscoveryDeviceUpdateMixin):
         self._sub_state = subscription.async_unsubscribe_topics(
             self.hass, self._sub_state
         )
-        tags = self.hass.data[DATA_MQTT].tags
-        if self.device_id in tags and discovery_id in tags[self.device_id]:
-            del tags[self.device_id][discovery_id]
+        if self.device_id:
+            del self.hass.data[DATA_MQTT].tags[self.device_id][discovery_id]

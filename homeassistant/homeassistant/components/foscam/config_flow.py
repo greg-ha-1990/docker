@@ -1,7 +1,5 @@
 """Config flow for foscam integration."""
 
-from typing import Any
-
 from libpyfoscam import FoscamCamera
 from libpyfoscam.foscam import (
     ERROR_FOSCAM_AUTH,
@@ -10,7 +8,7 @@ from libpyfoscam.foscam import (
 )
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
@@ -92,9 +90,7 @@ class FoscamConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_create_entry(title=name, data=data)
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
 

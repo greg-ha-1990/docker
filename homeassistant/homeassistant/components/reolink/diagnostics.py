@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .util import ReolinkConfigEntry, ReolinkData
+from . import ReolinkData
+from .const import DOMAIN
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, config_entry: ReolinkConfigEntry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    reolink_data: ReolinkData = config_entry.runtime_data
+    reolink_data: ReolinkData = hass.data[DOMAIN][config_entry.entry_id]
     host = reolink_data.host
     api = host.api
 
@@ -21,9 +23,7 @@ async def async_get_config_entry_diagnostics(
     for ch in api.channels:
         IPC_cam[ch] = {}
         IPC_cam[ch]["model"] = api.camera_model(ch)
-        IPC_cam[ch]["hardware version"] = api.camera_hardware_version(ch)
         IPC_cam[ch]["firmware version"] = api.camera_sw_version(ch)
-        IPC_cam[ch]["encoding main"] = await api.get_encoding(ch)
 
     return {
         "model": api.model,
@@ -42,8 +42,6 @@ async def async_get_config_entry_diagnostics(
         "stream channels": api.stream_channels,
         "IPC cams": IPC_cam,
         "capabilities": api.capabilities,
-        "cmd list": host.update_cmd,
-        "firmware ch list": host.firmware_ch_list,
         "api versions": api.checked_api_versions,
         "abilities": api.abilities,
     }

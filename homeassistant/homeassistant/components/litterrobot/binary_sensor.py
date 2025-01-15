@@ -13,12 +13,14 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import LitterRobotConfigEntry
+from .const import DOMAIN
 from .entity import LitterRobotEntity, _RobotT
+from .hub import LitterRobotHub
 
 
 @dataclass(frozen=True)
@@ -78,11 +80,11 @@ BINARY_SENSOR_MAP: dict[type[Robot], tuple[RobotBinarySensorEntityDescription, .
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: LitterRobotConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Litter-Robot binary sensors using config entry."""
-    hub = entry.runtime_data
+    hub: LitterRobotHub = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         LitterRobotBinarySensorEntity(robot=robot, hub=hub, description=description)
         for robot in hub.account.robots

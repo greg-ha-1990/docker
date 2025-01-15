@@ -1,7 +1,5 @@
 {
   "services": {
-    "calibrate": {
-      "service": "mdi:wrench"
-    }
+    "calibrate": "mdi:wrench"
   }
 }

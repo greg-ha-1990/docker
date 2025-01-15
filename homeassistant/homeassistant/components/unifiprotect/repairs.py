@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import cast
 
-from uiprotect import ProtectApiClient
-from uiprotect.data import Bootstrap, Camera, ModelType
-from uiprotect.data.types import FirmwareReleaseChannel
+from pyunifiprotect import ProtectApiClient
+from pyunifiprotect.data import Bootstrap, Camera, ModelType
+from pyunifiprotect.data.types import FirmwareReleaseChannel
 import voluptuous as vol
 
 from homeassistant import data_entry_flow
@@ -16,7 +16,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from .const import CONF_ALLOW_EA
-from .data import UFPConfigEntry, async_get_data_for_entry_id
 from .utils import async_create_api_client
 
 
@@ -24,9 +23,9 @@ class ProtectRepair(RepairsFlow):
     """Handler for an issue fixing flow."""
 
     _api: ProtectApiClient
-    _entry: UFPConfigEntry
+    _entry: ConfigEntry
 
-    def __init__(self, *, api: ProtectApiClient, entry: UFPConfigEntry) -> None:
+    def __init__(self, *, api: ProtectApiClient, entry: ConfigEntry) -> None:
         """Create flow."""
 
         self._api = api
@@ -129,7 +128,7 @@ class RTSPRepair(ProtectRepair):
         self,
         *,
         api: ProtectApiClient,
-        entry: UFPConfigEntry,
+        entry: ConfigEntry,
         camera_id: str,
     ) -> None:
         """Create flow."""
@@ -220,34 +219,29 @@ class RTSPRepair(ProtectRepair):
         )
 
 
-@callback
-def _async_get_or_create_api_client(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> ProtectApiClient:
-    """Get or create an API client."""
-    if data := async_get_data_for_entry_id(hass, entry.entry_id):
-        return data.api
-    return async_create_api_client(hass, entry)
-
-
 async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, str | int | float | None] | None,
 ) -> RepairsFlow:
     """Create flow."""
-    if (
-        data is not None
-        and "entry_id" in data
-        and (entry := hass.config_entries.async_get_entry(cast(str, data["entry_id"])))
-    ):
-        api = _async_get_or_create_api_client(hass, entry)
-        if issue_id == "ea_channel_warning":
+    if data is not None and issue_id == "ea_channel_warning":
+        entry_id = cast(str, data["entry_id"])
+        if (entry := hass.config_entries.async_get_entry(entry_id)) is not None:
+            api = async_create_api_client(hass, entry)
             return EAConfirmRepair(api=api, entry=entry)
-        if issue_id == "cloud_user":
+
+    elif data is not None and issue_id == "cloud_user":
+        entry_id = cast(str, data["entry_id"])
+        if (entry := hass.config_entries.async_get_entry(entry_id)) is not None:
+            api = async_create_api_client(hass, entry)
             return CloudAccountRepair(api=api, entry=entry)
-        if issue_id.startswith("rtsp_disabled_"):
-            return RTSPRepair(
-                api=api, entry=entry, camera_id=cast(str, data["camera_id"])
-            )
+
+    elif data is not None and issue_id.startswith("rtsp_disabled_"):
+        entry_id = cast(str, data["entry_id"])
+        camera_id = cast(str, data["camera_id"])
+        if (entry := hass.config_entries.async_get_entry(entry_id)) is not None:
+            api = async_create_api_client(hass, entry)
+            return RTSPRepair(api=api, entry=entry, camera_id=camera_id)
+
     return ConfirmRepairFlow()

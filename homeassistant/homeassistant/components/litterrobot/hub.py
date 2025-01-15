@@ -60,13 +60,13 @@ class LitterRobotHub:
         except LitterRobotException as ex:
             raise ConfigEntryNotReady("Unable to connect to Litter-Robot API") from ex
 
-    def litter_robots(self) -> Generator[LitterRobot]:
+    def litter_robots(self) -> Generator[LitterRobot, Any, Any]:
         """Get Litter-Robots from the account."""
         return (
             robot for robot in self.account.robots if isinstance(robot, LitterRobot)
         )
 
-    def feeder_robots(self) -> Generator[FeederRobot]:
+    def feeder_robots(self) -> Generator[FeederRobot, Any, Any]:
         """Get Feeder-Robots from the account."""
         return (
             robot for robot in self.account.robots if isinstance(robot, FeederRobot)

@@ -9,8 +9,8 @@ from pexpect import pxssh
 import voluptuous as vol
 
 from homeassistant.components.device_tracker import (
-    DOMAIN as DEVICE_TRACKER_DOMAIN,
-    PLATFORM_SCHEMA as DEVICE_TRACKER_PLATFORM_SCHEMA,
+    DOMAIN,
+    PLATFORM_SCHEMA as PARENT_PLATFORM_SCHEMA,
     DeviceScanner,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
@@ -21,7 +21,7 @@ from homeassistant.helpers.typing import ConfigType
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORM_SCHEMA = vol.All(
-    DEVICE_TRACKER_PLATFORM_SCHEMA.extend(
+    PARENT_PLATFORM_SCHEMA.extend(
         {
             vol.Required(CONF_HOST): cv.string,
             vol.Required(CONF_USERNAME): cv.string,
@@ -34,7 +34,7 @@ PLATFORM_SCHEMA = vol.All(
 
 def get_scanner(hass: HomeAssistant, config: ConfigType) -> CiscoDeviceScanner | None:
     """Validate the configuration and return a Cisco scanner."""
-    scanner = CiscoDeviceScanner(config[DEVICE_TRACKER_DOMAIN])
+    scanner = CiscoDeviceScanner(config[DOMAIN])
 
     return scanner if scanner.success_init else None
 
@@ -52,8 +52,9 @@ class CiscoDeviceScanner(DeviceScanner):
         self.last_results = {}
 
         self.success_init = self._update_info()
+        _LOGGER.info("Initialized cisco_ios scanner")
 
-    async def async_get_device_name(self, device: str) -> str | None:
+    def get_device_name(self, device):
         """Get the firmware doesn't save the name of the wireless device."""
         return None
 

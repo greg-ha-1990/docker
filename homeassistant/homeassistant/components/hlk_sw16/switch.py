@@ -7,9 +7,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DATA_DEVICE_REGISTER
+from . import DATA_DEVICE_REGISTER, SW16Device
 from .const import DOMAIN
-from .entity import SW16Entity
 
 PARALLEL_UPDATES = 0
 
@@ -32,7 +31,7 @@ async def async_setup_entry(
     async_add_entities(devices_from_entities(hass, entry))
 
 
-class SW16Switch(SW16Entity, SwitchEntity):
+class SW16Switch(SW16Device, SwitchEntity):
     """Representation of a HLK-SW16 switch."""
 
     @property

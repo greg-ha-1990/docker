@@ -23,6 +23,7 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,7 +31,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import WhirlpoolConfigEntry
+from . import WhirlpoolData
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,11 +70,11 @@ SUPPORTED_TARGET_TEMPERATURE_STEP = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: WhirlpoolConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up entry."""
-    whirlpool_data = config_entry.runtime_data
+    whirlpool_data: WhirlpoolData = hass.data[DOMAIN][config_entry.entry_id]
 
     aircons = [
         AirConEntity(
@@ -109,6 +110,7 @@ class AirConEntity(ClimateEntity):
     _attr_swing_modes = SUPPORTED_SWING_MODES
     _attr_target_temperature_step = SUPPORTED_TARGET_TEMPERATURE_STEP
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self,

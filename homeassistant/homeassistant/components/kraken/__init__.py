@@ -77,7 +77,7 @@ class KrakenData:
                 return await self._hass.async_add_executor_job(self._get_kraken_data)
         except pykrakenapi.pykrakenapi.KrakenAPIError as error:
             if "Unknown asset pair" in str(error):
-                _LOGGER.warning(
+                _LOGGER.info(
                     "Kraken.com reported an unknown asset pair. Refreshing list of"
                     " tradable asset pairs"
                 )

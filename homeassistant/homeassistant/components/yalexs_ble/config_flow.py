@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import logging
-from typing import Any, Self
+from typing import Any
 
 from bleak_retry_connector import BleakError, BLEDevice
 import voluptuous as vol
@@ -68,16 +68,12 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _address: str | None = None
-    _local_name_is_unique = False
-    active = False
-    local_name: str | None = None
-
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
         self._lock_cfg: ValidatedLockConfig | None = None
+        self._reauth_entry: ConfigEntry | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -85,7 +81,7 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the bluetooth discovery step."""
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
-        self.local_name = discovery_info.name
+        self.context["local_name"] = discovery_info.name
         self._discovery_info = discovery_info
         self.context["title_placeholders"] = {
             "name": human_readable_name(
@@ -107,8 +103,8 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         address = lock_cfg.address
-        self.local_name = lock_cfg.local_name
-        self._local_name_is_unique = local_name_is_unique(self.local_name)
+        local_name = lock_cfg.local_name
+        hass = self.hass
 
         # We do not want to raise on progress as integration_discovery takes
         # precedence over other discovery flows since we already have the keys.
@@ -120,7 +116,7 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates=new_data)
         for entry in self._async_current_entries():
             if (
-                self._local_name_is_unique
+                local_name_is_unique(lock_cfg.local_name)
                 and entry.data.get(CONF_LOCAL_NAME) == lock_cfg.local_name
             ):
                 return self.async_update_reload_and_abort(
@@ -128,14 +124,27 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         self._discovery_info = async_find_existing_service_info(
-            self.hass, self.local_name, address
+            hass, local_name, address
         )
         if not self._discovery_info:
             return self.async_abort(reason="no_devices_found")
 
-        self._address = address
-        if self.hass.config_entries.flow.async_has_matching_flow(self):
-            raise AbortFlow("already_in_progress")
+        # Integration discovery should abort other flows unless they
+        # are already in the process of being set up since this discovery
+        # will already have all the keys and the user can simply confirm.
+        for progress in self._async_in_progress(include_uninitialized=True):
+            context = progress["context"]
+            if (
+                local_name_is_unique(local_name)
+                and context.get("local_name") == local_name
+            ) or context.get("unique_id") == address:
+                if context.get("active"):
+                    # The user has already started interacting with this flow
+                    # and entered the keys. We abort the discovery flow since
+                    # we assume they do not want to use the discovered keys for
+                    # some reason.
+                    raise AbortFlow("already_in_progress")
+                hass.config_entries.flow.async_abort(progress["flow_id"])
 
         self._lock_cfg = lock_cfg
         self.context["title_placeholders"] = {
@@ -144,24 +153,6 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
             )
         }
         return await self.async_step_integration_discovery_confirm()
-
-    def is_matching(self, other_flow: Self) -> bool:
-        """Return True if other_flow is matching this flow."""
-        # Integration discovery should abort other flows unless they
-        # are already in the process of being set up since this discovery
-        # will already have all the keys and the user can simply confirm.
-        if (
-            self._local_name_is_unique and other_flow.local_name == self.local_name
-        ) or other_flow.unique_id == self._address:
-            if other_flow.active:
-                # The user has already started interacting with this flow
-                # and entered the keys. We abort the discovery flow since
-                # we assume they do not want to use the discovered keys for
-                # some reason.
-                return True
-            self.hass.config_entries.flow.async_abort(other_flow.flow_id)
-
-        return False
 
     async def async_step_integration_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -193,6 +184,9 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle configuration by re-auth."""
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         return await self.async_step_reauth_validate()
 
     async def async_step_reauth_validate(
@@ -200,7 +194,8 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle reauth and validation."""
         errors = {}
-        reauth_entry = self._get_reauth_entry()
+        reauth_entry = self._reauth_entry
+        assert reauth_entry is not None
         if user_input is not None:
             if (
                 device := async_ble_device_from_address(
@@ -217,7 +212,7 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             ):
                 return self.async_update_reload_and_abort(
-                    reauth_entry, data_updates=user_input
+                    reauth_entry, data={**reauth_entry.data, **user_input}
                 )
 
         return self.async_show_form(
@@ -239,7 +234,7 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            self.active = True
+            self.context["active"] = True
             address = user_input[CONF_ADDRESS]
             discovery_info = self._discovered_devices[address]
             local_name = discovery_info.name
@@ -312,11 +307,15 @@ class YalexsConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> YaleXSBLEOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return YaleXSBLEOptionsFlowHandler()
+        return YaleXSBLEOptionsFlowHandler(config_entry)
 
 
 class YaleXSBLEOptionsFlowHandler(OptionsFlow):
     """Handle YaleXSBLE options."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize YaleXSBLE options flow."""
+        self.entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -339,9 +338,7 @@ class YaleXSBLEOptionsFlowHandler(OptionsFlow):
                 {
                     vol.Optional(
                         CONF_ALWAYS_CONNECTED,
-                        default=self.config_entry.options.get(
-                            CONF_ALWAYS_CONNECTED, False
-                        ),
+                        default=self.entry.options.get(CONF_ALWAYS_CONNECTED, False),
                     ): bool,
                 }
             ),

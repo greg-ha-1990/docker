@@ -194,7 +194,7 @@ async def async_handle_message(
 
     try:
         if not enabled:
-            raise AlexaBridgeUnreachableError(  # noqa: TRY301
+            raise AlexaBridgeUnreachableError(
                 "Alexa API not enabled in Home Assistant configuration"
             )
 

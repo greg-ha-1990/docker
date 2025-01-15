@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Iterable
 from datetime import timedelta
+from functools import partial
 import logging
 from types import ModuleType
 from typing import Any, Generic
 
 from typing_extensions import TypeVar
+import voluptuous as vol
 
 from homeassistant import config as conf_util
 from homeassistant.config_entries import ConfigEntry
@@ -34,7 +36,7 @@ from homeassistant.setup import async_prepare_setup_platform
 
 from . import config_validation as cv, discovery, entity, service
 from .entity_platform import EntityPlatform
-from .typing import ConfigType, DiscoveryInfoType, VolDictType, VolSchemaType
+from .typing import ConfigType, DiscoveryInfoType
 
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=15)
 DATA_INSTANCES = "entity_components"
@@ -65,13 +67,10 @@ async def async_update_entity(hass: HomeAssistant, entity_id: str) -> None:
 
 
 class EntityComponent(Generic[_EntityT]):
-    """The EntityComponent manages platforms that manage entities.
-
-    An example of an entity component is 'light', which manages platforms such
-    as 'hue.light'.
+    """The EntityComponent manages platforms that manages entities.
 
     This class has the following responsibilities:
-     - Process the configuration and set up a platform based component, for example light.
+     - Process the configuration and set up a platform based component.
      - Manage the platforms and their entities.
      - Help extract the entities from a service call.
      - Listen for discovery events for platforms related to the domain.
@@ -223,7 +222,7 @@ class EntityComponent(Generic[_EntityT]):
     def async_register_legacy_entity_service(
         self,
         name: str,
-        schema: VolDictType | VolSchemaType,
+        schema: dict[str | vol.Marker, Any] | vol.Schema,
         func: str | Callable[..., Any],
         required_features: list[int] | None = None,
         supports_response: SupportsResponse = SupportsResponse.NONE,
@@ -260,22 +259,31 @@ class EntityComponent(Generic[_EntityT]):
     def async_register_entity_service(
         self,
         name: str,
-        schema: VolDictType | VolSchemaType | None,
+        schema: dict[str | vol.Marker, Any] | vol.Schema,
         func: str | Callable[..., Any],
         required_features: list[int] | None = None,
         supports_response: SupportsResponse = SupportsResponse.NONE,
     ) -> None:
         """Register an entity service."""
-        service.async_register_entity_service(
-            self.hass,
+        if isinstance(schema, dict):
+            schema = cv.make_entity_service_schema(schema)
+
+        service_func: str | HassJob[..., Any]
+        service_func = func if isinstance(func, str) else HassJob(func)
+
+        self.hass.services.async_register(
             self.domain,
             name,
-            entities=self._entities,
-            func=func,
+            partial(
+                service.entity_service_call,
+                self.hass,
+                self._entities,
+                service_func,
+                required_features=required_features,
+            ),
+            schema,
+            supports_response,
             job_type=HassJobType.Coroutinefunction,
-            required_features=required_features,
-            schema=schema,
-            supports_response=supports_response,
         )
 
     async def async_setup_platform(

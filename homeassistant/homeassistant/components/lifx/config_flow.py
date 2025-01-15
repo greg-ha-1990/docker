@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import socket
-from typing import Any, Self
+from typing import Any
 
 from aiolifx.aiolifx import Light
 from aiolifx.connection import LIFXConnection
@@ -40,8 +40,6 @@ class LifXConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for LIFX."""
 
     VERSION = 1
-
-    host: str | None = None
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -92,8 +90,11 @@ class LifXConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle any discovery."""
         self._async_abort_entries_match({CONF_HOST: host})
-        self.host = host
-        if self.hass.config_entries.flow.async_has_matching_flow(self):
+        self.context[CONF_HOST] = host
+        if any(
+            progress.get("context", {}).get(CONF_HOST) == host
+            for progress in self._async_in_progress()
+        ):
             return self.async_abort(reason="already_in_progress")
         if not (
             device := await self._async_try_connect(
@@ -103,10 +104,6 @@ class LifXConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="cannot_connect")
         self._discovered_device = device
         return await self.async_step_discovery_confirm()
-
-    def is_matching(self, other_flow: Self) -> bool:
-        """Return True if other_flow is matching this flow."""
-        return other_flow.host == self.host
 
     @callback
     def _async_discovered_pending_migration(self) -> bool:

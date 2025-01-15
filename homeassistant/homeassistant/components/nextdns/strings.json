@@ -10,11 +10,6 @@
         "data": {
           "profile": "Profile"
         }
-      },
-      "reauth_confirm": {
-        "data": {
-          "api_key": "[%key:common::config_flow::data::api_key%]"
-        }
       }
     },
     "error": {
@@ -23,8 +18,7 @@
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
     "abort": {
-      "already_configured": "This NextDNS profile is already configured.",
-      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
+      "already_configured": "This NextDNS profile is already configured."
     }
   },
   "system_health": {
@@ -48,91 +42,76 @@
     },
     "sensor": {
       "all_queries": {
-        "name": "DNS queries",
-        "unit_of_measurement": "queries"
+        "name": "DNS queries"
       },
       "blocked_queries": {
-        "name": "DNS queries blocked",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS queries blocked"
       },
       "blocked_queries_ratio": {
         "name": "DNS queries blocked ratio"
       },
       "doh3_queries": {
-        "name": "DNS-over-HTTP/3 queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS-over-HTTP/3 queries"
       },
       "doh3_queries_ratio": {
         "name": "DNS-over-HTTP/3 queries ratio"
       },
       "doh_queries": {
-        "name": "DNS-over-HTTPS queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS-over-HTTPS queries"
       },
       "doh_queries_ratio": {
         "name": "DNS-over-HTTPS queries ratio"
       },
       "doq_queries": {
-        "name": "DNS-over-QUIC queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS-over-QUIC queries"
       },
       "doq_queries_ratio": {
         "name": "DNS-over-QUIC queries ratio"
       },
       "dot_queries": {
-        "name": "DNS-over-TLS queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS-over-TLS queries"
       },
       "dot_queries_ratio": {
         "name": "DNS-over-TLS queries ratio"
       },
       "encrypted_queries": {
-        "name": "Encrypted queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "Encrypted queries"
       },
       "encrypted_queries_ratio": {
         "name": "Encrypted queries ratio"
       },
       "ipv4_queries": {
-        "name": "IPv4 queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "IPv4 queries"
       },
       "ipv6_queries": {
-        "name": "IPv6 queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "IPv6 queries"
       },
       "ipv6_queries_ratio": {
         "name": "IPv6 queries ratio"
       },
       "not_validated_queries": {
-        "name": "DNSSEC not validated queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNSSEC not validated queries"
       },
       "relayed_queries": {
-        "name": "DNS queries relayed",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNS queries relayed"
       },
       "tcp_queries": {
-        "name": "TCP queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "TCP queries"
       },
       "tcp_queries_ratio": {
         "name": "TCP queries ratio"
       },
       "udp_queries": {
-        "name": "UDP queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "UDP queries"
       },
       "udp_queries_ratio": {
         "name": "UDP queries ratio"
       },
       "unencrypted_queries": {
-        "name": "Unencrypted queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "Unencrypted queries"
       },
       "validated_queries": {
-        "name": "DNSSEC validated queries",
-        "unit_of_measurement": "[%key:component::nextdns::entity::sensor::all_queries::unit_of_measurement%]"
+        "name": "DNSSEC validated queries"
       },
       "validated_queries_ratio": {
         "name": "DNSSEC validated queries ratio"

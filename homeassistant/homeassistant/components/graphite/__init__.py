@@ -138,7 +138,8 @@ class GraphiteFeeder(threading.Thread):
         with suppress(ValueError):
             things["state"] = state.state_as_number(new_state)
         lines = [
-            f"{self._prefix}.{entity_id}.{key.replace(' ', '_')} {value:f} {now}"
+            "%s.%s.%s %f %i"
+            % (self._prefix, entity_id, key.replace(" ", "_"), value, now)
             for key, value in things.items()
             if isinstance(value, (float, int))
         ]

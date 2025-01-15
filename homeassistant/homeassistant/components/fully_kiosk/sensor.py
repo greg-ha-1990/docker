@@ -12,12 +12,13 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfInformation
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import FullyKioskConfigEntry
+from .const import DOMAIN
 from .coordinator import FullyKioskDataUpdateCoordinator
 from .entity import FullyKioskEntity
 
@@ -113,11 +114,13 @@ SENSORS: tuple[FullySensorEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: FullyKioskConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Fully Kiosk Browser sensor."""
-    coordinator = config_entry.runtime_data
+    coordinator: FullyKioskDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
     async_add_entities(
         FullySensor(coordinator, description)
         for description in SENSORS

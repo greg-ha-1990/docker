@@ -35,7 +35,7 @@ USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_DISPLAY_OPTIONS): SelectSelector(
             SelectSelectorConfig(
-                options=OPTION_TYPES,
+                options=[option for option in OPTION_TYPES if option != "beat"],
                 mode=SelectSelectorMode.DROPDOWN,
                 translation_key="display_options",
             )

@@ -27,7 +27,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = DataUpdateCoordinator(
         hass,
         logging.getLogger(__name__),
-        config_entry=entry,
         name=DOMAIN,
         update_method=async_get_mullvad_api_data,
         update_interval=timedelta(minutes=1),

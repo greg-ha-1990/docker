@@ -1,12 +1,12 @@
 {
   "services": {
     "invoke_pin": {
-      "name": "Play pin",
-      "description": "Starts playing content pinned on the specified device.",
+      "name": "Invoke PIN",
+      "description": "Invokes a pin on the specified device.",
       "fields": {
         "pin": {
-          "name": "Pin ID",
-          "description": "ID of the pinned content."
+          "name": "PIN",
+          "description": "Which pin to invoke."
         }
       }
     }

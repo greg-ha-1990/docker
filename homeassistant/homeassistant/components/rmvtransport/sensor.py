@@ -13,10 +13,7 @@ from RMVtransport.rmvtransport import (
 )
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_NAME, CONF_TIMEOUT, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
@@ -58,7 +55,7 @@ ATTRIBUTION = "Data provided by opendata.rmv.de"
 
 SCAN_INTERVAL = timedelta(seconds=60)
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_NEXT_DEPARTURE): [
             {
@@ -271,7 +268,7 @@ class RMVDepartureData:
                 if not dest_found:
                     continue
 
-            if (
+            elif (
                 self._lines
                 and journey["number"] not in self._lines
                 or journey["minutes"] < self._time_offset
@@ -289,6 +286,6 @@ class RMVDepartureData:
 
         if not self._error_notification and _deps_not_found:
             self._error_notification = True
-            _LOGGER.warning("Destination(s) %s not found", ", ".join(_deps_not_found))
+            _LOGGER.info("Destination(s) %s not found", ", ".join(_deps_not_found))
 
         self.departures = _deps

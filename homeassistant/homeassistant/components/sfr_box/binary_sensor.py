@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from sfrbox_api.models import DslInfo, FtthInfo, SystemInfo, WanInfo
 
@@ -66,22 +65,19 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     data: DomainData = hass.data[DOMAIN][entry.entry_id]
-    system_info = data.system.data
-    if TYPE_CHECKING:
-        assert system_info is not None
 
     entities: list[SFRBoxBinarySensor] = [
-        SFRBoxBinarySensor(data.wan, description, system_info)
+        SFRBoxBinarySensor(data.wan, description, data.system.data)
         for description in WAN_SENSOR_TYPES
     ]
-    if (net_infra := system_info.net_infra) == "adsl":
+    if (net_infra := data.system.data.net_infra) == "adsl":
         entities.extend(
-            SFRBoxBinarySensor(data.dsl, description, system_info)
+            SFRBoxBinarySensor(data.dsl, description, data.system.data)
             for description in DSL_SENSOR_TYPES
         )
     elif net_infra == "ftth":
         entities.extend(
-            SFRBoxBinarySensor(data.ftth, description, system_info)
+            SFRBoxBinarySensor(data.ftth, description, data.system.data)
             for description in FTTH_SENSOR_TYPES
         )
 
@@ -115,6 +111,4 @@ class SFRBoxBinarySensor[_T](
     @property
     def is_on(self) -> bool | None:
         """Return the native value of the device."""
-        if self.coordinator.data is None:
-            return None
         return self.entity_description.value_fn(self.coordinator.data)

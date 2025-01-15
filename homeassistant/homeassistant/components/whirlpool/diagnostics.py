@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import WhirlpoolConfigEntry
+from . import WhirlpoolData
+from .const import DOMAIN
 
 TO_REDACT = {
     "SERIAL_NUMBER",
@@ -22,11 +24,11 @@ TO_REDACT = {
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
-    config_entry: WhirlpoolConfigEntry,
+    config_entry: ConfigEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
 
-    whirlpool = config_entry.runtime_data
+    whirlpool: WhirlpoolData = hass.data[DOMAIN][config_entry.entry_id]
     diagnostics_data = {
         "Washer_dryers": {
             wd["NAME"]: dict(wd.items())

@@ -2,12 +2,11 @@
 
 import asyncio
 import logging
-from typing import Any
 
 from roonapi import RoonApi, RoonDiscovery
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -37,14 +36,14 @@ TIMEOUT = 120
 class RoonHub:
     """Interact with roon during config flow."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass):
         """Initialise the RoonHub."""
         self._hass = hass
 
-    async def discover(self) -> list[tuple[str, int]]:
+    async def discover(self):
         """Try and discover roon servers."""
 
-        def get_discovered_servers(discovery: RoonDiscovery) -> list[tuple[str, int]]:
+        def get_discovered_servers(discovery):
             servers = discovery.all()
             discovery.stop()
             return servers
@@ -94,7 +93,7 @@ class RoonHub:
         return (token, core_id, core_name)
 
 
-async def discover(hass: HomeAssistant) -> list[tuple[str, int]]:
+async def discover(hass):
     """Connect and authenticate home assistant."""
 
     hub = RoonHub(hass)
@@ -123,15 +122,13 @@ class RoonConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize the Roon flow."""
         self._host = None
         self._port = None
-        self._servers: list[tuple[str, int]] = []
+        self._servers = []
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Get roon core details via discovery."""
 
         self._servers = await discover(self.hass)
@@ -142,11 +139,9 @@ class RoonConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_fallback()
 
-    async def async_step_fallback(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_fallback(self, user_input=None):
         """Get host and port details from the user."""
-        errors: dict[str, str] = {}
+        errors = {}
 
         if user_input is not None:
             self._host = user_input["host"]
@@ -157,9 +152,7 @@ class RoonConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="fallback", data_schema=DATA_SCHEMA, errors=errors
         )
 
-    async def async_step_link(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_link(self, user_input=None):
         """Handle linking and authenticating with the roon server."""
         errors = {}
         if user_input is not None:

@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import RingConfigEntry
+from . import RingData
+from .const import DOMAIN
 
 TO_REDACT = {
     "id",
@@ -27,10 +29,10 @@ TO_REDACT = {
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: RingConfigEntry
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    ring_data = entry.runtime_data
+    ring_data: RingData = hass.data[DOMAIN][entry.entry_id]
     devices_data = ring_data.api.devices_data
     devices_raw = [
         devices_data[device_type][device_id]

@@ -12,6 +12,9 @@
         }
       }
     },
+    "abort": {
+      "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]"
+    },
     "error": {
       "invalid_known_hosts": "Known hosts must be a comma separated list of hosts."
     }
@@ -53,7 +56,7 @@
         },
         "view_path": {
           "name": "View path",
-          "description": "The URL path of the dashboard view to show."
+          "description": "The path of the dashboard view to show."
         }
       }
     }

@@ -1,14 +1,13 @@
 """Config flow for Environment Canada integration."""
 
 import logging
-from typing import Any
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as et
 
 import aiohttp
 from env_canada import ECWeather, ec_exc
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_LANGUAGE, CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.helpers import config_validation as cv
 
@@ -47,15 +46,13 @@ class EnvironmentCanadaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
         if user_input is not None:
             try:
                 info = await validate_input(user_input)
-            except (ET.ParseError, vol.MultipleInvalid, ec_exc.UnknownStationId):
+            except (et.ParseError, vol.MultipleInvalid, ec_exc.UnknownStationId):
                 errors["base"] = "bad_station_id"
             except aiohttp.ClientConnectionError:
                 errors["base"] = "cannot_connect"

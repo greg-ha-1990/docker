@@ -6,18 +6,16 @@ from collections.abc import Mapping
 import logging
 from typing import Any, NamedTuple
 
-from homewizard_energy import HomeWizardEnergyV1
+from homewizard_energy import HomeWizardEnergy
 from homewizard_energy.errors import DisabledError, RequestError, UnsupportedError
-from homewizard_energy.v1.models import Device
-import voluptuous as vol
+from homewizard_energy.models import Device
+from voluptuous import Required, Schema
 
 from homeassistant.components import onboarding, zeroconf
-from homeassistant.components.dhcp import DhcpServiceInfo
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_IP_ADDRESS, CONF_PATH
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.selector import TextSelector
 
 from .const import (
     CONF_API_ENABLED,
@@ -45,6 +43,7 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     discovery: DiscoveryData
+    entry: ConfigEntry | None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -70,11 +69,11 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
         user_input = user_input or {}
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
+            data_schema=Schema(
                 {
-                    vol.Required(
+                    Required(
                         CONF_IP_ADDRESS, default=user_input.get(CONF_IP_ADDRESS)
-                    ): TextSelector(),
+                    ): str,
                 }
             ),
             errors=errors,
@@ -111,32 +110,6 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         return await self.async_step_discovery_confirm()
-
-    async def async_step_dhcp(
-        self, discovery_info: DhcpServiceInfo
-    ) -> ConfigFlowResult:
-        """Handle dhcp discovery to update existing entries.
-
-        This flow is triggered only by DHCP discovery of known devices.
-        """
-        try:
-            device = await self._async_try_connect(discovery_info.ip)
-        except RecoverableError as ex:
-            _LOGGER.error(ex)
-            return self.async_abort(reason="unknown")
-
-        await self.async_set_unique_id(
-            f"{device.product_type}_{discovery_info.macaddress}"
-        )
-
-        self._abort_if_unique_id_configured(
-            updates={CONF_IP_ADDRESS: discovery_info.ip}
-        )
-
-        # This situation should never happen, as Home Assistant will only
-        # send updates for existing entries. In case it does, we'll just
-        # abort the flow with an unknown error.
-        return self.async_abort(reason="unknown")
 
     async def async_step_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -178,6 +151,7 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle re-auth if API was disabled."""
+        self.entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -186,52 +160,18 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
         """Confirm reauth dialog."""
         errors: dict[str, str] | None = None
         if user_input is not None:
-            reauth_entry = self._get_reauth_entry()
+            assert self.entry is not None
             try:
-                await self._async_try_connect(reauth_entry.data[CONF_IP_ADDRESS])
+                await self._async_try_connect(self.entry.data[CONF_IP_ADDRESS])
             except RecoverableError as ex:
                 _LOGGER.error(ex)
                 errors = {"base": ex.error_code}
             else:
-                await self.hass.config_entries.async_reload(reauth_entry.entry_id)
+                await self.hass.config_entries.async_reload(self.entry.entry_id)
                 return self.async_abort(reason="reauth_successful")
 
-        return self.async_show_form(step_id="reauth_confirm", errors=errors)
-
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle reconfiguration of the integration."""
-        errors: dict[str, str] = {}
-        if user_input:
-            try:
-                device_info = await self._async_try_connect(user_input[CONF_IP_ADDRESS])
-            except RecoverableError as ex:
-                _LOGGER.error(ex)
-                errors = {"base": ex.error_code}
-            else:
-                await self.async_set_unique_id(
-                    f"{device_info.product_type}_{device_info.serial}"
-                )
-                self._abort_if_unique_id_mismatch(reason="wrong_device")
-                return self.async_update_reload_and_abort(
-                    self._get_reconfigure_entry(),
-                    data_updates=user_input,
-                )
-        reconfigure_entry = self._get_reconfigure_entry()
         return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_IP_ADDRESS,
-                        default=reconfigure_entry.data.get(CONF_IP_ADDRESS),
-                    ): TextSelector(),
-                }
-            ),
-            description_placeholders={
-                "title": reconfigure_entry.title,
-            },
+            step_id="reauth_confirm",
             errors=errors,
         )
 
@@ -242,7 +182,7 @@ class HomeWizardConfigFlow(ConfigFlow, domain=DOMAIN):
         Make connection with device to test the connection
         and to get info for unique_id.
         """
-        energy_api = HomeWizardEnergyV1(ip_address)
+        energy_api = HomeWizardEnergy(ip_address)
         try:
             return await energy_api.device()
 

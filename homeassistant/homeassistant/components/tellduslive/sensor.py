@@ -25,8 +25,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, TELLDUS_DISCOVERY_NEW
-from .entity import TelldusLiveEntity
+from .. import tellduslive
+from .entry import TelldusLiveEntity
 
 SENSOR_TYPE_TEMPERATURE = "temp"
 SENSOR_TYPE_HUMIDITY = "humidity"
@@ -127,12 +127,12 @@ async def async_setup_entry(
 
     async def async_discover_sensor(device_id):
         """Discover and add a discovered sensor."""
-        client = hass.data[DOMAIN]
+        client = hass.data[tellduslive.DOMAIN]
         async_add_entities([TelldusLiveSensor(client, device_id)])
 
     async_dispatcher_connect(
         hass,
-        TELLDUS_DISCOVERY_NEW.format(sensor.DOMAIN, DOMAIN),
+        tellduslive.TELLDUS_DISCOVERY_NEW.format(sensor.DOMAIN, tellduslive.DOMAIN),
         async_discover_sensor,
     )
 
@@ -194,4 +194,4 @@ class TelldusLiveSensor(TelldusLiveEntity, SensorEntity):
     @property
     def unique_id(self) -> str:
         """Return a unique ID."""
-        return "-".join(map(str, self._id))
+        return "{}-{}-{}".format(*self._id)

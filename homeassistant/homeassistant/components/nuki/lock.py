@@ -17,9 +17,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import NukiEntryData
-from .const import ATTR_ENABLE, ATTR_UNLATCH, DOMAIN as NUKI_DOMAIN, ERROR_STATES
-from .entity import NukiEntity
+from . import NukiEntity, NukiEntryData
+from .const import (
+    ATTR_BATTERY_CRITICAL,
+    ATTR_ENABLE,
+    ATTR_NUKI_ID,
+    ATTR_UNLATCH,
+    DOMAIN as NUKI_DOMAIN,
+    ERROR_STATES,
+)
 from .helpers import CannotConnect
 
 
@@ -68,6 +74,15 @@ class NukiDeviceEntity[_NukiDeviceT: NukiDevice](NukiEntity[_NukiDeviceT], LockE
     def unique_id(self) -> str | None:
         """Return a unique ID."""
         return self._nuki_device.nuki_id
+
+    # Deprecated, can be removed in 2024.10
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the device specific state attributes."""
+        return {
+            ATTR_BATTERY_CRITICAL: self._nuki_device.battery_critical,
+            ATTR_NUKI_ID: self._nuki_device.nuki_id,
+        }
 
     @property
     def available(self) -> bool:

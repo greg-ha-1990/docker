@@ -74,7 +74,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -144,8 +144,9 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         if not user_input:
             return self._show_form_reauth()
 
-        reauth_entry = self._get_reauth_entry()
-        user_input = {**reauth_entry.data, **user_input}
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        assert entry
+        user_input = {**entry.data, **user_input}
 
         tankerkoenig = Tankerkoenig(
             api_key=user_input[CONF_API_KEY],
@@ -156,7 +157,9 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         except TankerkoenigInvalidKeyError:
             return self._show_form_reauth(user_input, {CONF_API_KEY: "invalid_auth"})
 
-        return self.async_update_reload_and_abort(reauth_entry, data=user_input)
+        self.hass.config_entries.async_update_entry(entry, data=user_input)
+        await self.hass.config_entries.async_reload(entry.entry_id)
+        return self.async_abort(reason="reauth_successful")
 
     def _show_form_user(
         self,
@@ -236,8 +239,9 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Handle an options flow."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
+        self.config_entry = config_entry
         self._stations: dict[str, str] = {}
 
     async def async_step_init(

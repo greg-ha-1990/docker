@@ -20,14 +20,8 @@
     }
   },
   "services": {
-    "toggle": {
-      "service": "mdi:toggle-switch-variant"
-    },
-    "turn_off": {
-      "service": "mdi:toggle-switch-variant-off"
-    },
-    "turn_on": {
-      "service": "mdi:toggle-switch-variant"
-    }
+    "toggle": "mdi:toggle-switch-variant",
+    "turn_off": "mdi:toggle-switch-variant-off",
+    "turn_on": "mdi:toggle-switch-variant"
   }
 }

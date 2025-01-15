@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.components.notify import (
-    DOMAIN as NOTIFY_DOMAIN,
-    NotifyEntity,
-    NotifyEntityFeature,
-)
+from homeassistant.components.notify import DOMAIN, NotifyEntity, NotifyEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -39,7 +35,7 @@ class DemoNotifyEntity(NotifyEntity):
         self._attr_unique_id = unique_id
         self._attr_supported_features = NotifyEntityFeature.TITLE
         self._attr_device_info = DeviceInfo(
-            identifiers={(NOTIFY_DOMAIN, unique_id)},
+            identifiers={(DOMAIN, unique_id)},
             name=device_name,
         )
 

@@ -1,30 +1,28 @@
 """Teslemetry parent entity class."""
 
 from abc import abstractmethod
+import asyncio
 from typing import Any
 
 from tesla_fleet_api import EnergySpecific, VehicleSpecific
-from tesla_fleet_api.const import Scope
+from tesla_fleet_api.exceptions import TeslaFleetError
 
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, LOGGER, TeslemetryState
 from .coordinator import (
-    TeslemetryEnergyHistoryCoordinator,
     TeslemetryEnergySiteInfoCoordinator,
     TeslemetryEnergySiteLiveCoordinator,
     TeslemetryVehicleDataCoordinator,
 )
-from .helpers import wake_up_vehicle
 from .models import TeslemetryEnergyData, TeslemetryVehicleData
 
 
 class TeslemetryEntity(
     CoordinatorEntity[
         TeslemetryVehicleDataCoordinator
-        | TeslemetryEnergyHistoryCoordinator
         | TeslemetryEnergySiteLiveCoordinator
         | TeslemetryEnergySiteInfoCoordinator
     ]
@@ -32,18 +30,18 @@ class TeslemetryEntity(
     """Parent class for all Teslemetry entities."""
 
     _attr_has_entity_name = True
-    scoped: bool
 
     def __init__(
         self,
         coordinator: TeslemetryVehicleDataCoordinator
-        | TeslemetryEnergyHistoryCoordinator
         | TeslemetryEnergySiteLiveCoordinator
         | TeslemetryEnergySiteInfoCoordinator,
+        api: VehicleSpecific | EnergySpecific,
         key: str,
     ) -> None:
         """Initialize common aspects of a Teslemetry entity."""
         super().__init__(coordinator)
+        self.api = api
         self.key = key
         self._attr_translation_key = self.key
         self._async_update_attrs()
@@ -78,6 +76,15 @@ class TeslemetryEntity(
         """Return True if a specific value is in coordinator data."""
         return self.key in self.coordinator.data
 
+    async def handle_command(self, command) -> dict[str, Any]:
+        """Handle a command."""
+        try:
+            result = await command
+        except TeslaFleetError as e:
+            raise HomeAssistantError(f"Teslemetry command failed, {e.message}") from e
+        LOGGER.debug("Command result: %s", result)
+        return result
+
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._async_update_attrs()
@@ -87,22 +94,16 @@ class TeslemetryEntity(
     def _async_update_attrs(self) -> None:
         """Update the attributes of the entity."""
 
-    def raise_for_scope(self, scope: Scope):
+    def raise_for_scope(self):
         """Raise an error if a scope is not available."""
         if not self.scoped:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="missing_scope",
-                translation_placeholders={"scope": scope},
-            )
+            raise ServiceValidationError("Missing required scope")
 
 
 class TeslemetryVehicleEntity(TeslemetryEntity):
     """Parent class for Teslemetry Vehicle entities."""
 
     _last_update: int = 0
-    api: VehicleSpecific
-    vehicle: TeslemetryVehicleData
 
     def __init__(
         self,
@@ -111,11 +112,11 @@ class TeslemetryVehicleEntity(TeslemetryEntity):
     ) -> None:
         """Initialize common aspects of a Teslemetry entity."""
 
-        self.api = data.api
-        self.vehicle = data
         self._attr_unique_id = f"{data.vin}-{key}"
+        self._wakelock = data.wakelock
+
         self._attr_device_info = data.device
-        super().__init__(data.coordinator, key)
+        super().__init__(data.coordinator, data.api, key)
 
     @property
     def _value(self) -> Any | None:
@@ -124,13 +125,48 @@ class TeslemetryVehicleEntity(TeslemetryEntity):
 
     async def wake_up_if_asleep(self) -> None:
         """Wake up the vehicle if its asleep."""
-        await wake_up_vehicle(self.vehicle)
+        async with self._wakelock:
+            times = 0
+            while self.coordinator.data["state"] != TeslemetryState.ONLINE:
+                try:
+                    if times == 0:
+                        cmd = await self.api.wake_up()
+                    else:
+                        cmd = await self.api.vehicle()
+                    state = cmd["response"]["state"]
+                except TeslaFleetError as e:
+                    raise HomeAssistantError(str(e)) from e
+                self.coordinator.data["state"] = state
+                if state != TeslemetryState.ONLINE:
+                    times += 1
+                    if times >= 4:  # Give up after 30 seconds total
+                        raise HomeAssistantError("Could not wake up vehicle")
+                    await asyncio.sleep(times * 5)
+
+    async def handle_command(self, command) -> dict[str, Any]:
+        """Handle a vehicle command."""
+        result = await super().handle_command(command)
+        if (response := result.get("response")) is None:
+            if error := result.get("error"):
+                # No response with error
+                raise HomeAssistantError(error)
+            # No response without error (unexpected)
+            raise HomeAssistantError(f"Unknown response: {response}")
+        if (result := response.get("result")) is not True:
+            if reason := response.get("reason"):
+                if reason in ("already_set", "not_charging", "requested"):
+                    # Reason is acceptable
+                    return result
+                # Result of false with reason
+                raise HomeAssistantError(reason)
+            # Result of false without reason (unexpected)
+            raise HomeAssistantError("Command failed with no reason")
+        # Response with result of true
+        return result
 
 
 class TeslemetryEnergyLiveEntity(TeslemetryEntity):
     """Parent class for Teslemetry Energy Site Live entities."""
-
-    api: EnergySpecific
 
     def __init__(
         self,
@@ -138,57 +174,33 @@ class TeslemetryEnergyLiveEntity(TeslemetryEntity):
         key: str,
     ) -> None:
         """Initialize common aspects of a Teslemetry Energy Site Live entity."""
-
-        self.api = data.api
         self._attr_unique_id = f"{data.id}-{key}"
         self._attr_device_info = data.device
 
-        super().__init__(data.live_coordinator, key)
+        super().__init__(data.live_coordinator, data.api, key)
 
 
 class TeslemetryEnergyInfoEntity(TeslemetryEntity):
     """Parent class for Teslemetry Energy Site Info Entities."""
 
-    api: EnergySpecific
-
     def __init__(
         self,
         data: TeslemetryEnergyData,
         key: str,
     ) -> None:
         """Initialize common aspects of a Teslemetry Energy Site Info entity."""
-
-        self.api = data.api
         self._attr_unique_id = f"{data.id}-{key}"
         self._attr_device_info = data.device
 
-        super().__init__(data.info_coordinator, key)
+        super().__init__(data.info_coordinator, data.api, key)
 
 
-class TeslemetryEnergyHistoryEntity(TeslemetryEntity):
-    """Parent class for Teslemetry Energy History Entities."""
-
-    def __init__(
-        self,
-        data: TeslemetryEnergyData,
-        key: str,
-    ) -> None:
-        """Initialize common aspects of a Teslemetry Energy Site Info entity."""
-
-        assert data.history_coordinator
-
-        self.api = data.api
-        self._attr_unique_id = f"{data.id}-{key}"
-        self._attr_device_info = data.device
-
-        super().__init__(data.history_coordinator, key)
-
-
-class TeslemetryWallConnectorEntity(TeslemetryEntity):
+class TeslemetryWallConnectorEntity(
+    TeslemetryEntity, CoordinatorEntity[TeslemetryEnergySiteLiveCoordinator]
+):
     """Parent class for Teslemetry Wall Connector Entities."""
 
     _attr_has_entity_name = True
-    api: EnergySpecific
 
     def __init__(
         self,
@@ -197,18 +209,8 @@ class TeslemetryWallConnectorEntity(TeslemetryEntity):
         key: str,
     ) -> None:
         """Initialize common aspects of a Teslemetry entity."""
-
-        self.api = data.api
         self.din = din
         self._attr_unique_id = f"{data.id}-{din}-{key}"
-
-        # Find the model from the info coordinator
-        model: str | None = None
-        for wc in data.info_coordinator.data.get("components_wall_connectors", []):
-            if wc["din"] == din:
-                model = wc.get("part_name")
-                break
-
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, din)},
             manufacturer="Tesla",
@@ -216,10 +218,9 @@ class TeslemetryWallConnectorEntity(TeslemetryEntity):
             name="Wall Connector",
             via_device=(DOMAIN, str(data.id)),
             serial_number=din.split("-")[-1],
-            model=model,
         )
 
-        super().__init__(data.live_coordinator, key)
+        super().__init__(data.live_coordinator, data.api, key)
 
     @property
     def _value(self) -> int:
@@ -228,11 +229,4 @@ class TeslemetryWallConnectorEntity(TeslemetryEntity):
             self.coordinator.data.get("wall_connectors", {})
             .get(self.din, {})
             .get(self.key)
-        )
-
-    @property
-    def exists(self) -> bool:
-        """Return True if it exists in the wall connector coordinator data."""
-        return self.key in self.coordinator.data.get("wall_connectors", {}).get(
-            self.din, {}
         )

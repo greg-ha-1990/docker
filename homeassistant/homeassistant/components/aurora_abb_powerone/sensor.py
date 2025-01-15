@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_SERIAL_NUMBER,
     EntityCategory,
@@ -30,6 +31,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import AuroraAbbDataUpdateCoordinator
 from .const import (
     ATTR_DEVICE_NAME,
     ATTR_FIRMWARE,
@@ -38,7 +40,6 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
 )
-from .coordinator import AuroraAbbConfigEntry, AuroraAbbDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 ALARM_STATES = list(AuroraMapping.ALARM_STATES.values())
@@ -129,12 +130,12 @@ SENSOR_TYPES = [
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: AuroraAbbConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up aurora_abb_powerone sensor based on a config entry."""
 
-    coordinator = config_entry.runtime_data
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
     data = config_entry.data
 
     entities = [AuroraSensor(coordinator, data, sens) for sens in SENSOR_TYPES]

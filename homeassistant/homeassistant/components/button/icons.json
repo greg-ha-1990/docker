@@ -14,8 +14,6 @@
     }
   },
   "services": {
-    "press": {
-      "service": "mdi:gesture-tap-button"
-    }
+    "press": "mdi:gesture-tap-button"
   }
 }

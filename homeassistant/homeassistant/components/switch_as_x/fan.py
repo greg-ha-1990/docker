@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.fan import (
-    DOMAIN as FAN_DOMAIN,
-    FanEntity,
-    FanEntityFeature,
-)
+from homeassistant.components.fan import DOMAIN as FAN_DOMAIN, FanEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ENTITY_ID
 from homeassistant.core import HomeAssistant
@@ -44,8 +40,6 @@ async def async_setup_entry(
 
 class FanSwitch(BaseToggleEntity, FanEntity):
     """Represents a Switch as a Fan."""
-
-    _attr_supported_features = FanEntityFeature.TURN_OFF | FanEntityFeature.TURN_ON
 
     @property
     def is_on(self) -> bool | None:

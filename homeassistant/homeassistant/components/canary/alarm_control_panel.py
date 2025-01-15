@@ -10,9 +10,14 @@ from canary.model import Location
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    STATE_ALARM_ARMED_AWAY,
+    STATE_ALARM_ARMED_HOME,
+    STATE_ALARM_ARMED_NIGHT,
+    STATE_ALARM_DISARMED,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -65,18 +70,18 @@ class CanaryAlarm(
         return self.coordinator.data["locations"][self._location_id]
 
     @property
-    def alarm_state(self) -> AlarmControlPanelState | None:
+    def state(self) -> str | None:
         """Return the state of the device."""
         if self.location.is_private:
-            return AlarmControlPanelState.DISARMED
+            return STATE_ALARM_DISARMED
 
         mode = self.location.mode
         if mode.name == LOCATION_MODE_AWAY:
-            return AlarmControlPanelState.ARMED_AWAY
+            return STATE_ALARM_ARMED_AWAY
         if mode.name == LOCATION_MODE_HOME:
-            return AlarmControlPanelState.ARMED_HOME
+            return STATE_ALARM_ARMED_HOME
         if mode.name == LOCATION_MODE_NIGHT:
-            return AlarmControlPanelState.ARMED_NIGHT
+            return STATE_ALARM_ARMED_NIGHT
 
         return None
 

@@ -6,8 +6,8 @@ from typing import Any, Final
 
 import voluptuous as vol
 
-from homeassistant.components.device_automation import (
-    DEVICE_TRIGGER_BASE_SCHEMA,
+from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
+from homeassistant.components.device_automation.exceptions import (
     InvalidDeviceAutomationConfig,
 )
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF_TYPE
@@ -16,16 +16,13 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
-from . import trigger
-from .const import DOMAIN, KNX_MODULE_KEY
+from . import KNXModule, trigger
+from .const import DOMAIN
+from .project import KNXProject
 from .trigger import (
     CONF_KNX_DESTINATION,
-    CONF_KNX_GROUP_VALUE_READ,
-    CONF_KNX_GROUP_VALUE_RESPONSE,
-    CONF_KNX_GROUP_VALUE_WRITE,
-    CONF_KNX_INCOMING,
-    CONF_KNX_OUTGOING,
     PLATFORM_TYPE_TRIGGER_TELEGRAM,
+    TELEGRAM_TRIGGER_OPTIONS,
     TELEGRAM_TRIGGER_SCHEMA,
     TRIGGER_SCHEMA as TRIGGER_TRIGGER_SCHEMA,
 )
@@ -46,7 +43,7 @@ async def async_get_triggers(
     """List device triggers for KNX devices."""
     triggers = []
 
-    knx = hass.data[KNX_MODULE_KEY]
+    knx: KNXModule = hass.data[DOMAIN]
     if knx.interface_device.device.id == device_id:
         # Add trigger for KNX telegrams to interface device
         triggers.append(
@@ -66,7 +63,7 @@ async def async_get_trigger_capabilities(
     hass: HomeAssistant, config: ConfigType
 ) -> dict[str, vol.Schema]:
     """List trigger capabilities."""
-    project = hass.data[KNX_MODULE_KEY].project
+    project: KNXProject = hass.data[DOMAIN].project
     options = [
         selector.SelectOptionDict(value=ga.address, label=f"{ga.address} - {ga.name}")
         for ga in project.group_addresses.values()
@@ -82,21 +79,7 @@ async def async_get_trigger_capabilities(
                         options=options,
                     ),
                 ),
-                vol.Optional(
-                    CONF_KNX_GROUP_VALUE_WRITE, default=True
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_KNX_GROUP_VALUE_RESPONSE, default=True
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_KNX_GROUP_VALUE_READ, default=True
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_KNX_INCOMING, default=True
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_KNX_OUTGOING, default=True
-                ): selector.BooleanSelector(),
+                **TELEGRAM_TRIGGER_OPTIONS,
             }
         )
     }
@@ -115,7 +98,7 @@ async def async_attach_trigger(
     } | {CONF_PLATFORM: PLATFORM_TYPE_TRIGGER_TELEGRAM}
 
     try:
-        trigger_config = TRIGGER_TRIGGER_SCHEMA(trigger_config)
+        TRIGGER_TRIGGER_SCHEMA(trigger_config)
     except vol.Invalid as err:
         raise InvalidDeviceAutomationConfig(f"{err}") from err
 

@@ -12,8 +12,8 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import VeraDevice
 from .common import ControllerData, get_controller_data
-from .entity import VeraEntity
 
 
 async def async_setup_entry(
@@ -32,14 +32,14 @@ async def async_setup_entry(
     )
 
 
-class VeraCover(VeraEntity[veraApi.VeraCurtain], CoverEntity):
+class VeraCover(VeraDevice[veraApi.VeraCurtain], CoverEntity):
     """Representation a Vera Cover."""
 
     def __init__(
         self, vera_device: veraApi.VeraCurtain, controller_data: ControllerData
     ) -> None:
         """Initialize the Vera device."""
-        VeraEntity.__init__(self, vera_device, controller_data)
+        VeraDevice.__init__(self, vera_device, controller_data)
         self.entity_id = ENTITY_ID_FORMAT.format(self.vera_id)
 
     @property
@@ -61,11 +61,10 @@ class VeraCover(VeraEntity[veraApi.VeraCurtain], CoverEntity):
         self.schedule_update_ha_state()
 
     @property
-    def is_closed(self) -> bool | None:
+    def is_closed(self) -> bool:
         """Return if the cover is closed."""
         if self.current_cover_position is not None:
             return self.current_cover_position == 0
-        return None
 
     def open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""

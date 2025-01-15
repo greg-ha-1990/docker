@@ -34,9 +34,10 @@ class VizioAppsDataUpdateCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]
         self.fail_threshold = 10
         self.store = store
 
-    async def _async_setup(self) -> None:
+    async def async_config_entry_first_refresh(self) -> None:
         """Refresh data for the first time when a config entry is setup."""
         self.data = await self.store.async_load() or APPS
+        await super().async_config_entry_first_refresh()
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
         """Update data via library."""

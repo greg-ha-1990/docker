@@ -8,7 +8,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from .base import FritzBoxPhonebook
 from .const import CONF_PHONEBOOK, CONF_PREFIXES, PLATFORMS
@@ -42,7 +42,8 @@ async def async_setup_entry(
         )
         return False
     except FritzConnectionException as ex:
-        raise ConfigEntryAuthFailed from ex
+        _LOGGER.error("Invalid authentication: %s", ex)
+        return False
     except RequestsConnectionError as ex:
         _LOGGER.error("Unable to connect to AVM FRITZ!Box call monitor: %s", ex)
         raise ConfigEntryNotReady from ex

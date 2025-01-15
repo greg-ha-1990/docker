@@ -7,8 +7,6 @@
     }
   },
   "services": {
-    "start_irrigation": {
-      "service": "mdi:water"
-    }
+    "start_irrigation": "mdi:water"
   }
 }

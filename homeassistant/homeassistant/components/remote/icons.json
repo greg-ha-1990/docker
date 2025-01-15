@@ -8,23 +8,11 @@
     }
   },
   "services": {
-    "delete_command": {
-      "service": "mdi:delete"
-    },
-    "learn_command": {
-      "service": "mdi:school"
-    },
-    "send_command": {
-      "service": "mdi:remote"
-    },
-    "toggle": {
-      "service": "mdi:remote"
-    },
-    "turn_off": {
-      "service": "mdi:remote-off"
-    },
-    "turn_on": {
-      "service": "mdi:remote"
-    }
+    "delete_command": "mdi:delete",
+    "learn_command": "mdi:school",
+    "send_command": "mdi:remote",
+    "toggle": "mdi:remote",
+    "turn_off": "mdi:remote-off",
+    "turn_on": "mdi:remote"
   }
 }

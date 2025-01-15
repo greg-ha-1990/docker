@@ -34,8 +34,8 @@ from homeassistant.helpers.typing import ConfigType, StateType
 from homeassistant.util.enum import try_parse_enum
 
 from . import KNXModule
-from .const import ATTR_SOURCE, KNX_MODULE_KEY
-from .entity import KnxYamlEntity
+from .const import ATTR_SOURCE, DATA_KNX_CONFIG, DOMAIN
+from .knx_entity import KnxEntity
 from .schema import SensorSchema
 
 SCAN_INTERVAL = timedelta(seconds=10)
@@ -115,18 +115,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensor(s) for KNX platform."""
-    knx_module = hass.data[KNX_MODULE_KEY]
-    entities: list[SensorEntity] = []
-    entities.extend(
+    knx_module: KNXModule = hass.data[DOMAIN]
+
+    async_add_entities(
         KNXSystemSensor(knx_module, description)
         for description in SYSTEM_ENTITY_DESCRIPTIONS
     )
-    config: list[ConfigType] | None = knx_module.config_yaml.get(Platform.SENSOR)
+
+    config: list[ConfigType] = hass.data[DATA_KNX_CONFIG].get(Platform.SENSOR)
     if config:
-        entities.extend(
-            KNXSensor(knx_module, entity_config) for entity_config in config
+        async_add_entities(
+            KNXSensor(knx_module.xknx, entity_config) for entity_config in config
         )
-    async_add_entities(entities)
 
 
 def _create_sensor(xknx: XKNX, config: ConfigType) -> XknxSensor:
@@ -141,17 +141,14 @@ def _create_sensor(xknx: XKNX, config: ConfigType) -> XknxSensor:
     )
 
 
-class KNXSensor(KnxYamlEntity, SensorEntity):
+class KNXSensor(KnxEntity, SensorEntity):
     """Representation of a KNX sensor."""
 
     _device: XknxSensor
 
-    def __init__(self, knx_module: KNXModule, config: ConfigType) -> None:
+    def __init__(self, xknx: XKNX, config: ConfigType) -> None:
         """Initialize of a KNX sensor."""
-        super().__init__(
-            knx_module=knx_module,
-            device=_create_sensor(knx_module.xknx, config),
-        )
+        super().__init__(_create_sensor(xknx, config))
         if device_class := config.get(CONF_DEVICE_CLASS):
             self._attr_device_class = device_class
         else:
@@ -211,7 +208,7 @@ class KNXSystemSensor(SensorEntity):
             return True
         return self.knx.xknx.connection_manager.state is XknxConnectionState.CONNECTED
 
-    def after_update_callback(self, _: XknxConnectionState) -> None:
+    async def after_update_callback(self, _: XknxConnectionState) -> None:
         """Call after device was updated."""
         self.async_write_ha_state()
 

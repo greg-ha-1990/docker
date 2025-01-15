@@ -47,17 +47,14 @@ from .coordinator import OverkizDataUpdateCoordinator
 
 @dataclass
 class HomeAssistantOverkizData:
-    """Overkiz data stored in the runtime data object."""
+    """Overkiz data stored in the Home Assistant data object."""
 
     coordinator: OverkizDataUpdateCoordinator
     platforms: defaultdict[Platform, list[Device]]
     scenarios: list[Scenario]
 
 
-type OverkizDataConfigEntry = ConfigEntry[HomeAssistantOverkizData]
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: OverkizDataConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Overkiz from a config entry."""
     client: OverkizClient | None = None
     api_type = entry.data.get(CONF_API_TYPE, APIType.CLOUD)
@@ -126,7 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OverkizDataConfigEntry) 
 
     platforms: defaultdict[Platform, list[Device]] = defaultdict(list)
 
-    entry.runtime_data = HomeAssistantOverkizData(
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = HomeAssistantOverkizData(
         coordinator=coordinator, platforms=platforms, scenarios=scenarios
     )
 
@@ -165,15 +162,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: OverkizDataConfigEntry) 
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: OverkizDataConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
 
 
 async def _async_migrate_entries(
-    hass: HomeAssistant, config_entry: OverkizDataConfigEntry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> bool:
     """Migrate old entries to new unique IDs."""
     entity_registry = er.async_get(hass)

@@ -5,19 +5,21 @@ from typing import Any
 from homeassistant.components.cover import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
-    DOMAIN as COVER_DOMAIN,
+    DOMAIN,
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .entity import LutronCasetaUpdatableEntity
-from .models import LutronCasetaConfigEntry
+from . import LutronCasetaDeviceUpdatableEntity
+from .const import DOMAIN as CASETA_DOMAIN
+from .models import LutronCasetaData
 
 
-class LutronCasetaShade(LutronCasetaUpdatableEntity, CoverEntity):
+class LutronCasetaShade(LutronCasetaDeviceUpdatableEntity, CoverEntity):
     """Representation of a Lutron shade with open/close functionality."""
 
     _attr_supported_features = (
@@ -59,7 +61,7 @@ class LutronCasetaShade(LutronCasetaUpdatableEntity, CoverEntity):
         await self._smartbridge.set_value(self.device_id, kwargs[ATTR_POSITION])
 
 
-class LutronCasetaTiltOnlyBlind(LutronCasetaUpdatableEntity, CoverEntity):
+class LutronCasetaTiltOnlyBlind(LutronCasetaDeviceUpdatableEntity, CoverEntity):
     """Representation of a Lutron tilt only blind."""
 
     _attr_supported_features = (
@@ -112,7 +114,7 @@ PYLUTRON_TYPE_TO_CLASSES = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: LutronCasetaConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Lutron Caseta cover platform.
@@ -120,9 +122,9 @@ async def async_setup_entry(
     Adds shades from the Caseta bridge associated with the config_entry as
     cover entities.
     """
-    data = config_entry.runtime_data
+    data: LutronCasetaData = hass.data[CASETA_DOMAIN][config_entry.entry_id]
     bridge = data.bridge
-    cover_devices = bridge.get_devices_by_domain(COVER_DOMAIN)
+    cover_devices = bridge.get_devices_by_domain(DOMAIN)
     async_add_entities(
         # default to standard LutronCasetaCover type if the pylutron type is not yet mapped
         PYLUTRON_TYPE_TO_CLASSES.get(cover_device["type"], LutronCasetaShade)(

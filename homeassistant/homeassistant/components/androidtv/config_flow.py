@@ -13,7 +13,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithConfigEntry,
 )
 from homeassistant.const import CONF_DEVICE_CLASS, CONF_HOST, CONF_PORT
 from homeassistant.core import callback
@@ -34,7 +34,7 @@ from .const import (
     CONF_APPS,
     CONF_EXCLUDE_UNNAMED_APPS,
     CONF_GET_SOURCES,
-    CONF_SCREENCAP_INTERVAL,
+    CONF_SCREENCAP,
     CONF_STATE_DETECTION_RULES,
     CONF_TURN_OFF_COMMAND,
     CONF_TURN_ON_COMMAND,
@@ -43,7 +43,7 @@ from .const import (
     DEFAULT_EXCLUDE_UNNAMED_APPS,
     DEFAULT_GET_SOURCES,
     DEFAULT_PORT,
-    DEFAULT_SCREENCAP_INTERVAL,
+    DEFAULT_SCREENCAP,
     DEVICE_CLASSES,
     DOMAIN,
     PROP_ETHMAC,
@@ -76,7 +76,6 @@ class AndroidTVFlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     VERSION = 1
-    MINOR_VERSION = 2
 
     @callback
     def _show_setup_form(
@@ -132,7 +131,7 @@ class AndroidTVFlowHandler(ConfigFlow, domain=DOMAIN):
             return RESULT_CONN_ERROR, None
 
         dev_prop = aftv.device_properties
-        _LOGGER.debug(
+        _LOGGER.info(
             "Android device at %s: %s = %r, %s = %r",
             user_input[CONF_HOST],
             PROP_ETHMAC,
@@ -186,14 +185,16 @@ class AndroidTVFlowHandler(ConfigFlow, domain=DOMAIN):
         return OptionsFlowHandler(config_entry)
 
 
-class OptionsFlowHandler(OptionsFlow):
+class OptionsFlowHandler(OptionsFlowWithConfigEntry):
     """Handle an option flow for Android Debug Bridge."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
-        self._apps: dict[str, Any] = dict(config_entry.options.get(CONF_APPS, {}))
-        self._state_det_rules: dict[str, Any] = dict(
-            config_entry.options.get(CONF_STATE_DETECTION_RULES, {})
+        super().__init__(config_entry)
+
+        self._apps: dict[str, Any] = self.options.setdefault(CONF_APPS, {})
+        self._state_det_rules: dict[str, Any] = self.options.setdefault(
+            CONF_STATE_DETECTION_RULES, {}
         )
         self._conf_app_id: str | None = None
         self._conf_rule_id: str | None = None
@@ -235,7 +236,7 @@ class OptionsFlowHandler(OptionsFlow):
             SelectOptionDict(value=k, label=v) for k, v in apps_list.items()
         ]
         rules = [RULES_NEW_ID, *self._state_det_rules]
-        options = self.config_entry.options
+        options = self.options
 
         data_schema = vol.Schema(
             {
@@ -252,12 +253,10 @@ class OptionsFlowHandler(OptionsFlow):
                         CONF_EXCLUDE_UNNAMED_APPS, DEFAULT_EXCLUDE_UNNAMED_APPS
                     ),
                 ): bool,
-                vol.Required(
-                    CONF_SCREENCAP_INTERVAL,
-                    default=options.get(
-                        CONF_SCREENCAP_INTERVAL, DEFAULT_SCREENCAP_INTERVAL
-                    ),
-                ): vol.All(vol.Coerce(int), vol.Clamp(min=0, max=15)),
+                vol.Optional(
+                    CONF_SCREENCAP,
+                    default=options.get(CONF_SCREENCAP, DEFAULT_SCREENCAP),
+                ): bool,
                 vol.Optional(
                     CONF_TURN_OFF_COMMAND,
                     description={

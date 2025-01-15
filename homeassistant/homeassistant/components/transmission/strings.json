@@ -60,24 +60,19 @@
         }
       },
       "active_torrents": {
-        "name": "Active torrents",
-        "unit_of_measurement": "torrents"
+        "name": "Active torrents"
       },
       "paused_torrents": {
-        "name": "Paused torrents",
-        "unit_of_measurement": "[%key:component::transmission::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Paused torrents"
       },
       "total_torrents": {
-        "name": "Total torrents",
-        "unit_of_measurement": "[%key:component::transmission::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Total torrents"
       },
       "completed_torrents": {
-        "name": "Completed torrents",
-        "unit_of_measurement": "[%key:component::transmission::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Completed torrents"
       },
       "started_torrents": {
-        "name": "Started torrents",
-        "unit_of_measurement": "[%key:component::transmission::entity::sensor::active_torrents::unit_of_measurement%]"
+        "name": "Started torrents"
       }
     },
     "switch": {
@@ -101,10 +96,6 @@
         "torrent": {
           "name": "Torrent",
           "description": "URL, magnet link or Base64 encoded file."
-        },
-        "download_path": {
-          "name": "Download path",
-          "description": "Optional path to specify where the torrent should be downloaded. If not specified, the default download directory is used."
         }
       }
     },

@@ -1,7 +1,5 @@
 {
   "services": {
-    "reboot_gateway": {
-      "service": "mdi:restart"
-    }
+    "reboot_gateway": "mdi:restart"
   }
 }

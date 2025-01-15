@@ -7,8 +7,9 @@ from typing import Any
 
 import aiohttp
 from pyrainbird.async_client import AsyncRainbirdClient, AsyncRainbirdController
-from pyrainbird.exceptions import RainbirdApiException, RainbirdAuthException
+from pyrainbird.exceptions import RainbirdApiException
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
     CONF_MAC,
@@ -17,17 +18,12 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import format_mac
 
 from .const import CONF_SERIAL_NUMBER
-from .coordinator import (
-    RainbirdScheduleUpdateCoordinator,
-    RainbirdUpdateCoordinator,
-    async_create_clientsession,
-)
-from .types import RainbirdConfigEntry, RainbirdData
+from .coordinator import RainbirdData, async_create_clientsession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,9 +40,7 @@ DOMAIN = "rainbird"
 
 
 def _async_register_clientsession_shutdown(
-    hass: HomeAssistant,
-    entry: RainbirdConfigEntry,
-    clientsession: aiohttp.ClientSession,
+    hass: HomeAssistant, entry: ConfigEntry, clientsession: aiohttp.ClientSession
 ) -> None:
     """Register cleanup hooks for the clientsession."""
 
@@ -61,8 +55,10 @@ def _async_register_clientsession_shutdown(
     entry.async_on_unload(_async_close_websession)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: RainbirdConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the config entry for Rain Bird."""
+
+    hass.data.setdefault(DOMAIN, {})
 
     clientsession = async_create_clientsession()
     _async_register_clientsession_shutdown(hass, entry, clientsession)
@@ -95,37 +91,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: RainbirdConfigEntry) -> 
 
     try:
         model_info = await controller.get_model_and_version()
-    except RainbirdAuthException as err:
-        raise ConfigEntryAuthFailed from err
     except RainbirdApiException as err:
         raise ConfigEntryNotReady from err
 
-    data = RainbirdData(
-        controller,
-        model_info,
-        coordinator=RainbirdUpdateCoordinator(
-            hass,
-            name=entry.title,
-            controller=controller,
-            unique_id=entry.unique_id,
-            model_info=model_info,
-        ),
-        schedule_coordinator=RainbirdScheduleUpdateCoordinator(
-            hass,
-            name=f"{entry.title} Schedule",
-            controller=controller,
-        ),
-    )
+    data = RainbirdData(hass, entry, controller, model_info)
     await data.coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = data
+    hass.data[DOMAIN][entry.entry_id] = data
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
 async def _async_fix_unique_id(
-    hass: HomeAssistant, controller: AsyncRainbirdController, entry: RainbirdConfigEntry
+    hass: HomeAssistant, controller: AsyncRainbirdController, entry: ConfigEntry
 ) -> bool:
     """Update the config entry with a unique id based on the mac address."""
     _LOGGER.debug("Checking for migration of config entry (%s)", entry.unique_id)
@@ -254,6 +234,10 @@ def _async_fix_device_id(
         )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: RainbirdConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

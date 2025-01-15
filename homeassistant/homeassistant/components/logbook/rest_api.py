@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 
 from aiohttp import web
 import voluptuous as vol
@@ -70,11 +70,11 @@ class LogbookView(HomeAssistantView):
         if entity_ids_str := request.query.get("entity"):
             try:
                 entity_ids = cv.entity_ids(entity_ids_str)
-            except vol.Invalid as ex:
+            except vol.Invalid:
                 raise InvalidEntityFormatError(
                     f"Invalid entity id(s) encountered: {entity_ids_str}. "
                     "Format should be <domain>.<object_id>"
-                ) from ex
+                ) from vol.Invalid
         else:
             entity_ids = None
 
@@ -109,6 +109,13 @@ class LogbookView(HomeAssistantView):
 
         def json_events() -> web.Response:
             """Fetch events and generate JSON."""
-            return self.json(event_processor.get_events(start_day, end_day))
+            return self.json(
+                event_processor.get_events(
+                    start_day,
+                    end_day,
+                )
+            )
 
-        return await get_instance(hass).async_add_executor_job(json_events)
+        return cast(
+            web.Response, await get_instance(hass).async_add_executor_job(json_events)
+        )

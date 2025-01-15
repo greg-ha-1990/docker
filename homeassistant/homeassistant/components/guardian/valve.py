@@ -19,9 +19,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import GuardianData
+from . import GuardianData, ValveControllerEntity, ValveControllerEntityDescription
 from .const import API_VALVE_STATUS, DOMAIN
-from .entity import ValveControllerEntity, ValveControllerEntityDescription
 from .util import convert_exceptions_to_homeassistant_error
 
 VALVE_KIND_VALVE = "valve"

@@ -1,4 +1,4 @@
-"""An entity class for mobile_app."""
+"""A entity class for mobile_app."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .helpers import device_info
 
 
 class MobileAppEntity(RestoreEntity):
-    """Representation of a mobile app entity."""
+    """Representation of an mobile app entity."""
 
     _attr_should_poll = False
 

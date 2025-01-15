@@ -52,7 +52,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = DataUpdateCoordinator(
         hass,
         LOGGER,
-        config_entry=entry,
         name=(
             f"Place {entry.data[CONF_PLACE_ID]}, Service {entry.data[CONF_SERVICE_ID]}"
         ),
@@ -110,6 +109,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         await er.async_migrate_entries(hass, entry.entry_id, migrate_unique_id)
 
-    LOGGER.debug("Migration to version %s successful", version)
+    LOGGER.info("Migration to version %s successful", version)
 
     return True

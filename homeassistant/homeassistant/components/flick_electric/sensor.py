@@ -1,72 +1,74 @@
 """Support for Flick Electric Pricing data."""
 
+import asyncio
 from datetime import timedelta
-from decimal import Decimal
 import logging
 from typing import Any
 
+from pyflick import FlickAPI, FlickPrice
+
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_CENT, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.dt import utcnow
 
-from .const import ATTR_COMPONENTS, ATTR_END_AT, ATTR_START_AT
-from .coordinator import FlickConfigEntry, FlickElectricDataCoordinator
+from .const import ATTR_COMPONENTS, ATTR_END_AT, ATTR_START_AT, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
 SCAN_INTERVAL = timedelta(minutes=5)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: FlickConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Flick Sensor Setup."""
-    coordinator = entry.runtime_data
+    api: FlickAPI = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([FlickPricingSensor(coordinator)])
+    async_add_entities([FlickPricingSensor(api)], True)
 
 
-class FlickPricingSensor(CoordinatorEntity[FlickElectricDataCoordinator], SensorEntity):
+class FlickPricingSensor(SensorEntity):
     """Entity object for Flick Electric sensor."""
 
     _attr_attribution = "Data provided by Flick Electric"
     _attr_native_unit_of_measurement = f"{CURRENCY_CENT}/{UnitOfEnergy.KILO_WATT_HOUR}"
     _attr_has_entity_name = True
     _attr_translation_key = "power_price"
+    _attributes: dict[str, Any] = {}
 
-    def __init__(self, coordinator: FlickElectricDataCoordinator) -> None:
+    def __init__(self, api: FlickAPI) -> None:
         """Entity object for Flick Electric sensor."""
-        super().__init__(coordinator)
-
-        self._attr_unique_id = f"{coordinator.supply_node_ref}_pricing"
+        self._api: FlickAPI = api
+        self._price: FlickPrice = None
 
     @property
-    def native_value(self) -> Decimal:
+    def native_value(self):
         """Return the state of the sensor."""
-        # The API should return a unit price with quantity of 1.0 when no start/end time is provided
-        if self.coordinator.data.quantity != 1:
-            _LOGGER.warning(
-                "Unexpected quantity for unit price: %s", self.coordinator.data
-            )
-        return self.coordinator.data.cost * 100
+        return self._price.price
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
+    def extra_state_attributes(self):
         """Return the state attributes."""
-        components: dict[str, float] = {}
+        return self._attributes
 
-        for component in self.coordinator.data.components:
+    async def async_update(self) -> None:
+        """Get the Flick Pricing data from the web service."""
+        if self._price and self._price.end_at >= utcnow():
+            return  # Power price data is still valid
+
+        async with asyncio.timeout(60):
+            self._price = await self._api.getPricing()
+
+        _LOGGER.debug("Pricing data: %s", self._price)
+
+        self._attributes[ATTR_START_AT] = self._price.start_at
+        self._attributes[ATTR_END_AT] = self._price.end_at
+        for component in self._price.components:
             if component.charge_setter not in ATTR_COMPONENTS:
                 _LOGGER.warning("Found unknown component: %s", component.charge_setter)
                 continue
 
-            components[component.charge_setter] = float(component.value * 100)
-
-        return {
-            ATTR_START_AT: self.coordinator.data.start_at,
-            ATTR_END_AT: self.coordinator.data.end_at,
-            **components,
-        }
+            self._attributes[component.charge_setter] = float(component.value)

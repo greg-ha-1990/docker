@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any, Final, Literal
+from typing import Any, Final
 
 import voluptuous as vol
 from xknx import XKNX
@@ -29,7 +29,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.helpers import selector
-from homeassistant.helpers.typing import UNDEFINED, VolDictType
+from homeassistant.helpers.typing import UNDEFINED
 
 from .const import (
     CONF_KNX_AUTOMATIC,
@@ -58,12 +58,11 @@ from .const import (
     CONF_KNX_TUNNELING_TCP_SECURE,
     DEFAULT_ROUTING_IA,
     DOMAIN,
-    KNX_MODULE_KEY,
     TELEGRAM_LOG_DEFAULT,
     TELEGRAM_LOG_MAX,
     KNXConfigEntryData,
 )
-from .storage.keyring import DEFAULT_KNX_KEYRING_FILENAME, save_uploaded_knxkeys_file
+from .helpers.keyring import DEFAULT_KNX_KEYRING_FILENAME, save_uploaded_knxkeys_file
 from .validation import ia_validator, ip_v4_validator
 
 CONF_KNX_GATEWAY: Final = "gateway"
@@ -119,16 +118,7 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
         self._tunnel_endpoints: list[XMLInterface] = []
 
         self._gatewayscanner: GatewayScanner | None = None
-        self._async_scan_gen: AsyncGenerator[GatewayDescriptor] | None = None
-
-    @property
-    def _xknx(self) -> XKNX:
-        """Return XKNX instance."""
-        if isinstance(self, OptionsFlow) and (
-            knx_module := self.hass.data.get(KNX_MODULE_KEY)
-        ):
-            return knx_module.xknx
-        return XKNX()
+        self._async_scan_gen: AsyncGenerator[GatewayDescriptor, None] | None = None
 
     @abstractmethod
     def finish_flow(self) -> ConfigFlowResult:
@@ -192,8 +182,12 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             CONF_KNX_ROUTING: CONF_KNX_ROUTING.capitalize(),
         }
 
+        if isinstance(self, OptionsFlow) and (knx_module := self.hass.data.get(DOMAIN)):
+            xknx = knx_module.xknx
+        else:
+            xknx = XKNX()
         self._gatewayscanner = GatewayScanner(
-            self._xknx, stop_on_found=0, timeout_in_seconds=2
+            xknx, stop_on_found=0, timeout_in_seconds=2
         )
         # keep a reference to the generator to scan in background until user selects a connection type
         self._async_scan_gen = self._gatewayscanner.async_scan()
@@ -207,25 +201,8 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
                 CONF_KNX_AUTOMATIC: CONF_KNX_AUTOMATIC.capitalize()
             } | supported_connection_types
 
-        default_connection_type: Literal["automatic", "tunneling", "routing"]
-        _current_conn = self.initial_data.get(CONF_KNX_CONNECTION_TYPE)
-        if _current_conn in (
-            CONF_KNX_TUNNELING,
-            CONF_KNX_TUNNELING_TCP,
-            CONF_KNX_TUNNELING_TCP_SECURE,
-        ):
-            default_connection_type = CONF_KNX_TUNNELING
-        elif _current_conn in (CONF_KNX_ROUTING, CONF_KNX_ROUTING_SECURE):
-            default_connection_type = CONF_KNX_ROUTING
-        elif CONF_KNX_AUTOMATIC in supported_connection_types:
-            default_connection_type = CONF_KNX_AUTOMATIC
-        else:
-            default_connection_type = CONF_KNX_TUNNELING
-
         fields = {
-            vol.Required(
-                CONF_KNX_CONNECTION_TYPE, default=default_connection_type
-            ): vol.In(supported_connection_types)
+            vol.Required(CONF_KNX_CONNECTION_TYPE): vol.In(supported_connection_types)
         }
         return self.async_show_form(
             step_id="connection_type", data_schema=vol.Schema(fields)
@@ -236,7 +213,8 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
     ) -> ConfigFlowResult:
         """Select a tunnel from a list.
 
-        Will be skipped if the gateway scan was unsuccessful.
+        Will be skipped if the gateway scan was unsuccessful
+        or if only one gateway was found.
         """
         if user_input is not None:
             if user_input[CONF_KNX_GATEWAY] == OPTION_MANUAL_TUNNEL:
@@ -266,8 +244,6 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
                 user_password=None,
                 tunnel_endpoint_ia=None,
             )
-            if connection_type == CONF_KNX_TUNNELING_TCP:
-                return await self.async_step_tcp_tunnel_endpoint()
             if connection_type == CONF_KNX_TUNNELING_TCP_SECURE:
                 return await self.async_step_secure_key_source_menu_tunnel()
             self.new_title = f"Tunneling @ {self._selected_tunnel}"
@@ -276,99 +252,16 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
         if not self._found_tunnels:
             return await self.async_step_manual_tunnel()
 
-        tunnel_options = [
-            selector.SelectOptionDict(
-                value=str(tunnel),
-                label=(
-                    f"{tunnel}"
-                    f"{' TCP' if tunnel.supports_tunnelling_tcp else ' UDP'}"
-                    f"{' 🔐 Secure tunneling' if tunnel.tunnelling_requires_secure else ''}"
-                ),
-            )
+        errors: dict = {}
+        tunnel_options = {
+            str(tunnel): f"{tunnel}{' 🔐' if tunnel.tunnelling_requires_secure else ''}"
             for tunnel in self._found_tunnels
-        ]
-        tunnel_options.append(
-            selector.SelectOptionDict(
-                value=OPTION_MANUAL_TUNNEL, label=OPTION_MANUAL_TUNNEL
-            )
-        )
-        default_tunnel = next(
-            (
-                str(tunnel)
-                for tunnel in self._found_tunnels
-                if tunnel.ip_addr == self.initial_data.get(CONF_HOST)
-            ),
-            vol.UNDEFINED,
-        )
-        fields = {
-            vol.Required(
-                CONF_KNX_GATEWAY, default=default_tunnel
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=tunnel_options,
-                    mode=selector.SelectSelectorMode.LIST,
-                )
-            )
         }
+        tunnel_options |= {OPTION_MANUAL_TUNNEL: OPTION_MANUAL_TUNNEL}
+        fields = {vol.Required(CONF_KNX_GATEWAY): vol.In(tunnel_options)}
 
-        return self.async_show_form(step_id="tunnel", data_schema=vol.Schema(fields))
-
-    async def async_step_tcp_tunnel_endpoint(
-        self, user_input: dict | None = None
-    ) -> ConfigFlowResult:
-        """Select specific tunnel endpoint for plain TCP connection."""
-        if user_input is not None:
-            selected_tunnel_ia: str | None = (
-                None
-                if user_input[CONF_KNX_TUNNEL_ENDPOINT_IA] == CONF_KNX_AUTOMATIC
-                else user_input[CONF_KNX_TUNNEL_ENDPOINT_IA]
-            )
-            self.new_entry_data |= KNXConfigEntryData(
-                tunnel_endpoint_ia=selected_tunnel_ia,
-            )
-            self.new_title = (
-                f"{selected_tunnel_ia or 'Tunneling'} @ {self._selected_tunnel}"
-            )
-            return self.finish_flow()
-
-        # this step is only called from async_step_tunnel so self._selected_tunnel is always set
-        assert self._selected_tunnel
-        # skip if only one tunnel endpoint or no tunnelling slot infos
-        if len(self._selected_tunnel.tunnelling_slots) <= 1:
-            return self.finish_flow()
-
-        tunnel_endpoint_options = [
-            selector.SelectOptionDict(
-                value=CONF_KNX_AUTOMATIC, label=CONF_KNX_AUTOMATIC.capitalize()
-            )
-        ]
-        _current_ia = self._xknx.current_address
-        tunnel_endpoint_options.extend(
-            selector.SelectOptionDict(
-                value=str(slot),
-                label=(
-                    f"{slot} - {'current connection' if slot == _current_ia else 'occupied' if not slot_status.free else 'free'}"
-                ),
-            )
-            for slot, slot_status in self._selected_tunnel.tunnelling_slots.items()
-        )
-        default_endpoint = (
-            self.initial_data.get(CONF_KNX_TUNNEL_ENDPOINT_IA) or CONF_KNX_AUTOMATIC
-        )
         return self.async_show_form(
-            step_id="tcp_tunnel_endpoint",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_KNX_TUNNEL_ENDPOINT_IA, default=default_endpoint
-                    ): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=tunnel_endpoint_options,
-                            mode=selector.SelectSelectorMode.LIST,
-                        )
-                    ),
-                }
-            ),
+            step_id="tunnel", data_schema=vol.Schema(fields), errors=errors
         )
 
     async def async_step_manual_tunnel(
@@ -439,7 +332,6 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             self.initial_data.get(CONF_KNX_CONNECTION_TYPE)
             in CONF_KNX_TUNNELING_TYPE_LABELS
         )
-        ip_address: str | None
         if (  # initial attempt on ConfigFlow or coming from automatic / routing
             (isinstance(self, ConfigFlow) or not _reconfiguring_existing_tunnel)
             and not user_input
@@ -475,7 +367,7 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             CONF_KNX_ROUTE_BACK, not bool(self._selected_tunnel)
         )
 
-        fields: VolDictType = {
+        fields = {
             vol.Required(CONF_KNX_TUNNELING_TYPE, default=default_type): vol.In(
                 CONF_KNX_TUNNELING_TYPE_LABELS
             ),
@@ -552,7 +444,7 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             try:
                 key_bytes = bytes.fromhex(user_input[CONF_KNX_ROUTING_BACKBONE_KEY])
                 if len(key_bytes) != 16:
-                    raise ValueError  # noqa: TRY301
+                    raise ValueError
             except ValueError:
                 errors[CONF_KNX_ROUTING_BACKBONE_KEY] = "invalid_backbone_key"
             if not errors:
@@ -716,15 +608,12 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             )
             for endpoint in self._tunnel_endpoints
         )
-        default_endpoint = (
-            self.initial_data.get(CONF_KNX_TUNNEL_ENDPOINT_IA) or CONF_KNX_AUTOMATIC
-        )
         return self.async_show_form(
             step_id="knxkeys_tunnel_select",
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_KNX_TUNNEL_ENDPOINT_IA, default=default_endpoint
+                        CONF_KNX_TUNNEL_ENDPOINT_IA, default=CONF_KNX_AUTOMATIC
                     ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=tunnel_endpoint_options,
@@ -804,7 +693,7 @@ class KNXCommonFlow(ABC, ConfigEntryBaseFlow):
             router for router in routers if router.routing_requires_secure
         )
 
-        fields: VolDictType = {
+        fields = {
             vol.Required(
                 CONF_KNX_INDIVIDUAL_ADDRESS, default=_individual_address
             ): _IA_SELECTOR,
@@ -877,6 +766,7 @@ class KNXOptionsFlow(KNXCommonFlow, OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize KNX options flow."""
+        self.config_entry = config_entry
         super().__init__(initial_data=config_entry.data)  # type: ignore[arg-type]
 
     @callback

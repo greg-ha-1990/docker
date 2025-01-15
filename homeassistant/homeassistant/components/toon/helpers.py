@@ -8,7 +8,7 @@ from typing import Any, Concatenate
 
 from toonapi import ToonConnectionError, ToonError
 
-from .entity import ToonEntity
+from .models import ToonEntity
 
 _LOGGER = logging.getLogger(__name__)
 

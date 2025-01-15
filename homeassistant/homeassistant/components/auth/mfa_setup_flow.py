@@ -11,9 +11,7 @@ import voluptuous_serialize
 from homeassistant import data_entry_flow
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowContext
 import homeassistant.helpers.config_validation as cv
-from homeassistant.util.hass_dict import HassKey
 
 WS_TYPE_SETUP_MFA = "auth/setup_mfa"
 SCHEMA_WS_SETUP_MFA = vol.All(
@@ -33,7 +31,7 @@ SCHEMA_WS_DEPOSE_MFA = websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
     {vol.Required("type"): WS_TYPE_DEPOSE_MFA, vol.Required("mfa_module_id"): str}
 )
 
-DATA_SETUP_FLOW_MGR: HassKey[MfaFlowManager] = HassKey("auth_mfa_setup_flow_manager")
+DATA_SETUP_FLOW_MGR = "auth_mfa_setup_flow_manager"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ class MfaFlowManager(data_entry_flow.FlowManager):
         self,
         handler_key: str,
         *,
-        context: FlowContext | None,
+        context: dict[str, Any],
         data: dict[str, Any],
     ) -> data_entry_flow.FlowHandler:
         """Create a setup flow. handler is a mfa module."""
@@ -59,11 +57,7 @@ class MfaFlowManager(data_entry_flow.FlowManager):
     async def async_finish_flow(
         self, flow: data_entry_flow.FlowHandler, result: data_entry_flow.FlowResult
     ) -> data_entry_flow.FlowResult:
-        """Complete an mfa setup flow.
-
-        This method is called when a flow step returns FlowResultType.ABORT or
-        FlowResultType.CREATE_ENTRY.
-        """
+        """Complete an mfs setup flow."""
         _LOGGER.debug("flow_result: %s", result)
         return result
 
@@ -91,7 +85,7 @@ def websocket_setup_mfa(
 
     async def async_setup_flow(msg: dict[str, Any]) -> None:
         """Return a setup flow for mfa auth module."""
-        flow_manager = hass.data[DATA_SETUP_FLOW_MGR]
+        flow_manager: MfaFlowManager = hass.data[DATA_SETUP_FLOW_MGR]
 
         if (flow_id := msg.get("flow_id")) is not None:
             result = await flow_manager.async_configure(flow_id, msg.get("user_input"))
@@ -162,7 +156,7 @@ def _prepare_result_json(
     data = result.copy()
 
     if (schema := data["data_schema"]) is None:
-        data["data_schema"] = []  # type: ignore[typeddict-item]  # json result type
+        data["data_schema"] = []
     else:
         data["data_schema"] = voluptuous_serialize.convert(schema)
 

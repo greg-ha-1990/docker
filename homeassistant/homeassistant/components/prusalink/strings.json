@@ -23,11 +23,6 @@
     }
   },
   "entity": {
-    "binary_sensor": {
-      "mmu": {
-        "name": "MMU"
-      }
-    },
     "sensor": {
       "printer_state": {
         "state": {
@@ -83,9 +78,6 @@
       },
       "z_height": {
         "name": "Z-Height"
-      },
-      "nozzle_diameter": {
-        "name": "Nozzle Diameter"
       }
     },
     "button": {

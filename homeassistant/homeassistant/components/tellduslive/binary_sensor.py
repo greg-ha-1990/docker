@@ -7,8 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, TELLDUS_DISCOVERY_NEW
-from .entity import TelldusLiveEntity
+from .. import tellduslive
+from .entry import TelldusLiveEntity
 
 
 async def async_setup_entry(
@@ -20,12 +20,14 @@ async def async_setup_entry(
 
     async def async_discover_binary_sensor(device_id):
         """Discover and add a discovered sensor."""
-        client = hass.data[DOMAIN]
+        client = hass.data[tellduslive.DOMAIN]
         async_add_entities([TelldusLiveSensor(client, device_id)])
 
     async_dispatcher_connect(
         hass,
-        TELLDUS_DISCOVERY_NEW.format(binary_sensor.DOMAIN, DOMAIN),
+        tellduslive.TELLDUS_DISCOVERY_NEW.format(
+            binary_sensor.DOMAIN, tellduslive.DOMAIN
+        ),
         async_discover_binary_sensor,
     )
 

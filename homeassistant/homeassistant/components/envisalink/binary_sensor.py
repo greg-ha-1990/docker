@@ -13,8 +13,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import dt as dt_util
 
-from . import CONF_ZONENAME, CONF_ZONETYPE, DATA_EVL, SIGNAL_ZONE_UPDATE, ZONE_SCHEMA
-from .entity import EnvisalinkEntity
+from . import (
+    CONF_ZONENAME,
+    CONF_ZONETYPE,
+    DATA_EVL,
+    SIGNAL_ZONE_UPDATE,
+    ZONE_SCHEMA,
+    EnvisalinkDevice,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +52,7 @@ async def async_setup_platform(
     async_add_entities(entities)
 
 
-class EnvisalinkBinarySensor(EnvisalinkEntity, BinarySensorEntity):
+class EnvisalinkBinarySensor(EnvisalinkDevice, BinarySensorEntity):
     """Representation of an Envisalink binary sensor."""
 
     def __init__(self, hass, zone_number, zone_name, zone_type, info, controller):

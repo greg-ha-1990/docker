@@ -21,10 +21,7 @@ class HomeWizardEntity(CoordinatorEntity[HWEnergyDeviceUpdateCoordinator]):
         self._attr_device_info = DeviceInfo(
             manufacturer="HomeWizard",
             sw_version=coordinator.data.device.firmware_version,
-            model_id=coordinator.data.device.product_type,
-            model=coordinator.data.device.product.name
-            if coordinator.data.device.product
-            else None,
+            model=coordinator.data.device.product_type,
         )
 
         if (serial_number := coordinator.data.device.serial) is not None:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from aioambient import API
 from aioambient.errors import AmbientError
 import voluptuous as vol
@@ -34,9 +32,7 @@ class AmbientStationFlowHandler(ConfigFlow, domain=DOMAIN):
             errors=errors if errors else {},
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict | None = None) -> ConfigFlowResult:
         """Handle the start of the config flow."""
         if not user_input:
             return await self._show_form()

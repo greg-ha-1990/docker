@@ -24,10 +24,4 @@ TUBE_LINES = [
     "Piccadilly",
     "Victoria",
     "Waterloo & City",
-    "Liberty",
-    "Lioness",
-    "Mildmay",
-    "Suffragette",
-    "Weaver",
-    "Windrush",
 ]

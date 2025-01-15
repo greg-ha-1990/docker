@@ -1,10 +1,6 @@
 {
   "services": {
-    "press": {
-      "service": "mdi:gesture-tap-button"
-    },
-    "reload": {
-      "service": "mdi:reload"
-    }
+    "press": "mdi:gesture-tap-button",
+    "reload": "mdi:reload"
   }
 }

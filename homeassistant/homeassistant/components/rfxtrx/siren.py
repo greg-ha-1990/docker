@@ -14,9 +14,13 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from . import DEFAULT_OFF_DELAY, DeviceTuple, async_setup_platform_entry
+from . import (
+    DEFAULT_OFF_DELAY,
+    DeviceTuple,
+    RfxtrxCommandEntity,
+    async_setup_platform_entry,
+)
 from .const import CONF_OFF_DELAY
-from .entity import RfxtrxCommandEntity
 
 SECURITY_PANIC_ON = "Panic"
 SECURITY_PANIC_OFF = "End Panic"
@@ -89,7 +93,7 @@ async def async_setup_entry(
     )
 
 
-class RfxtrxOffDelayMixin(Entity):  # pylint: disable=hass-enforce-class-module
+class RfxtrxOffDelayMixin(Entity):
     """Mixin to support timeouts on data.
 
     Many 433 devices only send data when active. They will

@@ -35,11 +35,15 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def host_port(data):
+    """Return a list with host and port."""
+    return (data[CONF_HOST], data[CONF_PORT])
+
+
 def create_schema(previous_input=None):
     """Create a schema with given values as default."""
     if previous_input is not None:
-        host = previous_input[CONF_HOST]
-        port = previous_input[CONF_PORT]
+        host, port = host_port(previous_input)
     else:
         host = DEFAULT_HOST
         port = DEFAULT_PORT
@@ -66,9 +70,9 @@ class BleBoxConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize the BleBox config flow."""
-        self.device_config: dict[str, Any] = {}
+        self.device_config = {}
 
     def handle_step_exception(
         self, step, exception, schema, host, port, message_id, log_fn
@@ -142,9 +146,7 @@ class BleBoxConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle initial user-triggered config step."""
         hass = self.hass
         schema = create_schema(user_input)
@@ -157,14 +159,14 @@ class BleBoxConfigFlow(ConfigFlow, domain=DOMAIN):
                 description_placeholders={},
             )
 
-        host = user_input[CONF_HOST]
-        port = user_input[CONF_PORT]
+        addr = host_port(user_input)
 
         username = user_input.get(CONF_USERNAME)
         password = user_input.get(CONF_PASSWORD)
 
         for entry in self._async_current_entries():
-            if host == entry.data[CONF_HOST] and port == entry.data[CONF_PORT]:
+            if addr == host_port(entry.data):
+                host, port = addr
                 return self.async_abort(
                     reason=ADDRESS_ALREADY_CONFIGURED,
                     description_placeholders={"address": f"{host}:{port}"},
@@ -172,35 +174,27 @@ class BleBoxConfigFlow(ConfigFlow, domain=DOMAIN):
 
         websession = get_maybe_authenticated_session(hass, password, username)
 
-        api_host = ApiHost(
-            host, port, DEFAULT_SETUP_TIMEOUT, websession, hass.loop, _LOGGER
-        )
+        api_host = ApiHost(*addr, DEFAULT_SETUP_TIMEOUT, websession, hass.loop, _LOGGER)
         try:
             product = await Box.async_from_host(api_host)
 
         except UnsupportedBoxVersion as ex:
             return self.handle_step_exception(
-                "user",
-                ex,
-                schema,
-                host,
-                port,
-                UNSUPPORTED_VERSION,
-                _LOGGER.debug,
+                "user", ex, schema, *addr, UNSUPPORTED_VERSION, _LOGGER.debug
             )
         except UnauthorizedRequest as ex:
             return self.handle_step_exception(
-                "user", ex, schema, host, port, CANNOT_CONNECT, _LOGGER.error
+                "user", ex, schema, *addr, CANNOT_CONNECT, _LOGGER.error
             )
 
         except Error as ex:
             return self.handle_step_exception(
-                "user", ex, schema, host, port, CANNOT_CONNECT, _LOGGER.warning
+                "user", ex, schema, *addr, CANNOT_CONNECT, _LOGGER.warning
             )
 
         except RuntimeError as ex:
             return self.handle_step_exception(
-                "user", ex, schema, host, port, UNKNOWN, _LOGGER.error
+                "user", ex, schema, *addr, UNKNOWN, _LOGGER.error
             )
 
         # Check if configured but IP changed since

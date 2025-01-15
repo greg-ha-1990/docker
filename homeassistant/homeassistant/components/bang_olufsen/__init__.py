@@ -8,7 +8,6 @@ from aiohttp.client_exceptions import (
     ClientConnectorError,
     ClientOSError,
     ServerTimeoutError,
-    WSMessageTypeError,
 )
 from mozart_api.exceptions import ApiException
 from mozart_api.mozart_client import MozartClient
@@ -18,7 +17,6 @@ from homeassistant.const import CONF_HOST, CONF_MODEL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 import homeassistant.helpers.device_registry as dr
-from homeassistant.util.ssl import get_default_context
 
 from .const import DOMAIN
 from .websocket import BangOlufsenWebsocket
@@ -32,12 +30,10 @@ class BangOlufsenData:
     client: MozartClient
 
 
-type BangOlufsenConfigEntry = ConfigEntry[BangOlufsenData]
-
 PLATFORMS = [Platform.MEDIA_PLAYER]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: BangOlufsenConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from a config entry."""
 
     # Remove casts to str
@@ -52,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BangOlufsenConfigEntry) 
         model=entry.data[CONF_MODEL],
     )
 
-    client = MozartClient(host=entry.data[CONF_HOST], ssl_context=get_default_context())
+    client = MozartClient(host=entry.data[CONF_HOST])
 
     # Check API and WebSocket connection
     try:
@@ -63,7 +59,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: BangOlufsenConfigEntry) 
         ServerTimeoutError,
         ApiException,
         TimeoutError,
-        WSMessageTypeError,
     ) as error:
         await client.close_api_client()
         raise ConfigEntryNotReady(f"Unable to connect to {entry.title}") from error
@@ -71,7 +66,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BangOlufsenConfigEntry) 
     websocket = BangOlufsenWebsocket(hass, entry, client)
 
     # Add the websocket and API client
-    entry.runtime_data = BangOlufsenData(websocket, client)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = BangOlufsenData(
+        websocket,
+        client,
+    )
 
     # Start WebSocket connection
     await client.connect_notifications(remote_control=True, reconnect=True)
@@ -81,12 +79,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: BangOlufsenConfigEntry) 
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: BangOlufsenConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # Close the API client and WebSocket notification listener
-    entry.runtime_data.client.disconnect_notifications()
-    await entry.runtime_data.client.close_api_client()
+    hass.data[DOMAIN][entry.entry_id].client.disconnect_notifications()
+    await hass.data[DOMAIN][entry.entry_id].client.close_api_client()
 
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

@@ -5,5 +5,6 @@
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/tellduslive",
   "iot_class": "cloud_polling",
-  "requirements": ["tellduslive==0.10.12"]
+  "quality_scale": "silver",
+  "requirements": ["tellduslive==0.10.11"]
 }

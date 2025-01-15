@@ -9,9 +9,14 @@ import lupupy
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    STATE_ALARM_ARMED_AWAY,
+    STATE_ALARM_ARMED_HOME,
+    STATE_ALARM_DISARMED,
+    STATE_ALARM_TRIGGERED,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -59,16 +64,16 @@ class LupusecAlarm(LupusecDevice, AlarmControlPanelEntity):
         )
 
     @property
-    def alarm_state(self) -> AlarmControlPanelState | None:
+    def state(self) -> str | None:
         """Return the state of the device."""
         if self._device.is_standby:
-            state = AlarmControlPanelState.DISARMED
+            state = STATE_ALARM_DISARMED
         elif self._device.is_away:
-            state = AlarmControlPanelState.ARMED_AWAY
+            state = STATE_ALARM_ARMED_AWAY
         elif self._device.is_home:
-            state = AlarmControlPanelState.ARMED_HOME
+            state = STATE_ALARM_ARMED_HOME
         elif self._device.is_alarm_triggered:
-            state = AlarmControlPanelState.TRIGGERED
+            state = STATE_ALARM_TRIGGERED
         else:
             state = None
         return state

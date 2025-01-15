@@ -1,5 +1,4 @@
 {
-  "title": "Trend",
   "services": {
     "reload": {
       "name": "[%key:common::action::reload%]",

@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HassJob, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ACTIVITY_POWER_OFF, DOMAIN
-from .data import HarmonyConfigEntry, HarmonyData
+from .const import ACTIVITY_POWER_OFF, DOMAIN, HARMONY_DATA
+from .data import HarmonyData
 from .entity import HarmonyEntity
 from .subscriber import HarmonyCallback
 
@@ -19,12 +20,11 @@ TRANSLATABLE_POWER_OFF = "power_off"
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: HarmonyConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up harmony activities select."""
-    async_add_entities([HarmonyActivitySelect(entry.runtime_data)])
+    data: HarmonyData = hass.data[DOMAIN][entry.entry_id][HARMONY_DATA]
+    async_add_entities([HarmonyActivitySelect(data)])
 
 
 class HarmonyActivitySelect(HarmonyEntity, SelectEntity):

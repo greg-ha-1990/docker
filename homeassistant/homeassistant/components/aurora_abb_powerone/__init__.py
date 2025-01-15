@@ -10,15 +10,21 @@
 # and add the following to the end of script/bootstrap:
 # sudo chmod 777 /dev/ttyUSB0
 
+import logging
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 
-from .coordinator import AuroraAbbConfigEntry, AuroraAbbDataUpdateCoordinator
+from .const import DOMAIN
+from .coordinator import AuroraAbbDataUpdateCoordinator
 
 PLATFORMS = [Platform.SENSOR]
 
+_LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass: HomeAssistant, entry: AuroraAbbConfigEntry) -> bool:
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Aurora ABB PowerOne from a config entry."""
 
     comport = entry.data[CONF_PORT]
@@ -26,13 +32,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: AuroraAbbConfigEntry) ->
     coordinator = AuroraAbbDataUpdateCoordinator(hass, comport, address)
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: AuroraAbbConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
 
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    # It should not be necessary to close the serial port because we close
+    # it after every use in sensor.py, i.e. no need to do entry["client"].close()
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

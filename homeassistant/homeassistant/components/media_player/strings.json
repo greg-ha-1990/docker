@@ -17,9 +17,6 @@
       "paused": "{entity_name} is paused",
       "playing": "{entity_name} starts playing",
       "changed_states": "[%key:common::device_automation::trigger_type::changed_states%]"
-    },
-    "extra_fields": {
-      "for": "[%key:common::device_automation::extra_fields::for%]"
     }
   },
   "entity_component": {
@@ -282,7 +279,7 @@
     },
     "clear_playlist": {
       "name": "Clear playlist",
-      "description": "Removes all items from the playlist."
+      "description": "Clears the playlist."
     },
     "shuffle_set": {
       "name": "Shuffle",

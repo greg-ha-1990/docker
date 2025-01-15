@@ -17,20 +17,30 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import API, COORDINATOR, DOMAIN
-from .coordinator import Tami4EdgeCoordinator
+from .coordinator import Tami4EdgeWaterQualityCoordinator
 from .entity import Tami4EdgeBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 ENTITY_DESCRIPTIONS = [
     SensorEntityDescription(
+        key="uv_last_replacement",
+        translation_key="uv_last_replacement",
+        device_class=SensorDeviceClass.DATE,
+    ),
+    SensorEntityDescription(
         key="uv_upcoming_replacement",
         translation_key="uv_upcoming_replacement",
         device_class=SensorDeviceClass.DATE,
     ),
     SensorEntityDescription(
-        key="uv_installed",
-        translation_key="uv_installed",
+        key="uv_status",
+        translation_key="uv_status",
+    ),
+    SensorEntityDescription(
+        key="filter_last_replacement",
+        translation_key="filter_last_replacement",
+        device_class=SensorDeviceClass.DATE,
     ),
     SensorEntityDescription(
         key="filter_upcoming_replacement",
@@ -38,8 +48,8 @@ ENTITY_DESCRIPTIONS = [
         device_class=SensorDeviceClass.DATE,
     ),
     SensorEntityDescription(
-        key="filter_installed",
-        translation_key="filter_installed",
+        key="filter_status",
+        translation_key="filter_status",
     ),
     SensorEntityDescription(
         key="filter_litters_passed",
@@ -57,7 +67,7 @@ async def async_setup_entry(
     """Perform the setup for Tami4Edge."""
     data = hass.data[DOMAIN][entry.entry_id]
     api: Tami4EdgeAPI = data[API]
-    coordinator: Tami4EdgeCoordinator = data[COORDINATOR]
+    coordinator: Tami4EdgeWaterQualityCoordinator = data[COORDINATOR]
 
     async_add_entities(
         Tami4EdgeSensorEntity(
@@ -71,14 +81,14 @@ async def async_setup_entry(
 
 class Tami4EdgeSensorEntity(
     Tami4EdgeBaseEntity,
-    CoordinatorEntity[Tami4EdgeCoordinator],
+    CoordinatorEntity[Tami4EdgeWaterQualityCoordinator],
     SensorEntity,
 ):
     """Representation of the entity."""
 
     def __init__(
         self,
-        coordinator: Tami4EdgeCoordinator,
+        coordinator: Tami4EdgeWaterQualityCoordinator,
         api: Tami4EdgeAPI,
         entity_description: SensorEntityDescription,
     ) -> None:

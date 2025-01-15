@@ -10,7 +10,6 @@ from typing import Generic, TypeVar
 from pydeconz.interfaces.sensors import SensorResources
 from pydeconz.models.event import EventType
 from pydeconz.models.sensor import SensorBase as PydeconzSensorBase
-from pydeconz.models.sensor.air_purifier import AirPurifier
 from pydeconz.models.sensor.air_quality import AirQuality
 from pydeconz.models.sensor.carbon_dioxide import CarbonDioxide
 from pydeconz.models.sensor.consumption import Consumption
@@ -28,7 +27,7 @@ from pydeconz.models.sensor.temperature import Temperature
 from pydeconz.models.sensor.time import Time
 
 from homeassistant.components.sensor import (
-    DOMAIN as SENSOR_DOMAIN,
+    DOMAIN,
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -48,7 +47,6 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
-    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -56,7 +54,7 @@ from homeassistant.helpers.typing import StateType
 import homeassistant.util.dt as dt_util
 
 from .const import ATTR_DARK, ATTR_ON
-from .entity import DeconzDevice
+from .deconz_device import DeconzDevice
 from .hub import DeconzHub
 
 PROVIDES_EXTRA_ATTRIBUTES = (
@@ -79,7 +77,6 @@ ATTR_EVENT_ID = "event_id"
 
 T = TypeVar(
     "T",
-    AirPurifier,
     AirQuality,
     CarbonDioxide,
     Consumption,
@@ -111,19 +108,6 @@ class DeconzSensorDescription(Generic[T], SensorEntityDescription):
 
 
 ENTITY_DESCRIPTIONS: tuple[DeconzSensorDescription, ...] = (
-    DeconzSensorDescription[AirPurifier](
-        key="air_purifier_filter_run_time",
-        supported_fn=lambda device: True,
-        update_key="filterruntime",
-        name_suffix="Filter time",
-        value_fn=lambda device: device.filter_run_time,
-        instance_check=AirPurifier,
-        device_class=SensorDeviceClass.DURATION,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        native_unit_of_measurement=UnitOfTime.SECONDS,
-        suggested_unit_of_measurement=UnitOfTime.DAYS,
-        suggested_display_precision=1,
-    ),
     DeconzSensorDescription[AirQuality](
         key="air_quality",
         supported_fn=lambda device: device.supports_air_quality,
@@ -336,7 +320,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the deCONZ sensors."""
     hub = DeconzHub.get_hub(hass, config_entry)
-    hub.entities[SENSOR_DOMAIN] = set()
+    hub.entities[DOMAIN] = set()
 
     known_device_entities: dict[str, set[str]] = {
         description.key: set()
@@ -393,7 +377,7 @@ async def async_setup_entry(
 class DeconzSensor(DeconzDevice[SensorResources], SensorEntity):
     """Representation of a deCONZ sensor."""
 
-    TYPE = SENSOR_DOMAIN
+    TYPE = DOMAIN
     entity_description: DeconzSensorDescription
 
     def __init__(

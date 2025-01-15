@@ -19,8 +19,9 @@ from zwave_js_server.const.command_class.lock import (
 from zwave_js_server.exceptions import BaseZwaveJSServerError
 from zwave_js_server.util.lock import clear_usercode, set_configuration, set_usercode
 
-from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN, LockEntity, LockState
+from homeassistant.components.lock import DOMAIN as LOCK_DOMAIN, LockEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_LOCKED, STATE_UNLOCKED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, entity_platform
@@ -48,12 +49,12 @@ PARALLEL_UPDATES = 0
 
 STATE_TO_ZWAVE_MAP: dict[int, dict[str, int | bool]] = {
     CommandClass.DOOR_LOCK: {
-        LockState.UNLOCKED: DoorLockMode.UNSECURED,
-        LockState.LOCKED: DoorLockMode.SECURED,
+        STATE_UNLOCKED: DoorLockMode.UNSECURED,
+        STATE_LOCKED: DoorLockMode.SECURED,
     },
     CommandClass.LOCK: {
-        LockState.UNLOCKED: False,
-        LockState.LOCKED: True,
+        STATE_UNLOCKED: False,
+        STATE_LOCKED: True,
     },
 }
 UNIT16_SCHEMA = vol.All(vol.Coerce(int), vol.Range(min=0, max=65535))
@@ -139,7 +140,7 @@ class ZWaveLock(ZWaveBaseEntity, LockEntity):
             == self.info.primary_value.value
         )
 
-    async def _set_lock_state(self, target_state: LockState, **kwargs: Any) -> None:
+    async def _set_lock_state(self, target_state: str, **kwargs: Any) -> None:
         """Set the lock state."""
         target_value = self.get_zwave_value(
             LOCK_CMD_CLASS_TO_PROPERTY_MAP[
@@ -154,11 +155,11 @@ class ZWaveLock(ZWaveBaseEntity, LockEntity):
 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock the lock."""
-        await self._set_lock_state(LockState.LOCKED)
+        await self._set_lock_state(STATE_LOCKED)
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the lock."""
-        await self._set_lock_state(LockState.UNLOCKED)
+        await self._set_lock_state(STATE_UNLOCKED)
 
     async def async_set_lock_usercode(self, code_slot: int, usercode: str) -> None:
         """Set the usercode to index X on the lock."""
@@ -195,19 +196,15 @@ class ZWaveLock(ZWaveBaseEntity, LockEntity):
     ) -> None:
         """Set the lock configuration."""
         params: dict[str, Any] = {"operation_type": operation_type}
-        params.update(
-            {
-                attr: val
-                for attr, val in (
-                    ("lock_timeout_configuration", lock_timeout),
-                    ("auto_relock_time", auto_relock_time),
-                    ("hold_and_release_time", hold_and_release_time),
-                    ("twist_assist", twist_assist),
-                    ("block_to_block", block_to_block),
-                )
-                if val is not None
-            }
-        )
+        for attr, val in (
+            ("lock_timeout_configuration", lock_timeout),
+            ("auto_relock_time", auto_relock_time),
+            ("hold_and_release_time", hold_and_release_time),
+            ("twist_assist", twist_assist),
+            ("block_to_block", block_to_block),
+        ):
+            if val is not None:
+                params[attr] = val
         configuration = DoorLockCCConfigurationSetOptions(**params)
         result = await set_configuration(
             self.info.node.endpoints[self.info.primary_value.endpoint or 0],

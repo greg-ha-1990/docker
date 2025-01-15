@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.condition import ConditionCheckerType
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from . import DOMAIN
 
 # mypy: disallow-any-generics
 

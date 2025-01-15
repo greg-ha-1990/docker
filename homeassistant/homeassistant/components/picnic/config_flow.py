@@ -87,9 +87,7 @@ class PicnicConfigFlow(ConfigFlow, domain=DOMAIN):
         """Perform the re-auth step upon an API authentication error."""
         return await self.async_step_user()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the authentication step, this is the generic step for both `step_user` and `step_reauth`."""
         if user_input is None:
             return self.async_show_form(

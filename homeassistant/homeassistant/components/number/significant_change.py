@@ -44,6 +44,7 @@ def async_check_significant_change(
     if (device_class := new_attrs.get(ATTR_DEVICE_CLASS)) is None:
         return None
 
+    absolute_change: float | None = None
     percentage_change: float | None = None
 
     # special for temperature
@@ -82,8 +83,11 @@ def async_check_significant_change(
         # Old state was invalid, we should report again
         return True
 
-    if percentage_change is not None:
+    if absolute_change is not None and percentage_change is not None:
         return _absolute_and_relative_change(
             float(old_state), float(new_state), absolute_change, percentage_change
         )
-    return check_absolute_change(float(old_state), float(new_state), absolute_change)
+    if absolute_change is not None:
+        return check_absolute_change(
+            float(old_state), float(new_state), absolute_change
+        )

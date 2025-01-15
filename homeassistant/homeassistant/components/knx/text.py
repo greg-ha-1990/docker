@@ -22,9 +22,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.typing import ConfigType
 
-from . import KNXModule
-from .const import CONF_RESPOND_TO_READ, CONF_STATE_ADDRESS, KNX_ADDRESS, KNX_MODULE_KEY
-from .entity import KnxYamlEntity
+from .const import (
+    CONF_RESPOND_TO_READ,
+    CONF_STATE_ADDRESS,
+    DATA_KNX_CONFIG,
+    DOMAIN,
+    KNX_ADDRESS,
+)
+from .knx_entity import KnxEntity
 
 
 async def async_setup_entry(
@@ -33,10 +38,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensor(s) for KNX platform."""
-    knx_module = hass.data[KNX_MODULE_KEY]
-    config: list[ConfigType] = knx_module.config_yaml[Platform.TEXT]
+    xknx: XKNX = hass.data[DOMAIN].xknx
+    config: list[ConfigType] = hass.data[DATA_KNX_CONFIG][Platform.TEXT]
 
-    async_add_entities(KNXText(knx_module, entity_config) for entity_config in config)
+    async_add_entities(KNXText(xknx, entity_config) for entity_config in config)
 
 
 def _create_notification(xknx: XKNX, config: ConfigType) -> XknxNotification:
@@ -51,18 +56,15 @@ def _create_notification(xknx: XKNX, config: ConfigType) -> XknxNotification:
     )
 
 
-class KNXText(KnxYamlEntity, TextEntity, RestoreEntity):
+class KNXText(KnxEntity, TextEntity, RestoreEntity):
     """Representation of a KNX text."""
 
     _device: XknxNotification
     _attr_native_max = 14
 
-    def __init__(self, knx_module: KNXModule, config: ConfigType) -> None:
+    def __init__(self, xknx: XKNX, config: ConfigType) -> None:
         """Initialize a KNX text."""
-        super().__init__(
-            knx_module=knx_module,
-            device=_create_notification(knx_module.xknx, config),
-        )
+        super().__init__(_create_notification(xknx, config))
         self._attr_mode = config[CONF_MODE]
         self._attr_pattern = (
             r"[\u0000-\u00ff]*"  # Latin-1

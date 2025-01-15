@@ -1,7 +1,5 @@
 {
   "services": {
-    "printer_connect": {
-      "service": "mdi:lan-connect"
-    }
+    "printer_connect": "mdi:lan-connect"
   }
 }

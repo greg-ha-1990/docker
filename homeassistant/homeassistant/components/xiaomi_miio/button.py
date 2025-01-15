@@ -24,7 +24,7 @@ from .const import (
     MODEL_AIRFRESH_T2017,
     MODELS_VACUUM,
 )
-from .entity import XiaomiCoordinatedMiioEntity
+from .device import XiaomiCoordinatedMiioEntity
 
 # Fans
 ATTR_RESET_DUST_FILTER = "reset_dust_filter"
@@ -51,7 +51,7 @@ BUTTON_TYPES = (
     # Fans
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_DUST_FILTER,
-        translation_key=ATTR_RESET_DUST_FILTER,
+        name="Reset dust filter",
         icon="mdi:air-filter",
         method_press="reset_dust_filter",
         method_press_error_message="Resetting the dust filter lifetime failed",
@@ -59,7 +59,7 @@ BUTTON_TYPES = (
     ),
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_UPPER_FILTER,
-        translation_key=ATTR_RESET_UPPER_FILTER,
+        name="Reset upper filter",
         icon="mdi:air-filter",
         method_press="reset_upper_filter",
         method_press_error_message="Resetting the upper filter lifetime failed.",
@@ -68,7 +68,7 @@ BUTTON_TYPES = (
     # Vacuums
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_VACUUM_MAIN_BRUSH,
-        translation_key=ATTR_RESET_VACUUM_MAIN_BRUSH,
+        name="Reset main brush",
         icon="mdi:brush",
         method_press=METHOD_VACUUM_RESET_CONSUMABLE,
         method_press_params=Consumable.MainBrush,
@@ -77,7 +77,7 @@ BUTTON_TYPES = (
     ),
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_VACUUM_SIDE_BRUSH,
-        translation_key=ATTR_RESET_VACUUM_SIDE_BRUSH,
+        name="Reset side brush",
         icon="mdi:brush",
         method_press=METHOD_VACUUM_RESET_CONSUMABLE,
         method_press_params=Consumable.SideBrush,
@@ -86,7 +86,7 @@ BUTTON_TYPES = (
     ),
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_VACUUM_FILTER,
-        translation_key=ATTR_RESET_VACUUM_FILTER,
+        name="Reset filter",
         icon="mdi:air-filter",
         method_press=METHOD_VACUUM_RESET_CONSUMABLE,
         method_press_params=Consumable.Filter,
@@ -95,7 +95,7 @@ BUTTON_TYPES = (
     ),
     XiaomiMiioButtonDescription(
         key=ATTR_RESET_VACUUM_SENSOR_DIRTY,
-        translation_key=ATTR_RESET_VACUUM_SENSOR_DIRTY,
+        name="Reset sensor dirty",
         icon="mdi:eye-outline",
         method_press=METHOD_VACUUM_RESET_CONSUMABLE,
         method_press_params=Consumable.SensorDirty,

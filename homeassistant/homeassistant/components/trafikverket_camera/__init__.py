@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from pytrafikverket import TrafikverketCamera
+from pytrafikverket.trafikverket_camera import TrafikverketCamera
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, CONF_ID, CONF_LOCATION
@@ -25,7 +25,7 @@ TVCameraConfigEntry = ConfigEntry[TVDataUpdateCoordinator]
 async def async_setup_entry(hass: HomeAssistant, entry: TVCameraConfigEntry) -> bool:
     """Set up Trafikverket Camera from a config entry."""
 
-    coordinator = TVDataUpdateCoordinator(hass, entry)
+    coordinator = TVDataUpdateCoordinator(hass)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 

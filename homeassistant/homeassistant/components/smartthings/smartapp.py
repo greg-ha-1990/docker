@@ -16,7 +16,6 @@ from pysmartthings import (
     CAPABILITIES,
     CLASSIFICATION_AUTOMATION,
     App,
-    AppEntity,
     AppOAuth,
     AppSettings,
     InstalledAppStatus,
@@ -64,7 +63,7 @@ def format_unique_id(app_id: str, location_id: str) -> str:
     return f"{app_id}_{location_id}"
 
 
-async def find_app(hass: HomeAssistant, api: SmartThings) -> AppEntity | None:
+async def find_app(hass: HomeAssistant, api):
     """Find an existing SmartApp for this installation of hass."""
     apps = await api.apps()
     for app in [app for app in apps if app.app_name.startswith(APP_NAME_PREFIX)]:
@@ -75,7 +74,6 @@ async def find_app(hass: HomeAssistant, api: SmartThings) -> AppEntity | None:
             == hass.data[DOMAIN][CONF_INSTANCE_ID]
         ):
             return app
-    return None
 
 
 async def validate_installed_app(api, installed_app_id: str):

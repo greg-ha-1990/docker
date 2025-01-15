@@ -1,18 +1,16 @@
 """Config flow to configure emulated_roku component."""
 
-from typing import Any
-
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_NAME
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 
 from .const import CONF_LISTEN_PORT, DEFAULT_NAME, DEFAULT_PORT, DOMAIN
 
 
 @callback
-def configured_servers(hass: HomeAssistant) -> set[str]:
+def configured_servers(hass):
     """Return a set of the configured servers."""
     return {
         entry.data[CONF_NAME] for entry in hass.config_entries.async_entries(DOMAIN)
@@ -24,11 +22,9 @@ class EmulatedRokuFlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
-        errors: dict[str, str] = {}
+        errors = {}
 
         if user_input is not None:
             self._async_abort_entries_match({CONF_NAME: user_input[CONF_NAME]})
@@ -56,6 +52,6 @@ class EmulatedRokuFlowHandler(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+    async def async_step_import(self, import_config):
         """Handle a flow import."""
-        return await self.async_step_user(import_data)
+        return await self.async_step_user(import_config)

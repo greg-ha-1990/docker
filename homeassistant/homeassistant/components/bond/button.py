@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bond_async import Action
+from bond_async import Action, BPUPSubscriptions
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.core import HomeAssistant
@@ -12,8 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import BondConfigEntry
 from .entity import BondEntity
-from .models import BondData
-from .utils import BondDevice
+from .utils import BondDevice, BondHub
 
 # The api requires a step size even though it does not
 # seem to matter what is is as the underlying device is likely
@@ -237,20 +236,6 @@ BUTTONS: tuple[BondButtonEntityDescription, ...] = (
         mutually_exclusive=Action.SET_POSITION,
         argument=STEP_SIZE,
     ),
-    BondButtonEntityDescription(
-        key=Action.OPEN_NEXT,
-        name="Open Next",
-        translation_key="open_next",
-        mutually_exclusive=None,
-        argument=None,
-    ),
-    BondButtonEntityDescription(
-        key=Action.CLOSE_NEXT,
-        name="Close Next",
-        translation_key="close_next",
-        mutually_exclusive=None,
-        argument=None,
-    ),
 )
 
 
@@ -261,11 +246,13 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bond button devices."""
     data = entry.runtime_data
+    hub = data.hub
+    bpup_subs = data.bpup_subs
     entities: list[BondButtonEntity] = []
 
-    for device in data.hub.devices:
+    for device in hub.devices:
         device_entities = [
-            BondButtonEntity(data, device, description)
+            BondButtonEntity(hub, device, bpup_subs, description)
             for description in BUTTONS
             if device.has_action(description.key)
             and (
@@ -277,7 +264,9 @@ async def async_setup_entry(
             # Most devices have the stop action available, but
             # we only add the stop action button if we add actions
             # since its not so useful if there are no actions to stop
-            device_entities.append(BondButtonEntity(data, device, STOP_BUTTON))
+            device_entities.append(
+                BondButtonEntity(hub, device, bpup_subs, STOP_BUTTON)
+            )
         entities.extend(device_entities)
 
     async_add_entities(entities)
@@ -290,23 +279,26 @@ class BondButtonEntity(BondEntity, ButtonEntity):
 
     def __init__(
         self,
-        data: BondData,
+        hub: BondHub,
         device: BondDevice,
+        bpup_subs: BPUPSubscriptions,
         description: BondButtonEntityDescription,
     ) -> None:
         """Init Bond button."""
         self.entity_description = description
-        super().__init__(data, device, description.name, description.key.lower())
+        super().__init__(
+            hub, device, bpup_subs, description.name, description.key.lower()
+        )
 
     async def async_press(self) -> None:
         """Press the button."""
-        description = self.entity_description
-        key = description.key
-        if argument := description.argument:
-            action = Action(key, argument)
+        if self.entity_description.argument:
+            action = Action(
+                self.entity_description.key, self.entity_description.argument
+            )
         else:
-            action = Action(key)
-        await self._bond.action(self._device_id, action)
+            action = Action(self.entity_description.key)
+        await self._hub.bond.action(self._device.device_id, action)
 
     def _apply_state(self) -> None:
         """Apply the state."""

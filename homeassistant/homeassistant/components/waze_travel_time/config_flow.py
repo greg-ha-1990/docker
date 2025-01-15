@@ -7,7 +7,6 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.config_entries import (
-    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -21,8 +20,6 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
-    TextSelectorConfig,
-    TextSelectorType,
 )
 from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 
@@ -37,7 +34,6 @@ from .const import (
     CONF_REALTIME,
     CONF_UNITS,
     CONF_VEHICLE_TYPE,
-    DEFAULT_FILTER,
     DEFAULT_NAME,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -50,18 +46,8 @@ from .helpers import is_valid_config_entry
 
 OPTIONS_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_INCL_FILTER): TextSelector(
-            TextSelectorConfig(
-                type=TextSelectorType.TEXT,
-                multiple=True,
-            ),
-        ),
-        vol.Optional(CONF_EXCL_FILTER): TextSelector(
-            TextSelectorConfig(
-                type=TextSelectorType.TEXT,
-                multiple=True,
-            ),
-        ),
+        vol.Optional(CONF_INCL_FILTER, default=""): TextSelector(),
+        vol.Optional(CONF_EXCL_FILTER, default=""): TextSelector(),
         vol.Optional(CONF_REALTIME): BooleanSelector(),
         vol.Required(CONF_VEHICLE_TYPE): SelectSelector(
             SelectSelectorConfig(
@@ -102,7 +88,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-def default_options(hass: HomeAssistant) -> dict[str, str | bool | list[str]]:
+def default_options(hass: HomeAssistant) -> dict[str, str | bool]:
     """Get the default options."""
     defaults = DEFAULT_OPTIONS.copy()
     if hass.config.units is US_CUSTOMARY_SYSTEM:
@@ -113,13 +99,13 @@ def default_options(hass: HomeAssistant) -> dict[str, str | bool | list[str]]:
 class WazeOptionsFlow(OptionsFlow):
     """Handle an options flow for Waze Travel Time."""
 
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize waze options flow."""
+        self.config_entry = config_entry
+
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
         """Handle the initial step."""
         if user_input is not None:
-            if user_input.get(CONF_INCL_FILTER) is None:
-                user_input[CONF_INCL_FILTER] = DEFAULT_FILTER
-            if user_input.get(CONF_EXCL_FILTER) is None:
-                user_input[CONF_EXCL_FILTER] = DEFAULT_FILTER
             return self.async_create_entry(
                 title="",
                 data=user_input,
@@ -136,7 +122,11 @@ class WazeOptionsFlow(OptionsFlow):
 class WazeConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Waze Travel Time."""
 
-    VERSION = 2
+    VERSION = 1
+
+    def __init__(self) -> None:
+        """Init Config Flow."""
+        self._entry: ConfigEntry | None = None
 
     @staticmethod
     @callback
@@ -144,7 +134,7 @@ class WazeConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> WazeOptionsFlow:
         """Get the options flow for this handler."""
-        return WazeOptionsFlow()
+        return WazeOptionsFlow(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -161,11 +151,12 @@ class WazeConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input[CONF_DESTINATION],
                 user_input[CONF_REGION],
             ):
-                if self.source == SOURCE_RECONFIGURE:
+                if self._entry:
                     return self.async_update_reload_and_abort(
-                        self._get_reconfigure_entry(),
+                        self._entry,
                         title=user_input[CONF_NAME],
                         data=user_input,
+                        reason="reconfigure_successful",
                     )
                 return self.async_create_entry(
                     title=user_input.get(CONF_NAME, DEFAULT_NAME),
@@ -184,10 +175,13 @@ class WazeConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
+        self, _: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle reconfiguration."""
-        data = self._get_reconfigure_entry().data.copy()
+        self._entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        assert self._entry
+
+        data = self._entry.data.copy()
         data[CONF_REGION] = data[CONF_REGION].lower()
 
         return self.async_show_form(

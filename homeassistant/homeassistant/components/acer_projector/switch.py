@@ -9,10 +9,7 @@ from typing import Any
 import serial
 import voluptuous as vol
 
-from homeassistant.components.switch import (
-    PLATFORM_SCHEMA as SWITCH_PLATFORM_SCHEMA,
-    SwitchEntity,
-)
+from homeassistant.components.switch import PLATFORM_SCHEMA, SwitchEntity
 from homeassistant.const import (
     CONF_FILENAME,
     CONF_NAME,
@@ -41,7 +38,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORM_SCHEMA = SWITCH_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_FILENAME): cv.isdevice,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -81,7 +78,7 @@ class AcerSwitch(SwitchEntity):
         write_timeout: int,
     ) -> None:
         """Init of the Acer projector."""
-        self.serial = serial.Serial(
+        self.ser = serial.Serial(
             port=serial_port, timeout=timeout, write_timeout=write_timeout
         )
         self._serial_port = serial_port
@@ -99,16 +96,16 @@ class AcerSwitch(SwitchEntity):
         # was disconnected during runtime.
         # This way the projector can be reconnected and will still work
         try:
-            if not self.serial.is_open:
-                self.serial.open()
-            self.serial.write(msg.encode("utf-8"))
+            if not self.ser.is_open:
+                self.ser.open()
+            self.ser.write(msg.encode("utf-8"))
             # Size is an experience value there is no real limit.
             # AFAIK there is no limit and no end character so we will usually
             # need to wait for timeout
-            ret = self.serial.read_until(size=20).decode("utf-8")
+            ret = self.ser.read_until(size=20).decode("utf-8")
         except serial.SerialException:
             _LOGGER.error("Problem communicating with %s", self._serial_port)
-        self.serial.close()
+        self.ser.close()
         return ret
 
     def _write_read_format(self, msg: str) -> str:

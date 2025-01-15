@@ -7,8 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from . import DOMAIN as QWIKSWITCH
-from .entity import QSToggleEntity
+from . import DOMAIN as QWIKSWITCH, QSToggleEntity
 
 
 async def async_setup_platform(

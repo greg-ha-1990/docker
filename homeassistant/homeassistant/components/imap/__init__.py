@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from aioimaplib import IMAP4_SSL, AioImapException, Response
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import (
     HomeAssistant,
@@ -28,7 +29,6 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_ENABLE_PUSH, DOMAIN
 from .coordinator import (
-    ImapDataUpdateCoordinator,
     ImapMessage,
     ImapPollingDataUpdateCoordinator,
     ImapPushDataUpdateCoordinator,
@@ -65,18 +65,17 @@ SERVICE_MOVE_SCHEMA = _SERVICE_UID_SCHEMA.extend(
 SERVICE_DELETE_SCHEMA = _SERVICE_UID_SCHEMA
 SERVICE_FETCH_TEXT_SCHEMA = _SERVICE_UID_SCHEMA
 
-type ImapConfigEntry = ConfigEntry[ImapDataUpdateCoordinator]
-
 
 async def async_get_imap_client(hass: HomeAssistant, entry_id: str) -> IMAP4_SSL:
     """Get IMAP client and connect."""
-    if (entry := hass.config_entries.async_get_entry(entry_id)) is None or (
-        entry.state is not ConfigEntryState.LOADED
-    ):
+    if hass.data[DOMAIN].get(entry_id) is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="invalid_entry",
         )
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if TYPE_CHECKING:
+        assert entry is not None
     try:
         client = await connect_to_server(entry.data)
     except InvalidAuth as exc:
@@ -236,7 +235,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ImapConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up imap from a config entry."""
     try:
         imap_client: IMAP4_SSL = await connect_to_server(dict(entry.data))
@@ -256,10 +255,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ImapConfigEntry) -> bool
     else:
         coordinator_class = ImapPollingDataUpdateCoordinator
 
-    coordinator: ImapDataUpdateCoordinator = coordinator_class(hass, imap_client, entry)
+    coordinator: ImapPushDataUpdateCoordinator | ImapPollingDataUpdateCoordinator = (
+        coordinator_class(hass, imap_client, entry)
+    )
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, coordinator.shutdown)
@@ -270,9 +271,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ImapConfigEntry) -> bool
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ImapConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        coordinator = entry.runtime_data
+        coordinator: (
+            ImapPushDataUpdateCoordinator | ImapPollingDataUpdateCoordinator
+        ) = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.shutdown()
     return unload_ok

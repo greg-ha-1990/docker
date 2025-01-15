@@ -60,16 +60,13 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 3
 
-    manufacturer: str | None = None
-    url: str | None = None
-
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: ConfigEntry,
     ) -> OptionsFlowHandler:
         """Get options flow."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
     async def _async_show_user_form(
         self,
@@ -84,7 +81,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(
                         CONF_URL,
-                        default=user_input.get(CONF_URL, self.url or ""),
+                        default=user_input.get(
+                            CONF_URL,
+                            self.context.get(CONF_URL, ""),
+                        ),
                     ): str,
                     vol.Optional(
                         CONF_VERIFY_SSL,
@@ -241,7 +241,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         user_input.update(
             {
                 CONF_MAC: get_device_macs(info, wlan_settings),
-                CONF_MANUFACTURER: self.manufacturer,
+                CONF_MANUFACTURER: self.context.get(CONF_MANUFACTURER),
             }
         )
 
@@ -302,12 +302,11 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             {
                 "title_placeholders": {
                     CONF_NAME: discovery_info.upnp.get(ssdp.ATTR_UPNP_FRIENDLY_NAME)
-                    or "Huawei LTE"
-                }
+                },
+                CONF_MANUFACTURER: discovery_info.upnp.get(ssdp.ATTR_UPNP_MANUFACTURER),
+                CONF_URL: url,
             }
         )
-        self.manufacturer = discovery_info.upnp.get(ssdp.ATTR_UPNP_MANUFACTURER)
-        self.url = url
         return await self._async_show_user_form()
 
     async def async_step_reauth(
@@ -320,7 +319,8 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Dialog that informs the user that reauth is required."""
-        entry = self._get_reauth_entry()
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        assert entry
         if not user_input:
             return await self._async_show_reauth_form(
                 user_input={
@@ -339,11 +339,17 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 user_input=user_input, errors=errors
             )
 
-        return self.async_update_reload_and_abort(entry, data=new_data)
+        self.hass.config_entries.async_update_entry(entry, data=new_data)
+        await self.hass.config_entries.async_reload(entry.entry_id)
+        return self.async_abort(reason="reauth_successful")
 
 
 class OptionsFlowHandler(OptionsFlow):
     """Huawei LTE options flow."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

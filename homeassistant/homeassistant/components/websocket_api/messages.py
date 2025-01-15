@@ -224,12 +224,9 @@ def _state_diff_event(
     if (old_attributes := old_state.attributes) != (
         new_attributes := new_state.attributes
     ):
-        if added := {
-            key: value
-            for key, value in new_attributes.items()
-            if key not in old_attributes or old_attributes[key] != value
-        }:
-            additions[COMPRESSED_STATE_ATTRIBUTES] = added
+        for key, value in new_attributes.items():
+            if old_attributes.get(key) != value:
+                additions.setdefault(COMPRESSED_STATE_ATTRIBUTES, {})[key] = value
         if removed := old_attributes.keys() - new_attributes:
             # sets are not JSON serializable by default so we convert to list
             # here if there are any values to avoid jumping into the json_encoder_default

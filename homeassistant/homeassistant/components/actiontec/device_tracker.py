@@ -9,8 +9,8 @@ from typing import Final
 import voluptuous as vol
 
 from homeassistant.components.device_tracker import (
-    DOMAIN as DEVICE_TRACKER_DOMAIN,
-    PLATFORM_SCHEMA as DEVICE_TRACKER_PLATFORM_SCHEMA,
+    DOMAIN,
+    PLATFORM_SCHEMA as BASE_PLATFORM_SCHEMA,
     DeviceScanner,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
@@ -23,7 +23,7 @@ from .model import Device
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-PLATFORM_SCHEMA: Final = DEVICE_TRACKER_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA: Final = BASE_PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_HOST): cv.string,
         vol.Required(CONF_PASSWORD): cv.string,
@@ -36,7 +36,7 @@ def get_scanner(
     hass: HomeAssistant, config: ConfigType
 ) -> ActiontecDeviceScanner | None:
     """Validate the configuration and return an Actiontec scanner."""
-    scanner = ActiontecDeviceScanner(config[DEVICE_TRACKER_DOMAIN])
+    scanner = ActiontecDeviceScanner(config[DOMAIN])
     return scanner if scanner.success_init else None
 
 
@@ -51,6 +51,7 @@ class ActiontecDeviceScanner(DeviceScanner):
         self.last_results: list[Device] = []
         data = self.get_actiontec_data()
         self.success_init = data is not None
+        _LOGGER.info("Scanner initialized")
 
     def scan_devices(self) -> list[str]:
         """Scan for new devices and return a list with found device IDs."""
@@ -69,7 +70,7 @@ class ActiontecDeviceScanner(DeviceScanner):
 
         Return boolean if scanning successful.
         """
-        _LOGGER.debug("Scanning")
+        _LOGGER.info("Scanning")
         if not self.success_init:
             return False
 
@@ -78,7 +79,7 @@ class ActiontecDeviceScanner(DeviceScanner):
         self.last_results = [
             device for device in actiontec_data if device.timevalid > -60
         ]
-        _LOGGER.debug("Scan successful")
+        _LOGGER.info("Scan successful")
         return True
 
     def get_actiontec_data(self) -> list[Device] | None:

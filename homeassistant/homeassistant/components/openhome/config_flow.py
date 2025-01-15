@@ -24,9 +24,6 @@ def _is_complete_discovery(discovery_info: SsdpServiceInfo) -> bool:
 class OpenhomeConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle an Openhome config flow."""
 
-    _host: str | None
-    _name: str
-
     async def async_step_ssdp(
         self, discovery_info: SsdpServiceInfo
     ) -> ConfigFlowResult:
@@ -48,8 +45,8 @@ class OpenhomeConfigFlow(ConfigFlow, domain=DOMAIN):
             "async_step_ssdp: create entry %s", discovery_info.upnp[ATTR_UPNP_UDN]
         )
 
-        self._name = discovery_info.upnp[ATTR_UPNP_FRIENDLY_NAME]
-        self._host = discovery_info.ssdp_location
+        self.context[CONF_NAME] = discovery_info.upnp[ATTR_UPNP_FRIENDLY_NAME]
+        self.context[CONF_HOST] = discovery_info.ssdp_location
 
         return await self.async_step_confirm()
 
@@ -60,11 +57,11 @@ class OpenhomeConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             return self.async_create_entry(
-                title=self._name,
-                data={CONF_HOST: self._host},
+                title=self.context[CONF_NAME],
+                data={CONF_HOST: self.context[CONF_HOST]},
             )
 
         return self.async_show_form(
             step_id="confirm",
-            description_placeholders={CONF_NAME: self._name},
+            description_placeholders={CONF_NAME: self.context[CONF_NAME]},
         )

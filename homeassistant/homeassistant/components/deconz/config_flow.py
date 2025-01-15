@@ -20,6 +20,7 @@ from pydeconz.utils import (
 import voluptuous as vol
 
 from homeassistant.components import ssdp
+from homeassistant.components.hassio import HassioServiceInfo
 from homeassistant.config_entries import (
     SOURCE_HASSIO,
     ConfigEntry,
@@ -30,7 +31,6 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import aiohttp_client
-from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .const import (
     CONF_ALLOW_CLIP_SENSOR,
@@ -74,11 +74,9 @@ class DeconzFlowHandler(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: ConfigEntry,
-    ) -> DeconzOptionsFlowHandler:
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return DeconzOptionsFlowHandler()
+        return DeconzOptionsFlowHandler(config_entry)
 
     def __init__(self) -> None:
         """Initialize the deCONZ config flow."""
@@ -301,6 +299,11 @@ class DeconzOptionsFlowHandler(OptionsFlow):
 
     gateway: DeconzHub
 
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize deCONZ options flow."""
+        self.config_entry = config_entry
+        self.options = dict(config_entry.options)
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -312,7 +315,8 @@ class DeconzOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage the deconz devices options."""
         if user_input is not None:
-            return self.async_create_entry(data=self.config_entry.options | user_input)
+            self.options.update(user_input)
+            return self.async_create_entry(title="", data=self.options)
 
         schema_options = {}
         for option, default in (

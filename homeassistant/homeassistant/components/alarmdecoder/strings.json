@@ -22,8 +22,7 @@
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
     },
     "create_entry": {
       "default": "Successfully connected to AlarmDecoder."
@@ -38,7 +37,7 @@
         "title": "Configure AlarmDecoder",
         "description": "What would you like to edit?",
         "data": {
-          "edit_selection": "Edit"
+          "edit_select": "Edit"
         }
       },
       "arm_settings": {

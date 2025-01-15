@@ -30,7 +30,6 @@ from homeassistant.const import (
     CONF_UNIT_OF_MEASUREMENT,
     CONF_VALUE_TEMPLATE,
     EVENT_HOMEASSISTANT_STOP,
-    MATCH_ALL,
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
@@ -81,6 +80,9 @@ async def async_setup_platform(
     unique_id: str | None = conf.get(CONF_UNIQUE_ID)
     db_url: str = resolve_db_url(hass, conf.get(CONF_DB_URL))
 
+    if value_template is not None:
+        value_template.hass = hass
+
     trigger_entity_config = {CONF_NAME: name}
     for key in TRIGGER_ENTITY_OPTIONS:
         if key not in conf:
@@ -114,10 +116,12 @@ async def async_setup_entry(
     value_template: Template | None = None
     if template is not None:
         try:
-            value_template = Template(template, hass)
+            value_template = Template(template)
             value_template.ensure_valid()
         except TemplateError:
             value_template = None
+        if value_template is not None:
+            value_template.hass = hass
 
     name_template = Template(name, hass)
     trigger_entity_config = {CONF_NAME: name_template, CONF_UNIQUE_ID: entry.entry_id}
@@ -303,8 +307,6 @@ def _generate_lambda_stmt(query: str) -> StatementLambdaElement:
 class SQLSensor(ManualTriggerSensorEntity):
     """Representation of an SQL sensor."""
 
-    _unrecorded_attributes = frozenset({MATCH_ALL})
-
     def __init__(
         self,
         trigger_entity_config: ConfigType,
@@ -331,15 +333,8 @@ class SQLSensor(ManualTriggerSensorEntity):
                 entry_type=DeviceEntryType.SERVICE,
                 identifiers={(DOMAIN, unique_id)},
                 manufacturer="SQL",
-                name=self._rendered.get(CONF_NAME),
+                name=self.name,
             )
-
-    @property
-    def name(self) -> str | None:
-        """Name of the entity."""
-        if self.has_entity_name:
-            return self._attr_name
-        return self._rendered.get(CONF_NAME)
 
     async def async_added_to_hass(self) -> None:
         """Call when entity about to be added to hass."""

@@ -120,7 +120,7 @@ class UnifiEntityDescription(EntityDescription, Generic[HandlerT, ApiItemT]):
     # Optional constants
     has_entity_name = True  # Part of EntityDescription
     """Has entity name defaults to true."""
-    event_is_on: set[EventKey] | None = None
+    event_is_on: tuple[EventKey, ...] | None = None
     """Which UniFi events should be used to consider state 'on'."""
     event_to_subscribe: tuple[EventKey, ...] | None = None
     """Which UniFi events to listen on."""
@@ -143,7 +143,6 @@ class UnifiEntity(Entity, Generic[HandlerT, ApiItemT]):
         """Set up UniFi switch entity."""
         self._obj_id = obj_id
         self.hub = hub
-        self.api = hub.api
         self.entity_description = description
 
         hub.entity_loader.known_objects.add((description.key, obj_id))
@@ -155,14 +154,14 @@ class UnifiEntity(Entity, Generic[HandlerT, ApiItemT]):
         self._attr_should_poll = description.should_poll
         self._attr_unique_id = description.unique_id_fn(hub, obj_id)
 
-        obj = description.object_fn(self.api, obj_id)
+        obj = description.object_fn(self.hub.api, obj_id)
         self._attr_name = description.name_fn(obj)
         self.async_initiate_state()
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks."""
         description = self.entity_description
-        handler = description.api_handler_fn(self.api)
+        handler = description.api_handler_fn(self.hub.api)
 
         @callback
         def unregister_object() -> None:
@@ -202,7 +201,7 @@ class UnifiEntity(Entity, Generic[HandlerT, ApiItemT]):
         # Subscribe to events if defined
         if description.event_to_subscribe is not None:
             self.async_on_remove(
-                self.api.events.subscribe(
+                self.hub.api.events.subscribe(
                     self.async_event_callback,
                     description.event_to_subscribe,
                 )
@@ -211,8 +210,8 @@ class UnifiEntity(Entity, Generic[HandlerT, ApiItemT]):
     @callback
     def async_signalling_callback(self, event: ItemEvent, obj_id: str) -> None:
         """Update the entity state."""
-        if event is ItemEvent.DELETED and obj_id == self._obj_id:
-            self.hass.async_create_task(self.remove_item({obj_id}))
+        if event == ItemEvent.DELETED and obj_id == self._obj_id:
+            self.hass.async_create_task(self.remove_item({self._obj_id}))
             return
 
         description = self.entity_description

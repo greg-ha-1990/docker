@@ -34,15 +34,19 @@ def validate(integrations: dict[str, Integration], config: Config) -> None:
     if config.specific_integrations:
         return
 
-    if bluetooth_path.read_text() != content:
-        config.add_error(
-            "bluetooth",
-            "File bluetooth.py is not up to date. Run python3 -m script.hassfest",
-            fixable=True,
-        )
+    with open(str(bluetooth_path)) as fp:
+        current = fp.read()
+        if current != content:
+            config.add_error(
+                "bluetooth",
+                "File bluetooth.py is not up to date. Run python3 -m script.hassfest",
+                fixable=True,
+            )
+        return
 
 
 def generate(integrations: dict[str, Integration], config: Config) -> None:
     """Generate bluetooth file."""
     bluetooth_path = config.root / "homeassistant/generated/bluetooth.py"
-    bluetooth_path.write_text(f"{config.cache['bluetooth']}")
+    with open(str(bluetooth_path), "w") as fp:
+        fp.write(f"{config.cache['bluetooth']}")

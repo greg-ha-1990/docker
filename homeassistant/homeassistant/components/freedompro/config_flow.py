@@ -1,11 +1,9 @@
 """Config flow to configure Freedompro."""
 
-from typing import Any
-
 from pyfreedompro import get_list
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -19,19 +17,19 @@ STEP_USER_DATA_SCHEMA = vol.Schema({vol.Required(CONF_API_KEY): str})
 class Hub:
     """Freedompro Hub class."""
 
-    def __init__(self, hass: HomeAssistant, api_key: str) -> None:
+    def __init__(self, hass, api_key):
         """Freedompro Hub class init."""
         self._hass = hass
         self._api_key = api_key
 
-    async def authenticate(self) -> dict[str, Any]:
+    async def authenticate(self):
         """Freedompro Hub class authenticate."""
         return await get_list(
             aiohttp_client.async_get_clientsession(self._hass), self._api_key
         )
 
 
-async def validate_input(hass: HomeAssistant, api_key: str) -> None:
+async def validate_input(hass: HomeAssistant, api_key):
     """Validate api key."""
     hub = Hub(hass, api_key)
     result = await hub.authenticate()
@@ -47,9 +45,7 @@ class FreedomProConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Show the setup form to the user."""
         if user_input is None:
             return self.async_show_form(

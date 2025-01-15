@@ -10,28 +10,26 @@ from bimmer_connected.vehicle import MyBMWVehicle
 from bimmer_connected.vehicle.doors_windows import LockState
 
 from homeassistant.components.lock import LockEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN as BMW_DOMAIN, BMWConfigEntry
+from . import BMWBaseEntity
+from .const import DOMAIN
 from .coordinator import BMWDataUpdateCoordinator
-from .entity import BMWBaseEntity
-
-PARALLEL_UPDATES = 1
 
 DOOR_LOCK_STATE = "door_lock_state"
-
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: BMWConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the MyBMW lock from config entry."""
-    coordinator = config_entry.runtime_data
+    coordinator: BMWDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     if not coordinator.read_only:
         async_add_entities(
@@ -70,11 +68,7 @@ class BMWLock(BMWBaseEntity, LockEntity):
             # Set the state to unknown if the command fails
             self._attr_is_locked = None
             self.async_write_ha_state()
-            raise HomeAssistantError(
-                translation_domain=BMW_DOMAIN,
-                translation_key="remote_service_error",
-                translation_placeholders={"exception": str(ex)},
-            ) from ex
+            raise HomeAssistantError(ex) from ex
         finally:
             # Always update the listeners to get the latest state
             self.coordinator.async_update_listeners()
@@ -94,11 +88,7 @@ class BMWLock(BMWBaseEntity, LockEntity):
             # Set the state to unknown if the command fails
             self._attr_is_locked = None
             self.async_write_ha_state()
-            raise HomeAssistantError(
-                translation_domain=BMW_DOMAIN,
-                translation_key="remote_service_error",
-                translation_placeholders={"exception": str(ex)},
-            ) from ex
+            raise HomeAssistantError(ex) from ex
         finally:
             # Always update the listeners to get the latest state
             self.coordinator.async_update_listeners()
@@ -107,6 +97,8 @@ class BMWLock(BMWBaseEntity, LockEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         _LOGGER.debug("Updating lock data of %s", self.vehicle.name)
+        # Set default attributes
+        self._attr_extra_state_attributes = self._attrs
 
         # Only update the HA state machine if the vehicle reliably reports its lock state
         if self.door_lock_state_available:
@@ -114,8 +106,8 @@ class BMWLock(BMWBaseEntity, LockEntity):
                 LockState.LOCKED,
                 LockState.SECURED,
             }
-            self._attr_extra_state_attributes = {
-                DOOR_LOCK_STATE: self.vehicle.doors_and_windows.door_lock_state.value
-            }
+            self._attr_extra_state_attributes["door_lock_state"] = (
+                self.vehicle.doors_and_windows.door_lock_state.value
+            )
 
         super()._handle_coordinator_update()

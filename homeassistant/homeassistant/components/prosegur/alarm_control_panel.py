@@ -10,9 +10,13 @@ from pyprosegur.installation import Installation, Status
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    STATE_ALARM_ARMED_AWAY,
+    STATE_ALARM_ARMED_HOME,
+    STATE_ALARM_DISARMED,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -22,10 +26,10 @@ from . import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 STATE_MAPPING = {
-    Status.DISARMED: AlarmControlPanelState.DISARMED,
-    Status.ARMED: AlarmControlPanelState.ARMED_AWAY,
-    Status.PARTIALLY: AlarmControlPanelState.ARMED_HOME,
-    Status.ERROR_PARTIALLY: AlarmControlPanelState.ARMED_HOME,
+    Status.DISARMED: STATE_ALARM_DISARMED,
+    Status.ARMED: STATE_ALARM_ARMED_AWAY,
+    Status.PARTIALLY: STATE_ALARM_ARMED_HOME,
+    Status.ERROR_PARTIALLY: STATE_ALARM_ARMED_HOME,
 }
 
 
@@ -78,7 +82,7 @@ class ProsegurAlarm(AlarmControlPanelEntity):
             self._attr_available = False
             return
 
-        self._attr_alarm_state = STATE_MAPPING.get(self._installation.status)
+        self._attr_state = STATE_MAPPING.get(self._installation.status)
         self._attr_available = True
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:

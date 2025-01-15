@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import ToonDataUpdateCoordinator
-from .entity import (
+from .models import (
     ToonBoilerDeviceEntity,
     ToonBoilerModuleDeviceEntity,
     ToonDisplayDeviceEntity,

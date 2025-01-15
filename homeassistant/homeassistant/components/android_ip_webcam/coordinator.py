@@ -15,22 +15,19 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-type AndroidIPCamConfigEntry = ConfigEntry[AndroidIPCamDataUpdateCoordinator]
-
 
 class AndroidIPCamDataUpdateCoordinator(DataUpdateCoordinator[None]):
     """Coordinator class for the Android IP Webcam."""
 
-    config_entry: AndroidIPCamConfigEntry
-
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: AndroidIPCamConfigEntry,
+        config_entry: ConfigEntry,
         cam: PyDroidIPCam,
     ) -> None:
         """Initialize the Android IP Webcam."""
         self.hass = hass
+        self.config_entry: ConfigEntry = config_entry
         self.cam = cam
         super().__init__(
             self.hass,

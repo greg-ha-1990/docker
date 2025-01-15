@@ -17,7 +17,7 @@ import voluptuous as vol
 
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
-    PLATFORM_SCHEMA as MEDIA_PLAYER_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     BrowseMedia,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -26,19 +26,15 @@ from homeassistant.components.media_player import (
     RepeatMode,
     async_process_play_media_url,
 )
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT
-from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import Throttle
 import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN, LOGGER
+_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "MPD"
 DEFAULT_PORT = 6600
@@ -61,7 +57,7 @@ SUPPORT_MPD = (
     | MediaPlayerEntityFeature.BROWSE_MEDIA
 )
 
-PLATFORM_SCHEMA = MEDIA_PLAYER_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_HOST): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -78,89 +74,36 @@ async def async_setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up the MPD platform."""
+    host = config.get(CONF_HOST)
+    port = config.get(CONF_PORT)
+    name = config.get(CONF_NAME)
+    password = config.get(CONF_PASSWORD)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": SOURCE_IMPORT},
-        data=config,
-    )
-    if (
-        result["type"] is FlowResultType.CREATE_ENTRY
-        or result["reason"] == "already_configured"
-    ):
-        async_create_issue(
-            hass,
-            HOMEASSISTANT_DOMAIN,
-            f"deprecated_yaml_{DOMAIN}",
-            breaks_in_ha_version="2025.1.0",
-            is_fixable=False,
-            issue_domain=DOMAIN,
-            severity=IssueSeverity.WARNING,
-            translation_key="deprecated_yaml",
-            translation_placeholders={
-                "domain": DOMAIN,
-                "integration_title": "Music Player Daemon",
-            },
-        )
-        return
-    async_create_issue(
-        hass,
-        DOMAIN,
-        f"deprecated_yaml_import_issue_{result['reason']}",
-        breaks_in_ha_version="2025.1.0",
-        is_fixable=False,
-        issue_domain=DOMAIN,
-        severity=IssueSeverity.WARNING,
-        translation_key=f"deprecated_yaml_import_issue_{result['reason']}",
-        translation_placeholders={
-            "domain": DOMAIN,
-            "integration_title": "Music Player Daemon",
-        },
-    )
-
-
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
-) -> None:
-    """Set up media player from config_entry."""
-
-    async_add_entities(
-        [
-            MpdDevice(
-                entry.data[CONF_HOST],
-                entry.data[CONF_PORT],
-                entry.data.get(CONF_PASSWORD),
-                entry.entry_id,
-            )
-        ],
-        True,
-    )
+    entity = MpdDevice(host, port, password, name)
+    async_add_entities([entity], True)
 
 
 class MpdDevice(MediaPlayerEntity):
     """Representation of a MPD server."""
 
     _attr_media_content_type = MediaType.MUSIC
-    _attr_has_entity_name = True
-    _attr_name = None
 
-    def __init__(
-        self, server: str, port: int, password: str | None, unique_id: str
-    ) -> None:
+    def __init__(self, server, port, password, name):
         """Initialize the MPD device."""
         self.server = server
         self.port = port
-        self._attr_unique_id = unique_id
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, unique_id)},
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._name = name
         self.password = password
 
-        self._status: dict[str, Any] = {}
+        self._status = {}
         self._currentsong = None
-        self._current_playlist: str | None = None
+        self._playlists = None
+        self._currentplaylist = None
+        self._is_available = None
+        self._muted = False
         self._muted_volume = None
+        self._media_position_updated_at = None
+        self._media_position = None
         self._media_image_hash = None
         # Track if the song changed so image doesn't have to be loaded every update.
         self._media_image_file = None
@@ -192,7 +135,7 @@ class MpdDevice(MediaPlayerEntity):
                     raise TimeoutError("Connection attempt timed out") from error
                 if self.password is not None:
                     await self._client.password(self.password)
-                self._attr_available = True
+                self._is_available = True
                 yield
             except (
                 TimeoutError,
@@ -203,12 +146,12 @@ class MpdDevice(MediaPlayerEntity):
                 # Log a warning during startup or when previously connected; for
                 # subsequent errors a debug message is sufficient.
                 log_level = logging.DEBUG
-                if self._attr_available is not False:
+                if self._is_available is not False:
                     log_level = logging.WARNING
-                LOGGER.log(
+                _LOGGER.log(
                     log_level, "Error connecting to '%s': %s", self.server, error
                 )
-                self._attr_available = False
+                self._is_available = False
                 self._status = {}
                 # Also yield on failure. Handling mpd.ConnectionErrors caused by
                 # attempting to control a disconnected client is the
@@ -232,13 +175,23 @@ class MpdDevice(MediaPlayerEntity):
                     if isinstance(position, str) and ":" in position:
                         position = position.split(":")[0]
 
-                if position is not None and self._attr_media_position != position:
-                    self._attr_media_position_updated_at = dt_util.utcnow()
-                    self._attr_media_position = int(float(position))
+                if position is not None and self._media_position != position:
+                    self._media_position_updated_at = dt_util.utcnow()
+                    self._media_position = int(float(position))
 
                 await self._update_playlists()
             except (mpd.ConnectionError, ValueError) as error:
-                LOGGER.debug("Error updating status: %s", error)
+                _LOGGER.debug("Error updating status: %s", error)
+
+    @property
+    def available(self) -> bool:
+        """Return true if MPD is available and connected."""
+        return self._is_available is True
+
+    @property
+    def name(self):
+        """Return the name of the device."""
+        return self._name
 
     @property
     def state(self) -> MediaPlayerState:
@@ -253,6 +206,11 @@ class MpdDevice(MediaPlayerEntity):
             return MediaPlayerState.OFF
 
         return MediaPlayerState.OFF
+
+    @property
+    def is_volume_muted(self):
+        """Boolean if volume is currently muted."""
+        return self._muted
 
     @property
     def media_content_id(self):
@@ -270,6 +228,20 @@ class MpdDevice(MediaPlayerEntity):
             return time_from_status.split(":")[1]
 
         return None
+
+    @property
+    def media_position(self):
+        """Position of current playing media in seconds.
+
+        This is returned as part of the mpd status rather than in the details
+        of the current song.
+        """
+        return self._media_position
+
+    @property
+    def media_position_updated_at(self):
+        """Last valid time of media position."""
+        return self._media_position_updated_at
 
     @property
     def media_title(self):
@@ -368,7 +340,7 @@ class MpdDevice(MediaPlayerEntity):
                     response = await self._client.readpicture(file)
             except mpd.CommandError as error:
                 if error.errno is not mpd.FailureResponseCode.NO_EXIST:
-                    LOGGER.warning(
+                    _LOGGER.warning(
                         "Retrieving artwork through `readpicture` command failed: %s",
                         error,
                     )
@@ -380,7 +352,7 @@ class MpdDevice(MediaPlayerEntity):
                     response = await self._client.albumart(file)
             except mpd.CommandError as error:
                 if error.errno is not mpd.FailureResponseCode.NO_EXIST:
-                    LOGGER.warning(
+                    _LOGGER.warning(
                         "Retrieving artwork through `albumart` command failed: %s",
                         error,
                     )
@@ -411,7 +383,7 @@ class MpdDevice(MediaPlayerEntity):
                 | MediaPlayerEntityFeature.VOLUME_STEP
                 | MediaPlayerEntityFeature.VOLUME_MUTE
             )
-        if self._attr_source_list is not None:
+        if self._playlists is not None:
             supported |= MediaPlayerEntityFeature.SELECT_SOURCE
 
         return supported
@@ -419,7 +391,12 @@ class MpdDevice(MediaPlayerEntity):
     @property
     def source(self):
         """Name of the current input source."""
-        return self._current_playlist
+        return self._currentplaylist
+
+    @property
+    def source_list(self):
+        """Return the list of available input sources."""
+        return self._playlists
 
     async def async_select_source(self, source: str) -> None:
         """Choose a different available playlist and play it."""
@@ -429,13 +406,13 @@ class MpdDevice(MediaPlayerEntity):
     async def _update_playlists(self, **kwargs: Any) -> None:
         """Update available MPD playlists."""
         try:
-            self._attr_source_list = []
+            self._playlists = []
             with suppress(mpd.ConnectionError):
                 for playlist_data in await self._client.listplaylists():
-                    self._attr_source_list.append(playlist_data["playlist"])
+                    self._playlists.append(playlist_data["playlist"])
         except mpd.CommandError as error:
-            self._attr_source_list = None
-            LOGGER.warning("Playlists could not be updated: %s:", error)
+            self._playlists = None
+            _LOGGER.warning("Playlists could not be updated: %s:", error)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume of media player."""
@@ -497,7 +474,7 @@ class MpdDevice(MediaPlayerEntity):
                 await self.async_set_volume_level(0)
             elif self._muted_volume is not None:
                 await self.async_set_volume_level(self._muted_volume)
-            self._attr_is_volume_muted = mute
+            self._muted = mute
 
     async def async_play_media(
         self, media_type: MediaType | str, media_id: str, **kwargs: Any
@@ -512,18 +489,18 @@ class MpdDevice(MediaPlayerEntity):
                 media_id = async_process_play_media_url(self.hass, play_item.url)
 
             if media_type == MediaType.PLAYLIST:
-                LOGGER.debug("Playing playlist: %s", media_id)
-                if self._attr_source_list and media_id in self._attr_source_list:
-                    self._current_playlist = media_id
+                _LOGGER.debug("Playing playlist: %s", media_id)
+                if media_id in self._playlists:
+                    self._currentplaylist = media_id
                 else:
-                    self._current_playlist = None
-                    LOGGER.warning("Unknown playlist name %s", media_id)
+                    self._currentplaylist = None
+                    _LOGGER.warning("Unknown playlist name %s", media_id)
                 await self._client.clear()
                 await self._client.load(media_id)
                 await self._client.play()
             else:
                 await self._client.clear()
-                self._current_playlist = None
+                self._currentplaylist = None
                 await self._client.add(media_id)
                 await self._client.play()
 

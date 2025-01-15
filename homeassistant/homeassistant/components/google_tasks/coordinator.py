@@ -20,11 +20,7 @@ class TaskUpdateCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     """Coordinator for fetching Google Tasks for a Task List form the API."""
 
     def __init__(
-        self,
-        hass: HomeAssistant,
-        api: AsyncConfigEntryAuth,
-        task_list_id: str,
-        task_list_title: str,
+        self, hass: HomeAssistant, api: AsyncConfigEntryAuth, task_list_id: str
     ) -> None:
         """Initialize TaskUpdateCoordinator."""
         super().__init__(
@@ -34,10 +30,9 @@ class TaskUpdateCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             update_interval=UPDATE_INTERVAL,
         )
         self.api = api
-        self.task_list_id = task_list_id
-        self.task_list_title = task_list_title
+        self._task_list_id = task_list_id
 
     async def _async_update_data(self) -> list[dict[str, Any]]:
         """Fetch tasks from API endpoint."""
         async with asyncio.timeout(TIMEOUT):
-            return await self.api.list_tasks(self.task_list_id)
+            return await self.api.list_tasks(self._task_list_id)

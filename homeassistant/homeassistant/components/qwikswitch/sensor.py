@@ -12,8 +12,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from . import DOMAIN as QWIKSWITCH
-from .entity import QSEntity
+from . import DOMAIN as QWIKSWITCH, QSEntity
 
 _LOGGER = logging.getLogger(__name__)
 

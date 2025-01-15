@@ -18,5 +18,6 @@ OPTION_TYPES = [
     "date_time_utc",
     "date_time_iso",
     "time_date",
+    "beat",
     "time_utc",
 ]

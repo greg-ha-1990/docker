@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from typing import cast
 
 from jaraco.abode.devices.sensor import Sensor
+from jaraco.abode.helpers.constants import (
+    HUMI_STATUS_KEY,
+    LUX_STATUS_KEY,
+    STATUSES_KEY,
+    TEMP_STATUS_KEY,
+    TYPE_SENSOR,
+    UNIT_CELSIUS,
+    UNIT_FAHRENHEIT,
+)
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -23,8 +32,8 @@ from .const import DOMAIN
 from .entity import AbodeDevice
 
 ABODE_TEMPERATURE_UNIT_HA_UNIT = {
-    "°F": UnitOfTemperature.FAHRENHEIT,
-    "°C": UnitOfTemperature.CELSIUS,
+    UNIT_FAHRENHEIT: UnitOfTemperature.FAHRENHEIT,
+    UNIT_CELSIUS: UnitOfTemperature.CELSIUS,
 }
 
 
@@ -38,7 +47,7 @@ class AbodeSensorDescription(SensorEntityDescription):
 
 SENSOR_TYPES: tuple[AbodeSensorDescription, ...] = (
     AbodeSensorDescription(
-        key="temperature",
+        key=TEMP_STATUS_KEY,
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement_fn=lambda device: ABODE_TEMPERATURE_UNIT_HA_UNIT[
             device.temp_unit
@@ -46,13 +55,13 @@ SENSOR_TYPES: tuple[AbodeSensorDescription, ...] = (
         value_fn=lambda device: cast(float, device.temp),
     ),
     AbodeSensorDescription(
-        key="humidity",
+        key=HUMI_STATUS_KEY,
         device_class=SensorDeviceClass.HUMIDITY,
         native_unit_of_measurement_fn=lambda _: PERCENTAGE,
         value_fn=lambda device: cast(float, device.humidity),
     ),
     AbodeSensorDescription(
-        key="lux",
+        key=LUX_STATUS_KEY,
         device_class=SensorDeviceClass.ILLUMINANCE,
         native_unit_of_measurement_fn=lambda _: LIGHT_LUX,
         value_fn=lambda device: cast(float, device.lux),
@@ -69,8 +78,8 @@ async def async_setup_entry(
     async_add_entities(
         AbodeSensor(data, device, description)
         for description in SENSOR_TYPES
-        for device in data.abode.get_devices(generic_type="sensor")
-        if description.key in device.get_value("statuses")
+        for device in data.abode.get_devices(generic_type=TYPE_SENSOR)
+        if description.key in device.get_value(STATUSES_KEY)
     )
 
 

@@ -5,10 +5,11 @@ from __future__ import annotations
 import math
 from typing import Any, cast
 
-from pybalboa import SpaControl
+from pybalboa import SpaClient, SpaControl
 from pybalboa.enums import OffOnState, UnknownState
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.percentage import (
@@ -16,29 +17,22 @@ from homeassistant.util.percentage import (
     ranged_value_to_percentage,
 )
 
-from . import BalboaConfigEntry
+from .const import DOMAIN
 from .entity import BalboaEntity
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: BalboaConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the spa's pumps."""
-    spa = entry.runtime_data
+    spa: SpaClient = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(BalboaPumpFanEntity(control) for control in spa.pumps)
 
 
 class BalboaPumpFanEntity(BalboaEntity, FanEntity):
     """Representation of a Balboa Spa pump fan entity."""
 
-    _attr_supported_features = (
-        FanEntityFeature.SET_SPEED
-        | FanEntityFeature.TURN_OFF
-        | FanEntityFeature.TURN_ON
-    )
-
+    _attr_supported_features = FanEntityFeature.SET_SPEED
     _attr_translation_key = "pump"
 
     def __init__(self, control: SpaControl) -> None:

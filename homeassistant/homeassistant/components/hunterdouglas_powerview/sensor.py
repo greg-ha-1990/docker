@@ -13,13 +13,15 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, SIGNAL_STRENGTH_DECIBELS, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import PowerviewShadeUpdateCoordinator
 from .entity import ShadeEntity
-from .model import PowerviewConfigEntry, PowerviewDeviceInfo
+from .model import PowerviewDeviceInfo, PowerviewEntryData
 
 
 @dataclass(frozen=True)
@@ -77,12 +79,12 @@ SENSORS: Final = [
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: PowerviewConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the hunter douglas sensor entities."""
-    pv_entry = entry.runtime_data
+
+    pv_entry: PowerviewEntryData = hass.data[DOMAIN][entry.entry_id]
+
     entities: list[PowerViewSensor] = []
     for shade in pv_entry.shade_data.values():
         room_name = getattr(pv_entry.room_data.get(shade.room_id), ATTR_NAME, "")

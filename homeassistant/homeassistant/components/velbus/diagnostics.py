@@ -7,17 +7,18 @@ from typing import Any
 from velbusaio.channels import Channel as VelbusChannel
 from velbusaio.module import Module as VelbusModule
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from . import VelbusConfigEntry
+from .const import DOMAIN
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: VelbusConfigEntry
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    controller = entry.runtime_data.controller
+    controller = hass.data[DOMAIN][entry.entry_id]["cntrl"]
     data: dict[str, Any] = {"entry": entry.as_dict(), "modules": []}
     for module in controller.get_modules().values():
         data["modules"].append(_build_module_diagnostics_info(module))
@@ -25,10 +26,10 @@ async def async_get_config_entry_diagnostics(
 
 
 async def async_get_device_diagnostics(
-    hass: HomeAssistant, entry: VelbusConfigEntry, device: DeviceEntry
+    hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a device entry."""
-    controller = entry.runtime_data.controller
+    controller = hass.data[DOMAIN][entry.entry_id]["cntrl"]
     channel = list(next(iter(device.identifiers)))[1]
     modules = controller.get_modules()
     return _build_module_diagnostics_info(modules[int(channel)])

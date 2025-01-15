@@ -15,14 +15,13 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
+from .const import DOMAIN
 from .coordinator import JvcProjectorDataUpdateCoordinator
-
-type JVCConfigEntry = ConfigEntry[JvcProjectorDataUpdateCoordinator]
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.REMOTE, Platform.SELECT, Platform.SENSOR]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JVCConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up integration from a config entry."""
     device = JvcProjector(
         host=entry.data[CONF_HOST],
@@ -44,7 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JVCConfigEntry) -> bool:
     coordinator = JvcProjectorDataUpdateCoordinator(hass, device)
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     async def disconnect(event: Event) -> None:
         await device.disconnect()
@@ -58,8 +57,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JVCConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: JVCConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        await entry.runtime_data.device.disconnect()
+        await hass.data[DOMAIN][entry.entry_id].device.disconnect()
+        hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok

@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from surepy.entities import SurepyEntity
-from surepy.enums import EntityType, LockState as SurepyLockState
+from surepy.enums import EntityType, LockState
 
-from homeassistant.components.lock import LockEntity, LockState
+from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_LOCKED, STATE_UNLOCKED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -29,9 +30,9 @@ async def async_setup_entry(
         for surepy_entity in coordinator.data.values()
         if surepy_entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]
         for lock_state in (
-            SurepyLockState.LOCKED_IN,
-            SurepyLockState.LOCKED_OUT,
-            SurepyLockState.LOCKED_ALL,
+            LockState.LOCKED_IN,
+            LockState.LOCKED_OUT,
+            LockState.LOCKED_ALL,
         )
     )
 
@@ -43,7 +44,7 @@ class SurePetcareLock(SurePetcareEntity, LockEntity):
         self,
         surepetcare_id: int,
         coordinator: SurePetcareDataCoordinator,
-        lock_state: SurepyLockState,
+        lock_state: LockState,
     ) -> None:
         """Initialize a Sure Petcare lock."""
         self._lock_state = lock_state.name.lower()
@@ -65,14 +66,14 @@ class SurePetcareLock(SurePetcareEntity, LockEntity):
         status = surepy_entity.raw_data()["status"]
 
         self._attr_is_locked = (
-            SurepyLockState(status["locking"]["mode"]).name.lower() == self._lock_state
+            LockState(status["locking"]["mode"]).name.lower() == self._lock_state
         )
 
         self._available = bool(status.get("online"))
 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock the lock."""
-        if self.state != LockState.UNLOCKED:
+        if self.state != STATE_UNLOCKED:
             return
         self._attr_is_locking = True
         self.async_write_ha_state()
@@ -86,7 +87,7 @@ class SurePetcareLock(SurePetcareEntity, LockEntity):
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the lock."""
-        if self.state != LockState.LOCKED:
+        if self.state != STATE_LOCKED:
             return
         self._attr_is_unlocking = True
         self.async_write_ha_state()

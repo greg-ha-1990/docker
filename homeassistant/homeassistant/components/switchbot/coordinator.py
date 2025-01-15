@@ -14,7 +14,6 @@ from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth.active_update_coordinator import (
     ActiveBluetoothDataUpdateCoordinator,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant, callback
 
 if TYPE_CHECKING:
@@ -24,8 +23,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 DEVICE_STARTUP_TIMEOUT = 30
-
-type SwitchbotConfigEntry = ConfigEntry[SwitchbotDataUpdateCoordinator]
 
 
 class SwitchbotDataUpdateCoordinator(ActiveBluetoothDataUpdateCoordinator[None]):

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hassil.recognize import RecognizeResult
-from hassil.util import PUNCTUATION_ALL
+from hassil.recognize import PUNCTUATION, RecognizeResult
 import voluptuous as vol
 
 from homeassistant.const import CONF_COMMAND, CONF_PLATFORM
@@ -15,14 +14,14 @@ from homeassistant.helpers.script import ScriptRunResult
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import UNDEFINED, ConfigType
 
-from .const import DATA_DEFAULT_ENTITY, DOMAIN
-from .models import ConversationInput
+from .const import DOMAIN
+from .default_agent import DefaultAgent, async_get_default_agent
 
 
 def has_no_punctuation(value: list[str]) -> list[str]:
     """Validate result does not contain punctuation."""
     for sentence in value:
-        if PUNCTUATION_ALL.search(sentence):
+        if PUNCTUATION.search(sentence):
             raise vol.Invalid("sentence should not contain punctuation")
 
     return value
@@ -63,7 +62,7 @@ async def async_attach_trigger(
     job = HassJob(action)
 
     async def call_action(
-        user_input: ConversationInput, result: RecognizeResult
+        sentence: str, result: RecognizeResult, device_id: str | None
     ) -> str | None:
         """Call action with right context."""
 
@@ -84,13 +83,12 @@ async def async_attach_trigger(
         trigger_input: dict[str, Any] = {  # Satisfy type checker
             **trigger_data,
             "platform": DOMAIN,
-            "sentence": user_input.text,
+            "sentence": sentence,
             "details": details,
             "slots": {  # direct access to values
                 entity_name: entity["value"] for entity_name, entity in details.items()
             },
-            "device_id": user_input.device_id,
-            "user_input": user_input.as_dict(),
+            "device_id": device_id,
         }
 
         # Wait for the automation to complete
@@ -112,4 +110,7 @@ async def async_attach_trigger(
         # two trigger copies for who will provide a response.
         return None
 
-    return hass.data[DATA_DEFAULT_ENTITY].register_trigger(sentences, call_action)
+    default_agent = async_get_default_agent(hass)
+    assert isinstance(default_agent, DefaultAgent)
+
+    return default_agent.register_trigger(sentences, call_action)

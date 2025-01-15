@@ -13,7 +13,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    DOMAIN,
     SOLAR_NET_ID_POWER_FLOW,
     SOLAR_NET_ID_SYSTEM,
     FroniusDeviceInfo,
@@ -68,11 +67,7 @@ class FroniusCoordinatorBase(
                 self._failed_update_count += 1
                 if self._failed_update_count == self.MAX_FAILED_UPDATES:
                     self.update_interval = self.error_interval
-                raise UpdateFailed(
-                    translation_domain=DOMAIN,
-                    translation_key="update_failed",
-                    translation_placeholders={"fronius_error": str(err)},
-                ) from err
+                raise UpdateFailed(err) from err
 
             if self._failed_update_count != 0:
                 self._failed_update_count = 0

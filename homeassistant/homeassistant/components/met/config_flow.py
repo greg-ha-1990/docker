@@ -11,6 +11,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    OptionsFlowWithConfigEntry,
 )
 from homeassistant.const import (
     CONF_ELEVATION,
@@ -142,12 +143,12 @@ class MetConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: ConfigEntry,
-    ) -> MetOptionsFlowHandler:
+    ) -> OptionsFlow:
         """Get the options flow for Met."""
-        return MetOptionsFlowHandler()
+        return MetOptionsFlowHandler(config_entry)
 
 
-class MetOptionsFlowHandler(OptionsFlow):
+class MetOptionsFlowHandler(OptionsFlowWithConfigEntry):
     """Options flow for Met component."""
 
     async def async_step_init(
@@ -158,13 +159,13 @@ class MetOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             # Update config entry with data from user input
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data=user_input
+                self._config_entry, data=user_input
             )
             return self.async_create_entry(
-                title=self.config_entry.title, data=user_input
+                title=self._config_entry.title, data=user_input
             )
 
         return self.async_show_form(
             step_id="init",
-            data_schema=_get_data_schema(self.hass, config_entry=self.config_entry),
+            data_schema=_get_data_schema(self.hass, config_entry=self._config_entry),
         )

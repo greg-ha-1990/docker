@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from pyipp import Marker, Printer
@@ -19,6 +19,7 @@ from homeassistant.const import ATTR_LOCATION, PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
+from homeassistant.util.dt import utcnow
 
 from . import IPPConfigEntry
 from .const import (
@@ -79,7 +80,7 @@ PRINTER_SENSORS: tuple[IPPSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda printer: printer.booted_at,
+        value_fn=lambda printer: (utcnow() - timedelta(seconds=printer.info.uptime)),
     ),
 )
 

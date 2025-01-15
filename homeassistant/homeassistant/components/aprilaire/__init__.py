@@ -6,24 +6,21 @@ import logging
 
 from pyaprilaire.const import Attribute
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.device_registry import format_mac
 
-from .coordinator import AprilaireConfigEntry, AprilaireCoordinator
+from .const import DOMAIN
+from .coordinator import AprilaireCoordinator
 
-PLATFORMS: list[Platform] = [
-    Platform.CLIMATE,
-    Platform.HUMIDIFIER,
-    Platform.SELECT,
-    Platform.SENSOR,
-]
+PLATFORMS: list[Platform] = [Platform.CLIMATE]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: AprilaireConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a config entry for Aprilaire."""
 
     host = entry.data[CONF_HOST]
@@ -32,15 +29,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AprilaireConfigEntry) ->
     coordinator = AprilaireCoordinator(hass, entry.unique_id, host, port)
     await coordinator.start_listen()
 
-    async def ready_callback(ready: bool) -> None:
+    hass.data.setdefault(DOMAIN, {})[entry.unique_id] = coordinator
+
+    async def ready_callback(ready: bool):
         if ready:
             mac_address = format_mac(coordinator.data[Attribute.MAC_ADDRESS])
 
             if mac_address != entry.unique_id:
                 raise ConfigEntryAuthFailed("Invalid MAC address")
-
-            entry.runtime_data = coordinator
-            entry.async_on_unload(coordinator.stop_listen)
 
             await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -62,6 +58,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: AprilaireConfigEntry) ->
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: AprilaireConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        coordinator: AprilaireCoordinator = hass.data[DOMAIN].pop(entry.unique_id)
+        coordinator.stop_listen()
+
+    return unload_ok

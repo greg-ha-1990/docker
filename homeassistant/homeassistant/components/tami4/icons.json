@@ -3,9 +3,6 @@
     "button": {
       "boil_water": {
         "default": "mdi:kettle-steam"
-      },
-      "prepare_drink": {
-        "default": "mdi:beer"
       }
     },
     "sensor": {

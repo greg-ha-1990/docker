@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from aioimaplib import AUTH, IMAP4_SSL, NONAUTH, SELECTED, AioImapException
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_PASSWORD,
     CONF_PORT,
@@ -51,9 +52,6 @@ from .const import (
     MESSAGE_DATA_OPTIONS,
 )
 from .errors import InvalidAuth, InvalidFolder
-
-if TYPE_CHECKING:
-    from . import ImapConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -212,14 +210,14 @@ class ImapMessage:
 class ImapDataUpdateCoordinator(DataUpdateCoordinator[int | None]):
     """Base class for imap client."""
 
-    config_entry: ImapConfigEntry
+    config_entry: ConfigEntry
     custom_event_template: Template | None
 
     def __init__(
         self,
         hass: HomeAssistant,
         imap_client: IMAP4_SSL,
-        entry: ImapConfigEntry,
+        entry: ConfigEntry,
         update_interval: timedelta | None,
     ) -> None:
         """Initiate imap client."""
@@ -334,17 +332,7 @@ class ImapDataUpdateCoordinator(DataUpdateCoordinator[int | None]):
             raise UpdateFailed(
                 f"Invalid response for search '{self.config_entry.data[CONF_SEARCH]}': {result} / {lines[0]}"
             )
-        # Check we do have returned items.
-        #
-        # In rare cases, when no UID's are returned,
-        # only the status line is returned, and not an empty line.
-        # See: https://github.com/home-assistant/core/issues/132042
-        #
-        # Strictly the RfC notes that 0 or more numbers should be returned
-        # delimited by a space.
-        #
-        # See: https://datatracker.ietf.org/doc/html/rfc3501#section-7.2.5
-        if len(lines) == 1 or not (count := len(message_ids := lines[0].split())):
+        if not (count := len(message_ids := lines[0].split())):
             self._last_message_uid = None
             return 0
         last_message_uid = (
@@ -403,7 +391,7 @@ class ImapPollingDataUpdateCoordinator(ImapDataUpdateCoordinator):
     """Class for imap client."""
 
     def __init__(
-        self, hass: HomeAssistant, imap_client: IMAP4_SSL, entry: ImapConfigEntry
+        self, hass: HomeAssistant, imap_client: IMAP4_SSL, entry: ConfigEntry
     ) -> None:
         """Initiate imap client."""
         _LOGGER.debug(
@@ -449,7 +437,7 @@ class ImapPushDataUpdateCoordinator(ImapDataUpdateCoordinator):
     """Class for imap client."""
 
     def __init__(
-        self, hass: HomeAssistant, imap_client: IMAP4_SSL, entry: ImapConfigEntry
+        self, hass: HomeAssistant, imap_client: IMAP4_SSL, entry: ConfigEntry
     ) -> None:
         """Initiate imap client."""
         _LOGGER.debug("Connected to server %s using IMAP push", entry.data[CONF_SERVER])

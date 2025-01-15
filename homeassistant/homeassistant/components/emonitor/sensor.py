@@ -10,6 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfPower
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
@@ -20,7 +21,8 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from . import EmonitorConfigEntry, name_short_mac
+from . import name_short_mac
+from .const import DOMAIN
 
 SENSORS = (
     SensorEntityDescription(key="inst_power"),
@@ -37,11 +39,11 @@ SENSORS = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EmonitorConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up entry."""
-    coordinator = config_entry.runtime_data
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
     channels = coordinator.data.channels
     entities: list[EmonitorPowerSensor] = []
     seen_channels = set()

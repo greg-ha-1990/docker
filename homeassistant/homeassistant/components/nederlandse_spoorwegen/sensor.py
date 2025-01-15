@@ -10,10 +10,7 @@ from ns_api import RequestParametersError
 import requests
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_API_KEY, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
@@ -45,7 +42,7 @@ ROUTE_SCHEMA = vol.Schema(
 
 ROUTES_SCHEMA = vol.All(cv.ensure_list, [ROUTE_SCHEMA])
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {vol.Required(CONF_API_KEY): cv.string, vol.Optional(CONF_ROUTES): ROUTES_SCHEMA}
 )
 

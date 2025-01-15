@@ -9,14 +9,19 @@ from homematicip.functionalHomes import SecurityAndAlarmHome
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    STATE_ALARM_ARMED_AWAY,
+    STATE_ALARM_ARMED_HOME,
+    STATE_ALARM_DISARMED,
+    STATE_ALARM_TRIGGERED,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from . import DOMAIN as HMIPC_DOMAIN
 from .hap import AsyncHome, HomematicipHAP
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,7 +35,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the HomematicIP alrm control panel from a config entry."""
-    hap = hass.data[DOMAIN][config_entry.unique_id]
+    hap = hass.data[HMIPC_DOMAIN][config_entry.unique_id]
     async_add_entities([HomematicipAlarmControlPanelEntity(hap)])
 
 
@@ -47,34 +52,35 @@ class HomematicipAlarmControlPanelEntity(AlarmControlPanelEntity):
     def __init__(self, hap: HomematicipHAP) -> None:
         """Initialize the alarm control panel."""
         self._home: AsyncHome = hap.home
+        _LOGGER.info("Setting up %s", self.name)
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device specific attributes."""
         return DeviceInfo(
-            identifiers={(DOMAIN, f"ACP {self._home.id}")},
+            identifiers={(HMIPC_DOMAIN, f"ACP {self._home.id}")},
             manufacturer="eQ-3",
             model=CONST_ALARM_CONTROL_PANEL_NAME,
             name=self.name,
-            via_device=(DOMAIN, self._home.id),
+            via_device=(HMIPC_DOMAIN, self._home.id),
         )
 
     @property
-    def alarm_state(self) -> AlarmControlPanelState:
+    def state(self) -> str:
         """Return the state of the alarm control panel."""
         # check for triggered alarm
         if self._security_and_alarm.alarmActive:
-            return AlarmControlPanelState.TRIGGERED
+            return STATE_ALARM_TRIGGERED
 
         activation_state = self._home.get_security_zones_activation()
         # check arm_away
         if activation_state == (True, True):
-            return AlarmControlPanelState.ARMED_AWAY
+            return STATE_ALARM_ARMED_AWAY
         # check arm_home
         if activation_state == (False, True):
-            return AlarmControlPanelState.ARMED_HOME
+            return STATE_ALARM_ARMED_HOME
 
-        return AlarmControlPanelState.DISARMED
+        return STATE_ALARM_DISARMED
 
     @property
     def _security_and_alarm(self) -> SecurityAndAlarmHome:

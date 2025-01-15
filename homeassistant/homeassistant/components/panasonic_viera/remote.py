@@ -12,7 +12,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import Remote
 from .const import (
     ATTR_DEVICE_INFO,
     ATTR_MANUFACTURER,
@@ -44,9 +43,7 @@ async def async_setup_entry(
 class PanasonicVieraRemoteEntity(RemoteEntity):
     """Representation of a Panasonic Viera TV Remote."""
 
-    def __init__(
-        self, remote: Remote, name: str, device_info: dict[str, Any] | None = None
-    ) -> None:
+    def __init__(self, remote, name, device_info):
         """Initialize the entity."""
         # Save a reference to the imported class
         self._remote = remote
@@ -54,7 +51,7 @@ class PanasonicVieraRemoteEntity(RemoteEntity):
         self._device_info = device_info
 
     @property
-    def unique_id(self) -> str | None:
+    def unique_id(self):
         """Return the unique ID of the device."""
         if self._device_info is None:
             return None
@@ -73,7 +70,7 @@ class PanasonicVieraRemoteEntity(RemoteEntity):
         )
 
     @property
-    def name(self) -> str:
+    def name(self):
         """Return the name of the device."""
         return self._name
 
@@ -83,7 +80,7 @@ class PanasonicVieraRemoteEntity(RemoteEntity):
         return self._remote.available
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self):
         """Return true if device is on."""
         return self._remote.state == STATE_ON
 

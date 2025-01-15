@@ -8,10 +8,7 @@ from aiohttp import web
 import voluptuous as vol
 
 from homeassistant.components.http import HomeAssistantView
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_EMAIL, CONF_NAME, DEGREE
 from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
@@ -34,7 +31,7 @@ NAME_KEY = re.compile(SENSOR_NAME_KEY)
 UNIT_KEY = re.compile(SENSOR_UNIT_KEY)
 VALUE_KEY = re.compile(SENSOR_VALUE_KEY)
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_EMAIL): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,

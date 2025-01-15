@@ -10,6 +10,7 @@ from requests.exceptions import ChunkedEncodingError
 import voluptuous as vol
 
 from homeassistant.components.camera import Camera
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_FILE_PATH, CONF_FILENAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -27,7 +28,7 @@ from .const import (
     SERVICE_SAVE_VIDEO,
     SERVICE_TRIGGER,
 )
-from .coordinator import BlinkConfigEntry, BlinkUpdateCoordinator
+from .coordinator import BlinkUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,13 +38,11 @@ PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: BlinkConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, config: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up a Blink Camera."""
 
-    coordinator = config_entry.runtime_data
+    coordinator: BlinkUpdateCoordinator = hass.data[DOMAIN][config.entry_id]
     entities = [
         BlinkCamera(coordinator, name, camera)
         for name, camera in coordinator.api.cameras.items()
@@ -52,8 +51,8 @@ async def async_setup_entry(
     async_add_entities(entities)
 
     platform = entity_platform.async_get_current_platform()
-    platform.async_register_entity_service(SERVICE_RECORD, None, "record")
-    platform.async_register_entity_service(SERVICE_TRIGGER, None, "trigger_camera")
+    platform.async_register_entity_service(SERVICE_RECORD, {}, "record")
+    platform.async_register_entity_service(SERVICE_TRIGGER, {}, "trigger_camera")
     platform.async_register_entity_service(
         SERVICE_SAVE_RECENT_CLIPS,
         {vol.Required(CONF_FILE_PATH): cv.string},

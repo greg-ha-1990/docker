@@ -7,11 +7,7 @@
     }
   },
   "services": {
-    "refresh_library": {
-      "service": "mdi:refresh"
-    },
-    "scan_for_clients": {
-      "service": "mdi:database-refresh"
-    }
+    "refresh_library": "mdi:refresh",
+    "scan_for_clients": "mdi:database-refresh"
   }
 }

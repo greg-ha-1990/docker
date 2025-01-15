@@ -8,6 +8,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CURRENCY_EURO,
     UnitOfElectricCurrent,
@@ -18,7 +19,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BlueCurrentConfigEntry, Connector
+from . import Connector
 from .const import DOMAIN
 from .entity import BlueCurrentEntity, ChargepointEntity
 
@@ -210,12 +211,10 @@ PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: BlueCurrentConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up Blue Current sensors."""
-    connector = entry.runtime_data
+    connector: Connector = hass.data[DOMAIN][entry.entry_id]
     sensor_list: list[SensorEntity] = [
         ChargePointSensor(connector, sensor, evse_id)
         for evse_id in connector.charge_points

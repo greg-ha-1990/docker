@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics.util import async_redact_data
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from . import FullyKioskConfigEntry
+from .const import DOMAIN
 
 DEVICE_INFO_TO_REDACT = {
     "serial",
@@ -56,10 +57,10 @@ SETTINGS_TO_REDACT = {
 
 
 async def async_get_device_diagnostics(
-    hass: HomeAssistant, entry: FullyKioskConfigEntry, device: dr.DeviceEntry
+    hass: HomeAssistant, entry: ConfigEntry, device: dr.DeviceEntry
 ) -> dict[str, Any]:
     """Return device diagnostics."""
-    coordinator = entry.runtime_data
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     data = coordinator.data
     data["settings"] = async_redact_data(data["settings"], SETTINGS_TO_REDACT)
     return async_redact_data(data, DEVICE_INFO_TO_REDACT)

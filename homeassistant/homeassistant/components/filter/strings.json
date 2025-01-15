@@ -1,5 +1,4 @@
 {
-  "title": "Filter",
   "services": {
     "reload": {
       "name": "[%key:common::action::reload%]",

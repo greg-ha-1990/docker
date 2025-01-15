@@ -25,14 +25,14 @@ PRICE_EUR_KWH: Final = f"EUR/{UnitOfEnergy.KILO_WATT_HOUR}"
 PRICE_EUR_M3: Final = f"EUR/{UnitOfVolume.CUBIC_METERS}"
 
 
-def dsmr_transform(value: str) -> float | str:
+def dsmr_transform(value):
     """Transform DSMR version value to right format."""
     if value.isdigit():
         return float(value) / 10
     return value
 
 
-def tariff_transform(value: str) -> str:
+def tariff_transform(value):
     """Transform tariff from number to description."""
     if value == "1":
         return "low"
@@ -40,7 +40,6 @@ def tariff_transform(value: str) -> str:
 
 
 @dataclass(frozen=True)
-# pylint: disable-next=hass-enforce-class-module
 class DSMRReaderSensorEntityDescription(SensorEntityDescription):
     """Sensor entity description for DSMR Reader."""
 

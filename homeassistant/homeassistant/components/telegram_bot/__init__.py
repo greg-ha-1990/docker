@@ -37,10 +37,10 @@ from homeassistant.const import (
     HTTP_DIGEST_AUTHENTICATION,
 )
 from homeassistant.core import Context, HomeAssistant, ServiceCall
+from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_loaded_integration
-from homeassistant.util.ssl import get_default_context, get_default_no_verify_context
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,7 +90,6 @@ ATTR_ANSWERS = "answers"
 ATTR_OPEN_PERIOD = "open_period"
 ATTR_IS_ANONYMOUS = "is_anonymous"
 ATTR_ALLOWS_MULTIPLE_ANSWERS = "allows_multiple_answers"
-ATTR_MESSAGE_THREAD_ID = "message_thread_id"
 
 CONF_ALLOWED_CHAT_IDS = "allowed_chat_ids"
 CONF_PROXY_URL = "proxy_url"
@@ -174,14 +173,14 @@ BASE_SERVICE_SCHEMA = vol.Schema(
 )
 
 SERVICE_SCHEMA_SEND_MESSAGE = BASE_SERVICE_SCHEMA.extend(
-    {vol.Required(ATTR_MESSAGE): cv.string, vol.Optional(ATTR_TITLE): cv.string}
+    {vol.Required(ATTR_MESSAGE): cv.template, vol.Optional(ATTR_TITLE): cv.template}
 )
 
 SERVICE_SCHEMA_SEND_FILE = BASE_SERVICE_SCHEMA.extend(
     {
-        vol.Optional(ATTR_URL): cv.string,
-        vol.Optional(ATTR_FILE): cv.string,
-        vol.Optional(ATTR_CAPTION): cv.string,
+        vol.Optional(ATTR_URL): cv.template,
+        vol.Optional(ATTR_FILE): cv.template,
+        vol.Optional(ATTR_CAPTION): cv.template,
         vol.Optional(ATTR_USERNAME): cv.string,
         vol.Optional(ATTR_PASSWORD): cv.string,
         vol.Optional(ATTR_AUTHENTICATION): cv.string,
@@ -195,8 +194,8 @@ SERVICE_SCHEMA_SEND_STICKER = SERVICE_SCHEMA_SEND_FILE.extend(
 
 SERVICE_SCHEMA_SEND_LOCATION = BASE_SERVICE_SCHEMA.extend(
     {
-        vol.Required(ATTR_LONGITUDE): cv.string,
-        vol.Required(ATTR_LATITUDE): cv.string,
+        vol.Required(ATTR_LONGITUDE): cv.template,
+        vol.Required(ATTR_LATITUDE): cv.template,
     }
 )
 
@@ -228,7 +227,7 @@ SERVICE_SCHEMA_EDIT_CAPTION = vol.Schema(
             cv.positive_int, vol.All(cv.string, "last")
         ),
         vol.Required(ATTR_CHAT_ID): vol.Coerce(int),
-        vol.Required(ATTR_CAPTION): cv.string,
+        vol.Required(ATTR_CAPTION): cv.template,
         vol.Optional(ATTR_KEYBOARD_INLINE): cv.ensure_list,
     },
     extra=vol.ALLOW_EXTRA,
@@ -247,7 +246,7 @@ SERVICE_SCHEMA_EDIT_REPLYMARKUP = vol.Schema(
 
 SERVICE_SCHEMA_ANSWER_CALLBACK_QUERY = vol.Schema(
     {
-        vol.Required(ATTR_MESSAGE): cv.string,
+        vol.Required(ATTR_MESSAGE): cv.template,
         vol.Required(ATTR_CALLBACK_QUERY_ID): vol.Coerce(int),
         vol.Optional(ATTR_SHOW_ALERT): cv.boolean,
     },
@@ -378,12 +377,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     for p_config in domain_config:
         # Each platform config gets its own bot
-        bot = await hass.async_add_executor_job(initialize_bot, hass, p_config)
+        bot = initialize_bot(hass, p_config)
         p_type: str = p_config[CONF_PLATFORM]
 
         platform = platforms[p_type]
 
-        _LOGGER.debug("Setting up %s.%s", DOMAIN, p_type)
+        _LOGGER.info("Setting up %s.%s", DOMAIN, p_type)
         try:
             receiver_service = await platform.async_setup_platform(hass, bot, p_config)
             if receiver_service is False:
@@ -401,8 +400,39 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def async_send_telegram_message(service: ServiceCall) -> None:
         """Handle sending Telegram Bot message service calls."""
 
+        def _render_template_attr(data, attribute):
+            if attribute_templ := data.get(attribute):
+                if any(
+                    isinstance(attribute_templ, vtype) for vtype in (float, int, str)
+                ):
+                    data[attribute] = attribute_templ
+                else:
+                    attribute_templ.hass = hass
+                    try:
+                        data[attribute] = attribute_templ.async_render(
+                            parse_result=False
+                        )
+                    except TemplateError as exc:
+                        _LOGGER.error(
+                            "TemplateError in %s: %s -> %s",
+                            attribute,
+                            attribute_templ.template,
+                            exc,
+                        )
+                        data[attribute] = attribute_templ.template
+
         msgtype = service.service
         kwargs = dict(service.data)
+        for attribute in (
+            ATTR_MESSAGE,
+            ATTR_TITLE,
+            ATTR_URL,
+            ATTR_FILE,
+            ATTR_CAPTION,
+            ATTR_LONGITUDE,
+            ATTR_LATITUDE,
+        ):
+            _render_template_attr(kwargs, attribute)
         _LOGGER.debug("New telegram message %s: %s", msgtype, kwargs)
 
         if msgtype == SERVICE_SEND_MESSAGE:
@@ -456,7 +486,7 @@ def initialize_bot(hass: HomeAssistant, p_config: dict) -> Bot:
             # Auth can actually be stuffed into the URL, but the docs have previously
             # indicated to put them here.
             auth = proxy_params.pop("username"), proxy_params.pop("password")
-            ir.create_issue(
+            ir.async_create_issue(
                 hass,
                 DOMAIN,
                 "proxy_params_auth_deprecation",
@@ -473,7 +503,7 @@ def initialize_bot(hass: HomeAssistant, p_config: dict) -> Bot:
                 learn_more_url="https://github.com/home-assistant/core/pull/112778",
             )
         else:
-            ir.create_issue(
+            ir.async_create_issue(
                 hass,
                 DOMAIN,
                 "proxy_params_deprecation",
@@ -609,7 +639,6 @@ class TelegramNotificationService:
             ATTR_REPLYMARKUP: None,
             ATTR_TIMEOUT: None,
             ATTR_MESSAGE_TAG: None,
-            ATTR_MESSAGE_THREAD_ID: None,
         }
         if data is not None:
             if ATTR_PARSER in data:
@@ -626,8 +655,6 @@ class TelegramNotificationService:
                 params[ATTR_REPLY_TO_MSGID] = data[ATTR_REPLY_TO_MSGID]
             if ATTR_MESSAGE_TAG in data:
                 params[ATTR_MESSAGE_TAG] = data[ATTR_MESSAGE_TAG]
-            if ATTR_MESSAGE_THREAD_ID in data:
-                params[ATTR_MESSAGE_THREAD_ID] = data[ATTR_MESSAGE_THREAD_ID]
             # Keyboards:
             if ATTR_KEYBOARD in data:
                 keys = data.get(ATTR_KEYBOARD)
@@ -671,10 +698,6 @@ class TelegramNotificationService:
                 }
                 if message_tag is not None:
                     event_data[ATTR_MESSAGE_TAG] = message_tag
-                if kwargs_msg.get(ATTR_MESSAGE_THREAD_ID) is not None:
-                    event_data[ATTR_MESSAGE_THREAD_ID] = kwargs_msg[
-                        ATTR_MESSAGE_THREAD_ID
-                    ]
                 self.hass.bus.async_fire(
                     EVENT_TELEGRAM_SENT, event_data, context=context
                 )
@@ -708,7 +731,6 @@ class TelegramNotificationService:
                 reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                 reply_markup=params[ATTR_REPLYMARKUP],
                 read_timeout=params[ATTR_TIMEOUT],
-                message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                 context=context,
             )
 
@@ -822,11 +844,7 @@ class TelegramNotificationService:
             username=kwargs.get(ATTR_USERNAME),
             password=kwargs.get(ATTR_PASSWORD),
             authentication=kwargs.get(ATTR_AUTHENTICATION),
-            verify_ssl=(
-                get_default_context()
-                if kwargs.get(ATTR_VERIFY_SSL, False)
-                else get_default_no_verify_context()
-            ),
+            verify_ssl=kwargs.get(ATTR_VERIFY_SSL),
         )
 
         if file_content:
@@ -846,7 +864,6 @@ class TelegramNotificationService:
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
                         parse_mode=params[ATTR_PARSER],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
 
@@ -861,7 +878,6 @@ class TelegramNotificationService:
                         reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
 
@@ -878,7 +894,6 @@ class TelegramNotificationService:
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
                         parse_mode=params[ATTR_PARSER],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
                 elif file_type == SERVICE_SEND_DOCUMENT:
@@ -894,7 +909,6 @@ class TelegramNotificationService:
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
                         parse_mode=params[ATTR_PARSER],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
                 elif file_type == SERVICE_SEND_VOICE:
@@ -909,7 +923,6 @@ class TelegramNotificationService:
                         reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
                 elif file_type == SERVICE_SEND_ANIMATION:
@@ -925,7 +938,6 @@ class TelegramNotificationService:
                         reply_markup=params[ATTR_REPLYMARKUP],
                         read_timeout=params[ATTR_TIMEOUT],
                         parse_mode=params[ATTR_PARSER],
-                        message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                         context=context,
                     )
 
@@ -949,7 +961,6 @@ class TelegramNotificationService:
                     reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                     reply_markup=params[ATTR_REPLYMARKUP],
                     read_timeout=params[ATTR_TIMEOUT],
-                    message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                     context=context,
                 )
         else:
@@ -976,7 +987,6 @@ class TelegramNotificationService:
                 disable_notification=params[ATTR_DISABLE_NOTIF],
                 reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                 read_timeout=params[ATTR_TIMEOUT],
-                message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                 context=context,
             )
 
@@ -1008,7 +1018,6 @@ class TelegramNotificationService:
                 disable_notification=params[ATTR_DISABLE_NOTIF],
                 reply_to_message_id=params[ATTR_REPLY_TO_MSGID],
                 read_timeout=params[ATTR_TIMEOUT],
-                message_thread_id=params[ATTR_MESSAGE_THREAD_ID],
                 context=context,
             )
 

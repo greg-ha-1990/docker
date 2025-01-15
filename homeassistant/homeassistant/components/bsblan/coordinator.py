@@ -1,10 +1,12 @@
 """DataUpdateCoordinator for the BSB-Lan integration."""
 
-from dataclasses import dataclass
+from __future__ import annotations
+
 from datetime import timedelta
 from random import randint
 
-from bsblan import BSBLAN, BSBLANConnectionError, HotWaterState, Sensor, State
+from bsblan import BSBLAN, BSBLANConnectionError
+from bsblan.models import State
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
@@ -14,16 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import DOMAIN, LOGGER, SCAN_INTERVAL
 
 
-@dataclass
-class BSBLanCoordinatorData:
-    """BSBLan data stored in the Home Assistant data object."""
-
-    state: State
-    sensor: Sensor
-    dhw: HotWaterState
-
-
-class BSBLanUpdateCoordinator(DataUpdateCoordinator[BSBLanCoordinatorData]):
+class BSBLanUpdateCoordinator(DataUpdateCoordinator[State]):
     """The BSB-Lan update coordinator."""
 
     config_entry: ConfigEntry
@@ -35,37 +28,30 @@ class BSBLanUpdateCoordinator(DataUpdateCoordinator[BSBLanCoordinatorData]):
         client: BSBLAN,
     ) -> None:
         """Initialize the BSB-Lan coordinator."""
-        super().__init__(
-            hass,
-            logger=LOGGER,
-            name=f"{DOMAIN}_{config_entry.data[CONF_HOST]}",
-            update_interval=self._get_update_interval(),
-        )
+
         self.client = client
 
-    def _get_update_interval(self) -> timedelta:
-        """Get the update interval with a random offset.
+        super().__init__(
+            hass,
+            LOGGER,
+            name=f"{DOMAIN}_{config_entry.data[CONF_HOST]}",
+            # use the default scan interval and add a random number of seconds to avoid timeouts when
+            # the BSB-Lan device is already/still busy retrieving data,
+            # e.g. for MQTT or internal logging.
+            update_interval=SCAN_INTERVAL + timedelta(seconds=randint(1, 8)),
+        )
 
-        Use the default scan interval and add a random number of seconds to avoid timeouts when
-        the BSB-Lan device is already/still busy retrieving data,
-        e.g. for MQTT or internal logging.
-        """
-        return SCAN_INTERVAL + timedelta(seconds=randint(1, 8))
+    async def _async_update_data(self) -> State:
+        """Get state from BSB-Lan device."""
 
-    async def _async_update_data(self) -> BSBLanCoordinatorData:
-        """Get state and sensor data from BSB-Lan device."""
+        # use the default scan interval and add a random number of seconds to avoid timeouts when
+        # the BSB-Lan device is already/still busy retrieving data, e.g. for MQTT or internal logging.
+        self.update_interval = SCAN_INTERVAL + timedelta(seconds=randint(1, 8))
+
         try:
-            # initialize the client, this is cached and will only be called once
-            await self.client.initialize()
-
-            state = await self.client.state()
-            sensor = await self.client.sensor()
-            dhw = await self.client.hot_water_state()
+            return await self.client.state()
         except BSBLANConnectionError as err:
-            host = self.config_entry.data[CONF_HOST] if self.config_entry else "unknown"
             raise UpdateFailed(
-                f"Error while establishing connection with BSB-Lan device at {host}"
+                f"Error while establishing connection with "
+                f"BSB-Lan device at {self.config_entry.data[CONF_HOST]}"
             ) from err
-
-        self.update_interval = self._get_update_interval()
-        return BSBLanCoordinatorData(state=state, sensor=sensor, dhw=dhw)

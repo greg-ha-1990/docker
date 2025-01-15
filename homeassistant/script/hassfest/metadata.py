@@ -10,7 +10,8 @@ from .model import Config, Integration
 def validate(integrations: dict[str, Integration], config: Config) -> None:
     """Validate project metadata keys."""
     metadata_path = config.root / "pyproject.toml"
-    data = tomllib.loads(metadata_path.read_text())
+    with open(metadata_path, "rb") as fp:
+        data = tomllib.load(fp)
 
     try:
         if data["project"]["version"] != __version__:

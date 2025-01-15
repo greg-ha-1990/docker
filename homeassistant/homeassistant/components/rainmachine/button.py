@@ -13,15 +13,16 @@ from homeassistant.components.button import (
     ButtonEntity,
     ButtonEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import RainMachineConfigEntry
-from .const import DATA_PROVISION_SETTINGS
-from .entity import RainMachineEntity, RainMachineEntityDescription
+from . import RainMachineData, RainMachineEntity
+from .const import DATA_PROVISION_SETTINGS, DOMAIN
+from .model import RainMachineEntityDescription
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -51,12 +52,11 @@ BUTTON_DESCRIPTIONS = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: RainMachineConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up RainMachine buttons based on a config entry."""
-    data = entry.runtime_data
+    data: RainMachineData = hass.data[DOMAIN][entry.entry_id]
+
     async_add_entities(
         RainMachineButton(entry, data, description)
         for description in BUTTON_DESCRIPTIONS

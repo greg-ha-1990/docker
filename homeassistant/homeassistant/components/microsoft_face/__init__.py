@@ -244,7 +244,11 @@ class MicrosoftFaceGroupEntity(Entity):
     @property
     def extra_state_attributes(self):
         """Return device specific state attributes."""
-        return dict(self._api.store[self._id])
+        attr = {}
+        for name, p_id in self._api.store[self._id].items():
+            attr[name] = p_id
+
+        return attr
 
 
 class MicrosoftFace:

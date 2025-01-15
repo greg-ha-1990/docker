@@ -19,7 +19,8 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import LockData, SchlageDataUpdateCoordinator
+from .const import DOMAIN
+from .coordinator import SchlageDataUpdateCoordinator
 from .entity import SchlageEntity
 
 
@@ -60,21 +61,16 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up switches based on a config entry."""
-    coordinator = config_entry.runtime_data
-
-    def _add_new_locks(locks: dict[str, LockData]) -> None:
-        async_add_entities(
-            SchlageSwitch(
-                coordinator=coordinator,
-                description=description,
-                device_id=device_id,
-            )
-            for device_id in locks
-            for description in SWITCHES
+    coordinator: SchlageDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    async_add_entities(
+        SchlageSwitch(
+            coordinator=coordinator,
+            description=description,
+            device_id=device_id,
         )
-
-    _add_new_locks(coordinator.data.locks)
-    coordinator.new_locks_callbacks.append(_add_new_locks)
+        for device_id in coordinator.data.locks
+        for description in SWITCHES
+    )
 
 
 class SchlageSwitch(SchlageEntity, SwitchEntity):

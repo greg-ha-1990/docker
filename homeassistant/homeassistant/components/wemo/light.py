@@ -8,11 +8,9 @@ from pywemo import Bridge, BridgeLight, Dimmer
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
-    ATTR_COLOR_TEMP_KELVIN,
+    ATTR_COLOR_TEMP,
     ATTR_HS_COLOR,
     ATTR_TRANSITION,
-    DEFAULT_MAX_KELVIN,
-    DEFAULT_MIN_KELVIN,
     ColorMode,
     LightEntity,
     LightEntityFeature,
@@ -79,8 +77,6 @@ def async_setup_bridge(
 class WemoLight(WemoEntity, LightEntity):
     """Representation of a WeMo light."""
 
-    _attr_max_color_temp_kelvin = DEFAULT_MAX_KELVIN
-    _attr_min_color_temp_kelvin = DEFAULT_MIN_KELVIN
     _attr_supported_features = LightEntityFeature.TRANSITION
 
     def __init__(self, coordinator: DeviceCoordinator, light: BridgeLight) -> None:
@@ -127,11 +123,9 @@ class WemoLight(WemoEntity, LightEntity):
         return self.light.state.get("color_xy")
 
     @property
-    def color_temp_kelvin(self) -> int | None:
-        """Return the color temperature value in Kelvin."""
-        if not (mireds := self.light.state.get("temperature_mireds")):
-            return None
-        return color_util.color_temperature_mired_to_kelvin(mireds)
+    def color_temp(self) -> int | None:
+        """Return the color temperature of this light in mireds."""
+        return self.light.state.get("temperature_mireds")
 
     @property
     def color_mode(self) -> ColorMode:
@@ -171,7 +165,7 @@ class WemoLight(WemoEntity, LightEntity):
         xy_color = None
 
         brightness = kwargs.get(ATTR_BRIGHTNESS, self.brightness or 255)
-        color_temp_kelvin = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
+        color_temp = kwargs.get(ATTR_COLOR_TEMP)
         hs_color = kwargs.get(ATTR_HS_COLOR)
         transition_time = int(kwargs.get(ATTR_TRANSITION, 0))
 
@@ -188,9 +182,9 @@ class WemoLight(WemoEntity, LightEntity):
             if xy_color is not None:
                 self.light.set_color(xy_color, transition=transition_time)
 
-            if color_temp_kelvin is not None:
+            if color_temp is not None:
                 self.light.set_temperature(
-                    kelvin=color_temp_kelvin, transition=transition_time
+                    mireds=color_temp, transition=transition_time
                 )
 
             self.light.turn_on(**turn_on_kwargs)

@@ -10,11 +10,12 @@ import voluptuous as vol
 
 from homeassistant.components.calendar import (
     ENTITY_ID_FORMAT,
-    PLATFORM_SCHEMA as CALENDAR_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     CalendarEntity,
     CalendarEvent,
     is_offset_reached,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
     CONF_PASSWORD,
@@ -29,8 +30,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import CalDavConfigEntry
 from .api import async_get_calendars
+from .const import DOMAIN
 from .coordinator import CalDavUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ CONFIG_ENTRY_DEFAULT_DAYS = 7
 # Only allow VCALENDARs that support this component type
 SUPPORTED_COMPONENT = "VEVENT"
 
-PLATFORM_SCHEMA = CALENDAR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_URL): vol.Url(),
         vol.Optional(CONF_CALENDARS, default=[]): vol.All(cv.ensure_list, [cv.string]),
@@ -109,7 +110,6 @@ async def async_setup_platform(
             entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, device_id, hass=hass)
             coordinator = CalDavUpdateCoordinator(
                 hass,
-                None,
                 calendar=calendar,
                 days=days,
                 include_all_day=True,
@@ -127,7 +127,6 @@ async def async_setup_platform(
             entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, device_id, hass=hass)
             coordinator = CalDavUpdateCoordinator(
                 hass,
-                None,
                 calendar=calendar,
                 days=days,
                 include_all_day=False,
@@ -142,11 +141,12 @@ async def async_setup_platform(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: CalDavConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the CalDav calendar platform for a config entry."""
-    calendars = await async_get_calendars(hass, entry.runtime_data, SUPPORTED_COMPONENT)
+    client: caldav.DAVClient = hass.data[DOMAIN][entry.entry_id]
+    calendars = await async_get_calendars(hass, client, SUPPORTED_COMPONENT)
     async_add_entities(
         (
             WebDavCalendarEntity(
@@ -154,7 +154,6 @@ async def async_setup_entry(
                 async_generate_entity_id(ENTITY_ID_FORMAT, calendar.name, hass=hass),
                 CalDavUpdateCoordinator(
                     hass,
-                    entry,
                     calendar=calendar,
                     days=CONFIG_ENTRY_DEFAULT_DAYS,
                     include_all_day=True,
@@ -207,8 +206,7 @@ class WebDavCalendarEntity(CoordinatorEntity[CalDavUpdateCoordinator], CalendarE
         if self._supports_offset:
             self._attr_extra_state_attributes = {
                 "offset_reached": is_offset_reached(
-                    self._event.start_datetime_local,
-                    self.coordinator.offset,  # type: ignore[arg-type]
+                    self._event.start_datetime_local, self.coordinator.offset
                 )
                 if self._event
                 else False

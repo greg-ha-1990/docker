@@ -96,6 +96,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         method = command_config[CONF_METHOD]
 
         template_url = command_config[CONF_URL]
+        template_url.hass = hass
 
         auth = None
         if CONF_USERNAME in command_config:
@@ -106,8 +107,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         template_payload = None
         if CONF_PAYLOAD in command_config:
             template_payload = command_config[CONF_PAYLOAD]
+            template_payload.hass = hass
 
         template_headers = command_config.get(CONF_HEADERS, {})
+        for template_header in template_headers.values():
+            template_header.hass = hass
 
         content_type = command_config.get(CONF_CONTENT_TYPE)
 

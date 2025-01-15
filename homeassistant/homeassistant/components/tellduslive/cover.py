@@ -9,9 +9,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .. import tellduslive
 from . import TelldusLiveClient
-from .const import DOMAIN, TELLDUS_DISCOVERY_NEW
-from .entity import TelldusLiveEntity
+from .entry import TelldusLiveEntity
 
 
 async def async_setup_entry(
@@ -23,12 +23,12 @@ async def async_setup_entry(
 
     async def async_discover_cover(device_id):
         """Discover and add a discovered sensor."""
-        client: TelldusLiveClient = hass.data[DOMAIN]
+        client: TelldusLiveClient = hass.data[tellduslive.DOMAIN]
         async_add_entities([TelldusLiveCover(client, device_id)])
 
     async_dispatcher_connect(
         hass,
-        TELLDUS_DISCOVERY_NEW.format(cover.DOMAIN, DOMAIN),
+        tellduslive.TELLDUS_DISCOVERY_NEW.format(cover.DOMAIN, tellduslive.DOMAIN),
         async_discover_cover,
     )
 

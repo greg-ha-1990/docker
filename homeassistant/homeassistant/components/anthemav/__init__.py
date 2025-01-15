@@ -13,16 +13,14 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import ANTHEMAV_UPDATE_SIGNAL, DEVICE_TIMEOUT_SECONDS
-
-type AnthemavConfigEntry = ConfigEntry[anthemav.Connection]
+from .const import ANTHEMAV_UPDATE_SIGNAL, DEVICE_TIMEOUT_SECONDS, DOMAIN
 
 PLATFORMS = [Platform.MEDIA_PLAYER]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: AnthemavConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Anthem A/V Receivers from a config entry."""
 
     @callback
@@ -43,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnthemavConfigEntry) -> 
     except (OSError, DeviceError) as err:
         raise ConfigEntryNotReady from err
 
-    entry.runtime_data = avr
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = avr
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -58,12 +56,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnthemavConfigEntry) -> 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: AnthemavConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    avr = entry.runtime_data
-    _LOGGER.debug("Close avr connection")
-    avr.close()
+    avr = hass.data[DOMAIN][entry.entry_id]
 
+    if avr is not None:
+        _LOGGER.debug("Close avr connection")
+        avr.close()
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok

@@ -9,9 +9,9 @@ from homeassistant.components.water_heater import (
 from homeassistant.const import STATE_OFF
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from . import GeniusHubConfigEntry
-from .entity import GeniusHeatingZone
+from . import DOMAIN, GeniusHeatingZone
 
 STATE_AUTO = "auto"
 STATE_MANUAL = "manual"
@@ -33,19 +33,24 @@ GH_STATE_TO_HA = {
 GH_HEATERS = ["hot water temperature"]
 
 
-async def async_setup_entry(
+async def async_setup_platform(
     hass: HomeAssistant,
-    entry: GeniusHubConfigEntry,
+    config: ConfigType,
     async_add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Set up the Genius Hub water heater entities."""
+    """Set up the Genius Hub water_heater entities."""
+    if discovery_info is None:
+        return
 
-    broker = entry.runtime_data
+    broker = hass.data[DOMAIN]["broker"]
 
     async_add_entities(
-        GeniusWaterHeater(broker, z)
-        for z in broker.client.zone_objs
-        if z.data.get("type") in GH_HEATERS
+        [
+            GeniusWaterHeater(broker, z)
+            for z in broker.client.zone_objs
+            if z.data.get("type") in GH_HEATERS
+        ]
     )
 
 

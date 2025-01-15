@@ -20,7 +20,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.config_validation import DEVICE_CONDITION_BASE_SCHEMA
 from homeassistant.helpers.typing import ConfigType, TemplateVarsType
 
-from . import DOMAIN, VacuumActivity
+from . import DOMAIN, STATE_CLEANING, STATE_DOCKED, STATE_RETURNING
 
 CONDITION_TYPES = {"is_cleaning", "is_docked"}
 
@@ -62,9 +62,9 @@ def async_condition_from_config(
 ) -> condition.ConditionCheckerType:
     """Create a function to test a device condition."""
     if config[CONF_TYPE] == "is_docked":
-        test_states = [VacuumActivity.DOCKED]
+        test_states = [STATE_DOCKED]
     else:
-        test_states = [VacuumActivity.CLEANING, VacuumActivity.RETURNING]
+        test_states = [STATE_CLEANING, STATE_RETURNING]
 
     registry = er.async_get(hass)
     entity_id = er.async_resolve_entity_id(registry, config[CONF_ENTITY_ID])

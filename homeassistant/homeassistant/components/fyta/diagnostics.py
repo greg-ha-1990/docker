@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
-from . import FytaConfigEntry
+from .const import DOMAIN
 
 TO_REDACT = [
     CONF_PASSWORD,
@@ -18,12 +19,12 @@ TO_REDACT = [
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, config_entry: FytaConfigEntry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    data = config_entry.runtime_data.data
+    data = hass.data[DOMAIN][config_entry.entry_id].data
 
     return {
         "config_entry": async_redact_data(config_entry.as_dict(), TO_REDACT),
-        "plant_data": {key: value.to_dict() for key, value in data.items()},
+        "plant_data": data,
     }

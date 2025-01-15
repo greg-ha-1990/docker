@@ -12,13 +12,11 @@ import aiohue
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
-    ATTR_COLOR_TEMP_KELVIN,
+    ATTR_COLOR_TEMP,
     ATTR_EFFECT,
     ATTR_FLASH,
     ATTR_HS_COLOR,
     ATTR_TRANSITION,
-    DEFAULT_MAX_KELVIN,
-    DEFAULT_MIN_KELVIN,
     EFFECT_COLORLOOP,
     EFFECT_RANDOM,
     FLASH_LONG,
@@ -37,7 +35,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
-from homeassistant.util import color as color_util
+from homeassistant.util import color
 
 from ..bridge import HueBridge
 from ..const import (
@@ -307,7 +305,6 @@ def hass_to_hue_brightness(value):
     return max(1, round((value / 255) * 254))
 
 
-# pylint: disable-next=hass-enforce-class-module
 class HueLight(CoordinatorEntity, LightEntity):
     """Representation of a Hue light."""
 
@@ -364,7 +361,7 @@ class HueLight(CoordinatorEntity, LightEntity):
                     "bulb in the Philips Hue App."
                 )
                 LOGGER.warning(err, self.name)
-            if self.gamut and not color_util.check_valid_gamut(self.gamut):
+            if self.gamut and not color.check_valid_gamut(self.gamut):
                 err = "Color gamut of %s: %s, not valid, setting gamut to None."
                 LOGGER.debug(err, self.name, str(self.gamut))
                 self.gamut_typ = GAMUT_TYPE_UNAVAILABLE
@@ -429,50 +426,49 @@ class HueLight(CoordinatorEntity, LightEntity):
         source = self.light.action if self.is_group else self.light.state
 
         if mode in ("xy", "hs") and "xy" in source:
-            return color_util.color_xy_to_hs(*source["xy"], self.gamut)
+            return color.color_xy_to_hs(*source["xy"], self.gamut)
 
         return None
 
     @property
-    def color_temp_kelvin(self) -> int | None:
-        """Return the color temperature value in Kelvin."""
+    def color_temp(self):
+        """Return the CT color value."""
         # Don't return color temperature unless in color temperature mode
         if self._color_mode != "ct":
             return None
 
-        ct = (
-            self.light.action.get("ct") if self.is_group else self.light.state.get("ct")
-        )
-        return color_util.color_temperature_mired_to_kelvin(ct) if ct else None
+        if self.is_group:
+            return self.light.action.get("ct")
+        return self.light.state.get("ct")
 
     @property
-    def max_color_temp_kelvin(self) -> int:
-        """Return the coldest color_temp_kelvin that this light supports."""
+    def min_mireds(self):
+        """Return the coldest color_temp that this light supports."""
         if self.is_group:
-            return DEFAULT_MAX_KELVIN
+            return super().min_mireds
 
         min_mireds = self.light.controlcapabilities.get("ct", {}).get("min")
 
         # We filter out '0' too, which can be incorrectly reported by 3rd party buls
         if not min_mireds:
-            return DEFAULT_MAX_KELVIN
+            return super().min_mireds
 
-        return color_util.color_temperature_mired_to_kelvin(min_mireds)
+        return min_mireds
 
     @property
-    def min_color_temp_kelvin(self) -> int:
-        """Return the warmest color_temp_kelvin that this light supports."""
+    def max_mireds(self):
+        """Return the warmest color_temp that this light supports."""
         if self.is_group:
-            return DEFAULT_MIN_KELVIN
+            return super().max_mireds
         if self.is_livarno:
-            return 2000  # 500 mireds
+            return 500
 
         max_mireds = self.light.controlcapabilities.get("ct", {}).get("max")
 
         if not max_mireds:
-            return DEFAULT_MIN_KELVIN
+            return super().max_mireds
 
-        return color_util.color_temperature_mired_to_kelvin(max_mireds)
+        return max_mireds
 
     @property
     def is_on(self):
@@ -544,14 +540,11 @@ class HueLight(CoordinatorEntity, LightEntity):
                 # Philips hue bulb models respond differently to hue/sat
                 # requests, so we convert to XY first to ensure a consistent
                 # color.
-                xy_color = color_util.color_hs_to_xy(*kwargs[ATTR_HS_COLOR], self.gamut)
+                xy_color = color.color_hs_to_xy(*kwargs[ATTR_HS_COLOR], self.gamut)
                 command["xy"] = xy_color
-        elif ATTR_COLOR_TEMP_KELVIN in kwargs:
-            temp_k = max(
-                self.min_color_temp_kelvin,
-                min(self.max_color_temp_kelvin, kwargs[ATTR_COLOR_TEMP_KELVIN]),
-            )
-            command["ct"] = color_util.color_temperature_kelvin_to_mired(temp_k)
+        elif ATTR_COLOR_TEMP in kwargs:
+            temp = kwargs[ATTR_COLOR_TEMP]
+            command["ct"] = max(self.min_mireds, min(temp, self.max_mireds))
 
         if ATTR_BRIGHTNESS in kwargs:
             command["bri"] = hass_to_hue_brightness(kwargs[ATTR_BRIGHTNESS])

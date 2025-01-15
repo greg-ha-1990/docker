@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .const import DOMAIN  # noqa: F401
 from .coordinator import AirNowDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)

@@ -18,7 +18,12 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import GuardianData
+from . import (
+    GuardianData,
+    PairedSensorEntity,
+    ValveControllerEntity,
+    ValveControllerEntityDescription,
+)
 from .const import (
     API_SYSTEM_ONBOARD_SENSOR_STATUS,
     CONF_UID,
@@ -26,11 +31,6 @@ from .const import (
     SIGNAL_PAIRED_SENSOR_COORDINATOR_ADDED,
 )
 from .coordinator import GuardianDataUpdateCoordinator
-from .entity import (
-    PairedSensorEntity,
-    ValveControllerEntity,
-    ValveControllerEntityDescription,
-)
 from .util import (
     EntityDomainReplacementStrategy,
     async_finish_entity_domain_replacements,

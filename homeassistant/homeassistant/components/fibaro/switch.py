@@ -7,28 +7,29 @@ from typing import Any
 from pyfibaro.fibaro_device import DeviceModel
 
 from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import FibaroConfigEntry
-from .entity import FibaroEntity
+from . import FibaroController, FibaroDevice
+from .const import DOMAIN
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: FibaroConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Fibaro switches."""
-    controller = entry.runtime_data
+    controller: FibaroController = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [FibaroSwitch(device) for device in controller.fibaro_devices[Platform.SWITCH]],
         True,
     )
 
 
-class FibaroSwitch(FibaroEntity, SwitchEntity):
+class FibaroSwitch(FibaroDevice, SwitchEntity):
     """Representation of a Fibaro Switch."""
 
     def __init__(self, fibaro_device: DeviceModel) -> None:

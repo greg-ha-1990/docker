@@ -32,8 +32,6 @@
     }
   },
   "services": {
-    "search": {
-      "service": "mdi:magnify"
-    }
+    "search": "mdi:magnify"
   }
 }

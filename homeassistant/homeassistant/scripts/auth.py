@@ -2,10 +2,8 @@
 
 import argparse
 import asyncio
-from collections.abc import Sequence
 import logging
 import os
-from typing import TYPE_CHECKING
 
 from homeassistant import runner
 from homeassistant.auth import auth_manager_from_config
@@ -17,7 +15,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 # mypy: allow-untyped-calls, allow-untyped-defs
 
 
-def run(args: Sequence[str] | None) -> None:
+def run(args):
     """Handle Home Assistant auth provider script."""
     parser = argparse.ArgumentParser(description="Manage Home Assistant users")
     parser.add_argument("--script", choices=["auth"])
@@ -52,7 +50,7 @@ def run(args: Sequence[str] | None) -> None:
     asyncio.run(run_command(parser.parse_args(args)))
 
 
-async def run_command(args: argparse.Namespace) -> None:
+async def run_command(args):
     """Run the command."""
     hass = HomeAssistant(os.path.join(os.getcwd(), args.config))
     await asyncio.gather(dr.async_load(hass), er.async_load(hass))
@@ -67,13 +65,9 @@ async def run_command(args: argparse.Namespace) -> None:
     await hass.async_stop()
 
 
-async def list_users(
-    hass: HomeAssistant, provider: hass_auth.HassAuthProvider, args: argparse.Namespace
-) -> None:
+async def list_users(hass, provider, args):
     """List the users."""
     count = 0
-    if TYPE_CHECKING:
-        assert provider.data
     for user in provider.data.users:
         count += 1
         print(user["username"])
@@ -82,12 +76,8 @@ async def list_users(
     print("Total users:", count)
 
 
-async def add_user(
-    hass: HomeAssistant, provider: hass_auth.HassAuthProvider, args: argparse.Namespace
-) -> None:
+async def add_user(hass, provider, args):
     """Create a user."""
-    if TYPE_CHECKING:
-        assert provider.data
     try:
         provider.data.add_auth(args.username, args.password)
     except hass_auth.InvalidUser:
@@ -99,12 +89,8 @@ async def add_user(
     print("Auth created")
 
 
-async def validate_login(
-    hass: HomeAssistant, provider: hass_auth.HassAuthProvider, args: argparse.Namespace
-) -> None:
+async def validate_login(hass, provider, args):
     """Validate a login."""
-    if TYPE_CHECKING:
-        assert provider.data
     try:
         provider.data.validate_login(args.username, args.password)
         print("Auth valid")
@@ -112,12 +98,8 @@ async def validate_login(
         print("Auth invalid")
 
 
-async def change_password(
-    hass: HomeAssistant, provider: hass_auth.HassAuthProvider, args: argparse.Namespace
-) -> None:
+async def change_password(hass, provider, args):
     """Change password."""
-    if TYPE_CHECKING:
-        assert provider.data
     try:
         provider.data.change_password(args.username, args.new_password)
         await provider.data.async_save()

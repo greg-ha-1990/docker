@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 import ssl
 from typing import Any
-from xml.parsers.expat import ExpatError
 
 import voluptuous as vol
 
 from homeassistant.components.sensor import (
     CONF_STATE_CLASS,
     DOMAIN as SENSOR_DOMAIN,
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     SensorDeviceClass,
 )
 from homeassistant.components.sensor.helpers import async_parse_date_datetime
@@ -49,9 +48,10 @@ from .util import parse_json_attributes
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({**RESOURCE_SCHEMA, **SENSOR_SCHEMA})
+
 PLATFORM_SCHEMA = vol.All(
-    SENSOR_PLATFORM_SCHEMA.extend({**RESOURCE_SCHEMA, **SENSOR_SCHEMA}),
-    cv.has_at_least_one_key(CONF_RESOURCE, CONF_RESOURCE_TEMPLATE),
+    cv.has_at_least_one_key(CONF_RESOURCE, CONF_RESOURCE_TEMPLATE), PLATFORM_SCHEMA
 )
 
 TRIGGER_ENTITY_OPTIONS = (
@@ -139,6 +139,8 @@ class RestSensor(ManualTriggerSensorEntity, RestEntity):
             config[CONF_FORCE_UPDATE],
         )
         self._value_template = config.get(CONF_VALUE_TEMPLATE)
+        if (value_template := self._value_template) is not None:
+            value_template.hass = hass
         self._json_attrs = config.get(CONF_JSON_ATTRS)
         self._json_attrs_path = config.get(CONF_JSON_ATTRS_PATH)
         self._attr_extra_state_attributes = {}
@@ -157,13 +159,7 @@ class RestSensor(ManualTriggerSensorEntity, RestEntity):
 
     def _update_from_rest_data(self) -> None:
         """Update state from the rest data."""
-        try:
-            value = self.rest.data_without_xml()
-        except ExpatError as err:
-            _LOGGER.warning(
-                "REST xml result could not be parsed and converted to JSON: %s", err
-            )
-            value = self.rest.data
+        value = self.rest.data_without_xml()
 
         if self._json_attrs:
             self._attr_extra_state_attributes = parse_json_attributes(

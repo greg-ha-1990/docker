@@ -7,7 +7,7 @@ from typing import Any
 from ttn_client import TTNAuthError, TTNClient
 import voluptuous as vol
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_API_KEY, CONF_HOST
 from homeassistant.helpers.selector import (
     TextSelector,
@@ -24,6 +24,8 @@ class TTNFlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     VERSION = 1
+
+    _reauth_entry: ConfigEntry | None = None
 
     async def async_step_user(
         self, user_input: Mapping[str, Any] | None = None
@@ -49,9 +51,11 @@ class TTNFlowHandler(ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 # Create entry
-                if self.source == SOURCE_REAUTH:
+                if self._reauth_entry:
                     return self.async_update_reload_and_abort(
-                        self._get_reauth_entry(), data=user_input
+                        self._reauth_entry,
+                        data=user_input,
+                        reason="reauth_successful",
                     )
                 await self.async_set_unique_id(user_input[CONF_APP_ID])
                 self._abort_if_unique_id_configured()
@@ -63,8 +67,8 @@ class TTNFlowHandler(ConfigFlow, domain=DOMAIN):
 
         # Show form for user to provide settings
         if not user_input:
-            if self.source == SOURCE_REAUTH:
-                user_input = self._get_reauth_entry().data
+            if self._reauth_entry:
+                user_input = self._reauth_entry.data
             else:
                 user_input = {CONF_HOST: TTN_API_HOST}
 
@@ -85,9 +89,14 @@ class TTNFlowHandler(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_reauth(
-        self, entry_data: Mapping[str, Any]
+        self, user_input: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle a flow initialized by a reauth event."""
+
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(

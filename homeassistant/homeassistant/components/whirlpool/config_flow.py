@@ -12,7 +12,7 @@ from whirlpool.appliancesmanager import AppliancesManager
 from whirlpool.auth import Auth
 from whirlpool.backendselector import BackendSelector
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_PASSWORD, CONF_REGION, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -71,11 +71,14 @@ class WhirlpoolConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Whirlpool Sixth Sense."""
 
     VERSION = 1
+    entry: ConfigEntry | None
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle re-authentication with Whirlpool Sixth Sense."""
+
+        self.entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -85,10 +88,10 @@ class WhirlpoolConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input:
-            reauth_entry = self._get_reauth_entry()
+            assert self.entry is not None
             password = user_input[CONF_PASSWORD]
             brand = user_input[CONF_BRAND]
-            data = {**reauth_entry.data, CONF_PASSWORD: password, CONF_BRAND: brand}
+            data = {**self.entry.data, CONF_PASSWORD: password, CONF_BRAND: brand}
 
             try:
                 await validate_input(self.hass, data)
@@ -97,7 +100,9 @@ class WhirlpoolConfigFlow(ConfigFlow, domain=DOMAIN):
             except (CannotConnect, TimeoutError):
                 errors["base"] = "cannot_connect"
             else:
-                return self.async_update_reload_and_abort(reauth_entry, data=data)
+                self.hass.config_entries.async_update_entry(self.entry, data=data)
+                await self.hass.config_entries.async_reload(self.entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
 
         return self.async_show_form(
             step_id="reauth_confirm",

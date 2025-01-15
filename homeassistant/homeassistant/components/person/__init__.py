@@ -24,6 +24,7 @@ from homeassistant.const import (
     ATTR_NAME,
     CONF_ID,
     CONF_NAME,
+    CONF_TYPE,
     EVENT_HOMEASSISTANT_START,
     SERVICE_RELOAD,
     STATE_HOME,
@@ -50,9 +51,10 @@ from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.typing import ConfigType, VolDictType
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import bind_hass
 
+from . import group as group_pre_import  # noqa: F401
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -165,7 +167,7 @@ def entities_in_person(hass: HomeAssistant, entity_id: str) -> list[str]:
     return person_entity.device_trackers
 
 
-CREATE_FIELDS: VolDictType = {
+CREATE_FIELDS = {
     vol.Required(CONF_NAME): vol.All(str, vol.Length(min=1)),
     vol.Optional(CONF_USER_ID): vol.Any(str, None),
     vol.Optional(CONF_DEVICE_TRACKERS, default=list): vol.All(
@@ -175,7 +177,7 @@ CREATE_FIELDS: VolDictType = {
 }
 
 
-UPDATE_FIELDS: VolDictType = {
+UPDATE_FIELDS = {
     vol.Optional(CONF_NAME): vol.All(str, vol.Length(min=1)),
     vol.Optional(CONF_USER_ID): vol.Any(str, None),
     vol.Optional(CONF_DEVICE_TRACKERS, default=list): vol.All(
@@ -305,23 +307,6 @@ class PersonStorageCollection(collection.DictStorageCollection):
                 raise ValueError("User already taken")
 
 
-class PersonStorageCollectionWebsocket(collection.DictStorageCollectionWebsocket):
-    """Class to expose storage collection management over websocket."""
-
-    def ws_list_item(
-        self,
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ) -> None:
-        """List persons."""
-        yaml, storage, _ = hass.data[DOMAIN]
-        connection.send_result(
-            msg[ATTR_ID],
-            {"storage": storage.async_items(), "config": yaml.async_items()},
-        )
-
-
 async def filter_yaml_data(hass: HomeAssistant, persons: list[dict]) -> list[dict]:
     """Validate YAML data that we can't validate via schema."""
     filtered = []
@@ -385,9 +370,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.data[DOMAIN] = (yaml_collection, storage_collection, entity_component)
 
-    PersonStorageCollectionWebsocket(
+    collection.DictStorageCollectionWebsocket(
         storage_collection, DOMAIN, DOMAIN, CREATE_FIELDS, UPDATE_FIELDS
-    ).async_setup(hass)
+    ).async_setup(hass, create_list=False)
+
+    websocket_api.async_register_command(hass, ws_list_person)
 
     async def _handle_user_removed(event: Event) -> None:
         """Handle a user being removed."""
@@ -581,6 +568,19 @@ class Person(
             data[ATTR_USER_ID] = user_id
 
         self._attr_extra_state_attributes = data
+
+
+@websocket_api.websocket_command({vol.Required(CONF_TYPE): "person/list"})
+def ws_list_person(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """List persons."""
+    yaml, storage, _ = hass.data[DOMAIN]
+    connection.send_result(
+        msg[ATTR_ID], {"storage": storage.async_items(), "config": yaml.async_items()}
+    )
 
 
 def _get_latest(prev: State | None, curr: State) -> State:

@@ -8,10 +8,7 @@ from netdata import Netdata
 from netdata.exceptions import NetdataError
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import (
     CONF_HOST,
     CONF_ICON,
@@ -24,7 +21,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,7 +44,7 @@ RESOURCE_SCHEMA = vol.Any(
     }
 )
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_HOST, default=DEFAULT_HOST): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -71,9 +67,7 @@ async def async_setup_platform(
     port = config[CONF_PORT]
     resources = config[CONF_RESOURCES]
 
-    netdata = NetdataData(
-        Netdata(host, port=port, timeout=20.0, httpx_client=get_async_client(hass))
-    )
+    netdata = NetdataData(Netdata(host, port=port, timeout=20.0))
     await netdata.async_update()
 
     if netdata.api.metrics is None:

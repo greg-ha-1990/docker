@@ -1,45 +1,37 @@
 """Support for LCN covers."""
 
-from collections.abc import Iterable
-from functools import partial
+from __future__ import annotations
+
 from typing import Any
 
 import pypck
 
 from homeassistant.components.cover import DOMAIN as DOMAIN_COVER, CoverEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_DOMAIN, CONF_ENTITIES
+from homeassistant.const import CONF_ADDRESS, CONF_DOMAIN, CONF_ENTITIES
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType
 
-from .const import (
-    ADD_ENTITIES_CALLBACKS,
-    CONF_DOMAIN_DATA,
-    CONF_MOTOR,
-    CONF_REVERSE_TIME,
-    DOMAIN,
-)
-from .entity import LcnEntity
-from .helpers import InputType
+from . import LcnEntity
+from .const import CONF_DOMAIN_DATA, CONF_MOTOR, CONF_REVERSE_TIME
+from .helpers import DeviceConnectionType, InputType, get_device_connection
 
 PARALLEL_UPDATES = 0
 
 
-def add_lcn_entities(
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-    entity_configs: Iterable[ConfigType],
-) -> None:
-    """Add entities for this domain."""
-    entities: list[LcnOutputsCover | LcnRelayCover] = []
-    for entity_config in entity_configs:
-        if entity_config[CONF_DOMAIN_DATA][CONF_MOTOR] in "OUTPUTS":
-            entities.append(LcnOutputsCover(entity_config, config_entry))
-        else:  # in RELAYS
-            entities.append(LcnRelayCover(entity_config, config_entry))
+def create_lcn_cover_entity(
+    hass: HomeAssistant, entity_config: ConfigType, config_entry: ConfigEntry
+) -> LcnEntity:
+    """Set up an entity for this domain."""
+    device_connection = get_device_connection(
+        hass, entity_config[CONF_ADDRESS], config_entry
+    )
 
-    async_add_entities(entities)
+    if entity_config[CONF_DOMAIN_DATA][CONF_MOTOR] in "OUTPUTS":
+        return LcnOutputsCover(entity_config, config_entry.entry_id, device_connection)
+    # in RELAYS
+    return LcnRelayCover(entity_config, config_entry.entry_id, device_connection)
 
 
 async def async_setup_entry(
@@ -48,22 +40,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up LCN cover entities from a config entry."""
-    add_entities = partial(
-        add_lcn_entities,
-        config_entry,
-        async_add_entities,
-    )
 
-    hass.data[DOMAIN][config_entry.entry_id][ADD_ENTITIES_CALLBACKS].update(
-        {DOMAIN_COVER: add_entities}
-    )
-
-    add_entities(
-        (
-            entity_config
-            for entity_config in config_entry.data[CONF_ENTITIES]
-            if entity_config[CONF_DOMAIN] == DOMAIN_COVER
-        ),
+    async_add_entities(
+        create_lcn_cover_entity(hass, entity_config, config_entry)
+        for entity_config in config_entry.data[CONF_ENTITIES]
+        if entity_config[CONF_DOMAIN] == DOMAIN_COVER
     )
 
 
@@ -75,9 +56,11 @@ class LcnOutputsCover(LcnEntity, CoverEntity):
     _attr_is_opening = False
     _attr_assumed_state = True
 
-    def __init__(self, config: ConfigType, config_entry: ConfigEntry) -> None:
+    def __init__(
+        self, config: ConfigType, entry_id: str, device_connection: DeviceConnectionType
+    ) -> None:
         """Initialize the LCN cover."""
-        super().__init__(config, config_entry)
+        super().__init__(config, entry_id, device_connection)
 
         self.output_ids = [
             pypck.lcn_defs.OutputPort["OUTPUTUP"].value,
@@ -177,9 +160,11 @@ class LcnRelayCover(LcnEntity, CoverEntity):
     _attr_is_opening = False
     _attr_assumed_state = True
 
-    def __init__(self, config: ConfigType, config_entry: ConfigEntry) -> None:
+    def __init__(
+        self, config: ConfigType, entry_id: str, device_connection: DeviceConnectionType
+    ) -> None:
         """Initialize the LCN cover."""
-        super().__init__(config, config_entry)
+        super().__init__(config, entry_id, device_connection)
 
         self.motor = pypck.lcn_defs.MotorPort[config[CONF_DOMAIN_DATA][CONF_MOTOR]]
         self.motor_port_onoff = self.motor.value * 2

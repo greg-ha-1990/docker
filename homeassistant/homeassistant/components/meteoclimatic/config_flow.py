@@ -1,13 +1,12 @@
 """Config flow to configure the Meteoclimatic integration."""
 
 import logging
-from typing import Any
 
 from meteoclimatic import MeteoclimaticClient
 from meteoclimatic.exceptions import MeteoclimaticError, StationNotFound
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 
 from .const import CONF_STATION_CODE, DOMAIN
 
@@ -36,11 +35,9 @@ class MeteoclimaticFlowHandler(ConfigFlow, domain=DOMAIN):
             errors=errors or {},
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user."""
-        errors: dict[str, str] = {}
+        errors = {}
 
         if user_input is None:
             return self._show_setup_form(user_input, errors)

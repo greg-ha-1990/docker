@@ -18,8 +18,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
-from .entity import VeluxEntity
+from . import DOMAIN, VeluxEntity
 
 PARALLEL_UPDATES = 1
 
@@ -30,7 +29,7 @@ async def async_setup_entry(
     """Set up cover(s) for Velux platform."""
     module = hass.data[DOMAIN][config.entry_id]
     async_add_entities(
-        VeluxCover(node, config.entry_id)
+        VeluxCover(node)
         for node in module.pyvlx.nodes
         if isinstance(node, OpeningDevice)
     )
@@ -42,9 +41,9 @@ class VeluxCover(VeluxEntity, CoverEntity):
     _is_blind = False
     node: OpeningDevice
 
-    def __init__(self, node: OpeningDevice, config_entry_id: str) -> None:
+    def __init__(self, node: OpeningDevice) -> None:
         """Initialize VeluxCover."""
-        super().__init__(node, config_entry_id)
+        super().__init__(node)
         self._attr_device_class = CoverDeviceClass.WINDOW
         if isinstance(node, Awning):
             self._attr_device_class = CoverDeviceClass.AWNING
@@ -94,16 +93,6 @@ class VeluxCover(VeluxEntity, CoverEntity):
     def is_closed(self) -> bool:
         """Return if the cover is closed."""
         return self.node.position.closed
-
-    @property
-    def is_opening(self) -> bool:
-        """Return if the cover is opening or not."""
-        return self.node.is_opening
-
-    @property
-    def is_closing(self) -> bool:
-        """Return if the cover is closing or not."""
-        return self.node.is_closing
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""

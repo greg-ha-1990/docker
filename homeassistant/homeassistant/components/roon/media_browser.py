@@ -2,7 +2,8 @@
 
 import logging
 
-from homeassistant.components.media_player import BrowseError, BrowseMedia, MediaClass
+from homeassistant.components.media_player import BrowseMedia, MediaClass
+from homeassistant.components.media_player.errors import BrowseError
 
 
 class UnknownMediaType(BrowseError):

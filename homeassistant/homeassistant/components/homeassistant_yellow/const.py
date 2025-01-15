@@ -12,6 +12,3 @@ ZHA_HW_DISCOVERY_DATA = {
     },
     "radio_type": "efr32",
 }
-
-FIRMWARE = "firmware"
-ZHA_DOMAIN = "zha"

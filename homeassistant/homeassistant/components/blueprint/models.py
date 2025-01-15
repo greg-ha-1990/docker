@@ -21,7 +21,7 @@ from homeassistant.const import (
     CONF_PATH,
     __version__,
 )
-from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant, callback
+from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import yaml
 
@@ -44,7 +44,7 @@ from .errors import (
     InvalidBlueprintInputs,
     MissingInput,
 )
-from .schemas import BLUEPRINT_INSTANCE_FIELDS
+from .schemas import BLUEPRINT_INSTANCE_FIELDS, BLUEPRINT_SCHEMA
 
 
 class Blueprint:
@@ -56,11 +56,10 @@ class Blueprint:
         *,
         path: str | None = None,
         expected_domain: str | None = None,
-        schema: Callable[[Any], Any],
     ) -> None:
         """Initialize a blueprint."""
         try:
-            data = self.data = schema(data)
+            data = self.data = BLUEPRINT_SCHEMA(data)
         except vol.Invalid as err:
             raise InvalidBlueprint(expected_domain, path, data, err) from err
 
@@ -100,7 +99,8 @@ class Blueprint:
         inputs = {}
         for key, value in self.data[CONF_BLUEPRINT][CONF_INPUT].items():
             if value and CONF_INPUT in value:
-                inputs.update(dict(value[CONF_INPUT]))
+                for key, value in value[CONF_INPUT].items():
+                    inputs[key] = value
             else:
                 inputs[key] = value
         return inputs
@@ -198,7 +198,6 @@ class DomainBlueprints:
         logger: logging.Logger,
         blueprint_in_use: Callable[[HomeAssistant, str], bool],
         reload_blueprint_consumers: Callable[[HomeAssistant, str], Awaitable[None]],
-        blueprint_schema: Callable[[Any], Any],
     ) -> None:
         """Initialize a domain blueprints instance."""
         self.hass = hass
@@ -208,7 +207,6 @@ class DomainBlueprints:
         self._reload_blueprint_consumers = reload_blueprint_consumers
         self._blueprints: dict[str, Blueprint | None] = {}
         self._load_lock = asyncio.Lock()
-        self._blueprint_schema = blueprint_schema
 
         hass.data.setdefault(DOMAIN, {})[domain] = self
 
@@ -236,10 +234,7 @@ class DomainBlueprints:
             raise FailedToLoad(self.domain, blueprint_path, err) from err
 
         return Blueprint(
-            blueprint_data,
-            expected_domain=self.domain,
-            path=blueprint_path,
-            schema=self._blueprint_schema,
+            blueprint_data, expected_domain=self.domain, path=blueprint_path
         )
 
     def _load_blueprints(self) -> dict[str, Blueprint | BlueprintException | None]:
@@ -378,7 +373,7 @@ class DomainBlueprints:
 
             shutil.copytree(
                 integration.file_path / BLUEPRINT_FOLDER,
-                self.blueprint_folder / HOMEASSISTANT_DOMAIN,
+                self.blueprint_folder / HA_DOMAIN,
             )
 
         await self.hass.async_add_executor_job(populate)

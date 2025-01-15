@@ -8,11 +8,7 @@ import logging
 import requests
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
@@ -40,7 +36,7 @@ OHM_MAX = "Max"
 OHM_CHILDREN = "Children"
 OHM_NAME = "Text"
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {vol.Required(CONF_HOST): cv.string, vol.Optional(CONF_PORT, default=8085): cv.port}
 )
 
@@ -60,8 +56,6 @@ def setup_platform(
 
 class OpenHardwareMonitorDevice(SensorEntity):
     """Device used to display information from OpenHardwareMonitor."""
-
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, data, name, path, unit_of_measurement):
         """Initialize an OpenHardwareMonitor sensor."""

@@ -14,8 +14,6 @@ class OAuth2FlowHandler(
 
     DOMAIN = DOMAIN
 
-    MINOR_VERSION = 2
-
     @property
     def logger(self) -> logging.Logger:
         """Return logger."""

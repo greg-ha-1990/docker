@@ -17,13 +17,17 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import GardenaBluetoothConfigEntry
-from .coordinator import GardenaBluetoothCoordinator
-from .entity import GardenaBluetoothDescriptorEntity, GardenaBluetoothEntity
+from .const import DOMAIN
+from .coordinator import (
+    Coordinator,
+    GardenaBluetoothDescriptorEntity,
+    GardenaBluetoothEntity,
+)
 
 
 @dataclass(frozen=True)
@@ -104,12 +108,10 @@ DESCRIPTIONS = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: GardenaBluetoothConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up entity based on a config entry."""
-    coordinator = entry.runtime_data
+    coordinator: Coordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[NumberEntity] = [
         GardenaBluetoothNumber(coordinator, description, description.context)
         for description in DESCRIPTIONS
@@ -157,7 +159,7 @@ class GardenaBluetoothRemainingOpenSetNumber(GardenaBluetoothEntity, NumberEntit
 
     def __init__(
         self,
-        coordinator: GardenaBluetoothCoordinator,
+        coordinator: Coordinator,
     ) -> None:
         """Initialize the remaining time entity."""
         super().__init__(coordinator, {Valve.remaining_open_time.uuid})

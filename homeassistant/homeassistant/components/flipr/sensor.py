@@ -8,11 +8,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import FliprConfigEntry
+from .const import DOMAIN
 from .entity import FliprEntity
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
@@ -56,17 +57,14 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: FliprConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Defer sensor setup to the shared sensor module."""
-    coordinators = config_entry.runtime_data.flipr_coordinators
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities(
-        FliprSensor(coordinator, description)
-        for description in SENSOR_TYPES
-        for coordinator in coordinators
-    )
+    sensors = [FliprSensor(coordinator, description) for description in SENSOR_TYPES]
+    async_add_entities(sensors)
 
 
 class FliprSensor(FliprEntity, SensorEntity):

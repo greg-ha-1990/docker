@@ -81,7 +81,7 @@ class PassiveBluetoothDataUpdateCoordinator(
         self._listeners[remove_listener] = (update_callback, context)
         return remove_listener
 
-    def async_contexts(self) -> Generator[Any]:
+    def async_contexts(self) -> Generator[Any, None, None]:
         """Return all registered contexts."""
         yield from (
             context for _, context in self._listeners.values() if context is not None
@@ -98,7 +98,7 @@ class PassiveBluetoothDataUpdateCoordinator(
         self.async_update_listeners()
 
 
-class PassiveBluetoothCoordinatorEntity(  # pylint: disable=hass-enforce-class-module
+class PassiveBluetoothCoordinatorEntity(
     BaseCoordinatorEntity[_PassiveBluetoothDataUpdateCoordinatorT]
 ):
     """A class for entities using DataUpdateCoordinator."""

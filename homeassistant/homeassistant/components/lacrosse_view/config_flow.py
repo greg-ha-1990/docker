@@ -9,7 +9,7 @@ from typing import Any
 from lacrosse_view import LaCrosse, Location, LoginError
 import voluptuous as vol
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -54,6 +54,7 @@ class LaCrosseViewConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self.data: dict[str, str] = {}
         self.locations: list[Location] = []
+        self._reauth_entry: ConfigEntry | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -82,10 +83,12 @@ class LaCrosseViewConfigFlow(ConfigFlow, domain=DOMAIN):
             self.locations = info
 
             # Check if we are reauthenticating
-            if self.source == SOURCE_REAUTH:
-                return self.async_update_reload_and_abort(
-                    self._get_reauth_entry(), data_updates=self.data
+            if self._reauth_entry is not None:
+                self.hass.config_entries.async_update_entry(
+                    self._reauth_entry, data=self._reauth_entry.data | self.data
                 )
+                await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
+                return self.async_abort(reason="reauth_successful")
 
             _LOGGER.debug("Moving on to location step")
             return await self.async_step_location()
@@ -136,6 +139,9 @@ class LaCrosseViewConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Reauth in case of a password change or other error."""
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         return await self.async_step_user()
 
 

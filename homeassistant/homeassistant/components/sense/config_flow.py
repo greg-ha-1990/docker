@@ -1,7 +1,6 @@
 """Config flow for Sense integration."""
 
 from collections.abc import Mapping
-from functools import partial
 import logging
 from typing import Any
 
@@ -34,13 +33,13 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _gateway: ASyncSenseable
-
-    def __init__(self) -> None:
+    def __init__(self):
         """Init Config ."""
-        self._auth_data: dict[str, Any] = {}
+        self._gateway = None
+        self._auth_data = {}
+        super().__init__()
 
-    async def validate_input(self, data: Mapping[str, Any]) -> None:
+    async def validate_input(self, data):
         """Validate the user input allows us to connect.
 
         Data has the keys from DATA_SCHEMA with values provided by the user.
@@ -49,22 +48,15 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
         timeout = self._auth_data[CONF_TIMEOUT]
         client_session = async_get_clientsession(self.hass)
 
-        # Creating the AsyncSenseable object loads
-        # ssl certificates which does blocking IO
-        self._gateway = await self.hass.async_add_executor_job(
-            partial(
-                ASyncSenseable,
-                api_timeout=timeout,
-                wss_timeout=timeout,
-                client_session=client_session,
-            )
+        self._gateway = ASyncSenseable(
+            api_timeout=timeout, wss_timeout=timeout, client_session=client_session
         )
         self._gateway.rate_limit = ACTIVE_UPDATE_RATE
         await self._gateway.authenticate(
             self._auth_data[CONF_EMAIL], self._auth_data[CONF_PASSWORD]
         )
 
-    async def create_entry_from_data(self) -> ConfigFlowResult:
+    async def create_entry_from_data(self):
         """Create the entry from the config data."""
         self._auth_data["access_token"] = self._gateway.sense_access_token
         self._auth_data["user_id"] = self._gateway.sense_user_id
@@ -79,9 +71,7 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_update_reload_and_abort(existing_entry, data=self._auth_data)
 
-    async def validate_input_and_create_entry(
-        self, user_input: Mapping[str, Any], errors: dict[str, str]
-    ) -> ConfigFlowResult | None:
+    async def validate_input_and_create_entry(self, user_input, errors):
         """Validate the input and create the entry from the data."""
         try:
             await self.validate_input(user_input)
@@ -98,9 +88,7 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.create_entry_from_data()
         return None
 
-    async def async_step_validation(
-        self, user_input: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_validation(self, user_input=None):
         """Handle validation (2fa) step."""
         errors = {}
         if user_input:
@@ -122,11 +110,9 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
-        errors: dict[str, str] = {}
+        errors = {}
         if user_input is not None:
             if result := await self.validate_input_and_create_entry(user_input, errors):
                 return result
@@ -142,11 +128,9 @@ class SenseConfigFlow(ConfigFlow, domain=DOMAIN):
         self._auth_data = dict(entry_data)
         return await self.async_step_reauth_validate(entry_data)
 
-    async def async_step_reauth_validate(
-        self, user_input: Mapping[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_reauth_validate(self, user_input=None):
         """Handle reauth and validation."""
-        errors: dict[str, str] = {}
+        errors = {}
         if user_input is not None:
             if result := await self.validate_input_and_create_entry(user_input, errors):
                 return result

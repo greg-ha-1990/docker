@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
 
 import voluptuous as vol
 
@@ -29,7 +28,7 @@ from .const import (
     DOMAIN,
     LUTRON_CASETA_BUTTON_EVENT,
 )
-from .models import LutronCasetaConfigEntry
+from .models import LutronCasetaData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -435,14 +434,11 @@ async def async_attach_trigger(
 
 def get_lutron_data_by_dr_id(hass: HomeAssistant, device_id: str):
     """Get a lutron integration data for the given device registry device id."""
-    entries = cast(
-        list[LutronCasetaConfigEntry],
-        hass.config_entries.async_entries(
-            DOMAIN, include_ignore=False, include_disabled=False
-        ),
-    )
-    for entry in entries:
-        if hasattr(entry, "runtime_data"):
-            if entry.runtime_data.keypad_data.dr_device_id_to_keypad.get(device_id):
-                return entry.runtime_data
+    if DOMAIN not in hass.data:
+        return None
+
+    for entry_id in hass.data[DOMAIN]:
+        data: LutronCasetaData = hass.data[DOMAIN][entry_id]
+        if data.keypad_data.dr_device_id_to_keypad.get(device_id):
+            return data
     return None

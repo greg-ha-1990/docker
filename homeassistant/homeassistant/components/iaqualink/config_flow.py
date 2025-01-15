@@ -14,7 +14,6 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN
 
@@ -28,6 +27,11 @@ class AqualinkFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle a flow start."""
+        # Supporting a single account.
+        entries = self._async_current_entries()
+        if entries:
+            return self.async_abort(reason="single_instance_allowed")
+
         errors = {}
 
         if user_input is not None:
@@ -35,9 +39,7 @@ class AqualinkFlowHandler(ConfigFlow, domain=DOMAIN):
             password = user_input[CONF_PASSWORD]
 
             try:
-                async with AqualinkClient(
-                    username, password, httpx_client=get_async_client(self.hass)
-                ):
+                async with AqualinkClient(username, password):
                     pass
             except AqualinkServiceUnauthorizedException:
                 errors["base"] = "invalid_auth"

@@ -10,30 +10,38 @@ from pydeconz.models.sensor.ancillary_control import (
 )
 
 from homeassistant.components.alarm_control_panel import (
-    DOMAIN as ALARM_CONTROl_PANEL_DOMAIN,
+    DOMAIN,
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
-    AlarmControlPanelState,
     CodeFormat,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import (
+    STATE_ALARM_ARMED_AWAY,
+    STATE_ALARM_ARMED_HOME,
+    STATE_ALARM_ARMED_NIGHT,
+    STATE_ALARM_ARMING,
+    STATE_ALARM_DISARMED,
+    STATE_ALARM_PENDING,
+    STATE_ALARM_TRIGGERED,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .entity import DeconzDevice
+from .deconz_device import DeconzDevice
 from .hub import DeconzHub
 
 DECONZ_TO_ALARM_STATE = {
-    AncillaryControlPanel.ARMED_AWAY: AlarmControlPanelState.ARMED_AWAY,
-    AncillaryControlPanel.ARMED_NIGHT: AlarmControlPanelState.ARMED_NIGHT,
-    AncillaryControlPanel.ARMED_STAY: AlarmControlPanelState.ARMED_HOME,
-    AncillaryControlPanel.ARMING_AWAY: AlarmControlPanelState.ARMING,
-    AncillaryControlPanel.ARMING_NIGHT: AlarmControlPanelState.ARMING,
-    AncillaryControlPanel.ARMING_STAY: AlarmControlPanelState.ARMING,
-    AncillaryControlPanel.DISARMED: AlarmControlPanelState.DISARMED,
-    AncillaryControlPanel.ENTRY_DELAY: AlarmControlPanelState.PENDING,
-    AncillaryControlPanel.EXIT_DELAY: AlarmControlPanelState.PENDING,
-    AncillaryControlPanel.IN_ALARM: AlarmControlPanelState.TRIGGERED,
+    AncillaryControlPanel.ARMED_AWAY: STATE_ALARM_ARMED_AWAY,
+    AncillaryControlPanel.ARMED_NIGHT: STATE_ALARM_ARMED_NIGHT,
+    AncillaryControlPanel.ARMED_STAY: STATE_ALARM_ARMED_HOME,
+    AncillaryControlPanel.ARMING_AWAY: STATE_ALARM_ARMING,
+    AncillaryControlPanel.ARMING_NIGHT: STATE_ALARM_ARMING,
+    AncillaryControlPanel.ARMING_STAY: STATE_ALARM_ARMING,
+    AncillaryControlPanel.DISARMED: STATE_ALARM_DISARMED,
+    AncillaryControlPanel.ENTRY_DELAY: STATE_ALARM_PENDING,
+    AncillaryControlPanel.EXIT_DELAY: STATE_ALARM_PENDING,
+    AncillaryControlPanel.IN_ALARM: STATE_ALARM_TRIGGERED,
 }
 
 
@@ -52,7 +60,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the deCONZ alarm control panel devices."""
     hub = DeconzHub.get_hub(hass, config_entry)
-    hub.entities[ALARM_CONTROl_PANEL_DOMAIN] = set()
+    hub.entities[DOMAIN] = set()
 
     @callback
     def async_add_sensor(_: EventType, sensor_id: str) -> None:
@@ -71,7 +79,7 @@ class DeconzAlarmControlPanel(DeconzDevice[AncillaryControl], AlarmControlPanelE
     """Representation of a deCONZ alarm control panel."""
 
     _update_key = "panel"
-    TYPE = ALARM_CONTROl_PANEL_DOMAIN
+    TYPE = DOMAIN
 
     _attr_code_format = CodeFormat.NUMBER
     _attr_supported_features = (
@@ -97,7 +105,7 @@ class DeconzAlarmControlPanel(DeconzDevice[AncillaryControl], AlarmControlPanelE
             super().async_update_callback()
 
     @property
-    def alarm_state(self) -> AlarmControlPanelState | None:
+    def state(self) -> str | None:
         """Return the state of the control panel."""
         if self._device.panel in DECONZ_TO_ALARM_STATE:
             return DECONZ_TO_ALARM_STATE[self._device.panel]

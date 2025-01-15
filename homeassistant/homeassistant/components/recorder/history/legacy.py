@@ -19,14 +19,24 @@ from sqlalchemy.sql.lambdas import StatementLambdaElement
 
 from homeassistant.const import COMPRESSED_STATE_LAST_UPDATED, COMPRESSED_STATE_STATE
 from homeassistant.core import HomeAssistant, State, split_entity_id
-from homeassistant.helpers.recorder import get_instance
 import homeassistant.util.dt as dt_util
 
-from ..db_schema import StateAttributes, States
+from ... import recorder
+from ..db_schema import RecorderRuns, StateAttributes, States
 from ..filters import Filters
-from ..models import process_timestamp_to_utc_isoformat
-from ..models.legacy import LegacyLazyState, legacy_row_to_compressed_state
+from ..models import (
+    process_datetime_to_timestamp,
+    process_timestamp,
+    process_timestamp_to_utc_isoformat,
+)
+from ..models.legacy import (
+    LegacyLazyState,
+    LegacyLazyStatePreSchema31,
+    legacy_row_to_compressed_state,
+    legacy_row_to_compressed_state_pre_schema_31,
+)
 from ..util import execute_stmt_lambda_element, session_scope
+from .common import _schema_version
 from .const import (
     LAST_CHANGED_KEY,
     NEED_ATTRIBUTE_DOMAINS,
@@ -127,7 +137,7 @@ _FIELD_MAP_PRE_SCHEMA_31 = {
 
 
 def _lambda_stmt_and_join_attributes(
-    no_attributes: bool, include_last_changed: bool = True
+    schema_version: int, no_attributes: bool, include_last_changed: bool = True
 ) -> tuple[StatementLambdaElement, bool]:
     """Return the lambda_stmt and if StateAttributes should be joined.
 
@@ -138,19 +148,54 @@ def _lambda_stmt_and_join_attributes(
     # without the attributes fields and do not join the
     # state_attributes table
     if no_attributes:
+        if schema_version >= 31:
+            if include_last_changed:
+                return (
+                    lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR)),
+                    False,
+                )
+            return (
+                lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED)),
+                False,
+            )
         if include_last_changed:
             return (
-                lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR)),
+                lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR_PRE_SCHEMA_31)),
                 False,
             )
         return (
-            lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED)),
+            lambda_stmt(
+                lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED_PRE_SCHEMA_31)
+            ),
+            False,
+        )
+    # If we in the process of migrating schema we do
+    # not want to join the state_attributes table as we
+    # do not know if it will be there yet
+    if schema_version < 25:
+        if include_last_changed:
+            return (
+                lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_25)),
+                False,
+            )
+        return (
+            lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_25_NO_LAST_CHANGED)),
             False,
         )
 
+    if schema_version >= 31:
+        if include_last_changed:
+            return lambda_stmt(lambda: select(*_QUERY_STATES)), True
+        return lambda_stmt(lambda: select(*_QUERY_STATES_NO_LAST_CHANGED)), True
+    # Finally if no migration is in progress and no_attributes
+    # was not requested, we query both attributes columns and
+    # join state_attributes
     if include_last_changed:
-        return lambda_stmt(lambda: select(*_QUERY_STATES)), True
-    return lambda_stmt(lambda: select(*_QUERY_STATES_NO_LAST_CHANGED)), True
+        return lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_31)), True
+    return (
+        lambda_stmt(lambda: select(*_QUERY_STATES_NO_LAST_CHANGED_PRE_SCHEMA_31)),
+        True,
+    )
 
 
 def get_significant_states(
@@ -183,6 +228,7 @@ def get_significant_states(
 
 
 def _significant_states_stmt(
+    schema_version: int,
     start_time: datetime,
     end_time: datetime | None,
     entity_ids: list[str],
@@ -191,43 +237,71 @@ def _significant_states_stmt(
 ) -> StatementLambdaElement:
     """Query the database for significant state changes."""
     stmt, join_attributes = _lambda_stmt_and_join_attributes(
-        no_attributes, include_last_changed=not significant_changes_only
+        schema_version, no_attributes, include_last_changed=not significant_changes_only
     )
     if (
         len(entity_ids) == 1
         and significant_changes_only
         and split_entity_id(entity_ids[0])[0] not in SIGNIFICANT_DOMAINS
     ):
-        stmt += lambda q: q.filter(
-            (States.last_changed_ts == States.last_updated_ts)
-            | States.last_changed_ts.is_(None)
-        )
-    elif significant_changes_only:
-        stmt += lambda q: q.filter(
-            or_(
-                *[
-                    States.entity_id.like(entity_domain)
-                    for entity_domain in SIGNIFICANT_DOMAINS_ENTITY_ID_LIKE
-                ],
-                (
-                    (States.last_changed_ts == States.last_updated_ts)
-                    | States.last_changed_ts.is_(None)
-                ),
+        if schema_version >= 31:
+            stmt += lambda q: q.filter(
+                (States.last_changed_ts == States.last_updated_ts)
+                | States.last_changed_ts.is_(None)
             )
-        )
+        else:
+            stmt += lambda q: q.filter(
+                (States.last_changed == States.last_updated)
+                | States.last_changed.is_(None)
+            )
+    elif significant_changes_only:
+        if schema_version >= 31:
+            stmt += lambda q: q.filter(
+                or_(
+                    *[
+                        States.entity_id.like(entity_domain)
+                        for entity_domain in SIGNIFICANT_DOMAINS_ENTITY_ID_LIKE
+                    ],
+                    (
+                        (States.last_changed_ts == States.last_updated_ts)
+                        | States.last_changed_ts.is_(None)
+                    ),
+                )
+            )
+        else:
+            stmt += lambda q: q.filter(
+                or_(
+                    *[
+                        States.entity_id.like(entity_domain)
+                        for entity_domain in SIGNIFICANT_DOMAINS_ENTITY_ID_LIKE
+                    ],
+                    (
+                        (States.last_changed == States.last_updated)
+                        | States.last_changed.is_(None)
+                    ),
+                )
+            )
     stmt += lambda q: q.filter(States.entity_id.in_(entity_ids))
 
-    start_time_ts = start_time.timestamp()
-    stmt += lambda q: q.filter(States.last_updated_ts > start_time_ts)
-    if end_time:
-        end_time_ts = end_time.timestamp()
-        stmt += lambda q: q.filter(States.last_updated_ts < end_time_ts)
+    if schema_version >= 31:
+        start_time_ts = start_time.timestamp()
+        stmt += lambda q: q.filter(States.last_updated_ts > start_time_ts)
+        if end_time:
+            end_time_ts = end_time.timestamp()
+            stmt += lambda q: q.filter(States.last_updated_ts < end_time_ts)
+    else:
+        stmt += lambda q: q.filter(States.last_updated > start_time)
+        if end_time:
+            stmt += lambda q: q.filter(States.last_updated < end_time)
 
     if join_attributes:
         stmt += lambda q: q.outerjoin(
             StateAttributes, States.attributes_id == StateAttributes.attributes_id
         )
-    stmt += lambda q: q.order_by(States.entity_id, States.last_updated_ts)
+    if schema_version >= 31:
+        stmt += lambda q: q.order_by(States.entity_id, States.last_updated_ts)
+    else:
+        stmt += lambda q: q.order_by(States.entity_id, States.last_updated)
     return stmt
 
 
@@ -260,6 +334,7 @@ def get_significant_states_with_session(
     if not entity_ids:
         raise ValueError("entity_ids must be provided")
     stmt = _significant_states_stmt(
+        _schema_version(hass),
         start_time,
         end_time,
         entity_ids,
@@ -314,6 +389,7 @@ def get_full_significant_states_with_session(
 
 
 def _state_changed_during_period_stmt(
+    schema_version: int,
     start_time: datetime,
     end_time: datetime | None,
     entity_id: str,
@@ -322,28 +398,47 @@ def _state_changed_during_period_stmt(
     limit: int | None,
 ) -> StatementLambdaElement:
     stmt, join_attributes = _lambda_stmt_and_join_attributes(
-        no_attributes, include_last_changed=False
+        schema_version, no_attributes, include_last_changed=False
     )
-    start_time_ts = start_time.timestamp()
-    stmt += lambda q: q.filter(
-        (
-            (States.last_changed_ts == States.last_updated_ts)
-            | States.last_changed_ts.is_(None)
+    if schema_version >= 31:
+        start_time_ts = start_time.timestamp()
+        stmt += lambda q: q.filter(
+            (
+                (States.last_changed_ts == States.last_updated_ts)
+                | States.last_changed_ts.is_(None)
+            )
+            & (States.last_updated_ts > start_time_ts)
         )
-        & (States.last_updated_ts > start_time_ts)
-    )
+    else:
+        stmt += lambda q: q.filter(
+            (
+                (States.last_changed == States.last_updated)
+                | States.last_changed.is_(None)
+            )
+            & (States.last_updated > start_time)
+        )
     if end_time:
-        end_time_ts = end_time.timestamp()
-        stmt += lambda q: q.filter(States.last_updated_ts < end_time_ts)
+        if schema_version >= 31:
+            end_time_ts = end_time.timestamp()
+            stmt += lambda q: q.filter(States.last_updated_ts < end_time_ts)
+        else:
+            stmt += lambda q: q.filter(States.last_updated < end_time)
     stmt += lambda q: q.filter(States.entity_id == entity_id)
     if join_attributes:
         stmt += lambda q: q.outerjoin(
             StateAttributes, States.attributes_id == StateAttributes.attributes_id
         )
     if descending:
-        stmt += lambda q: q.order_by(States.entity_id, States.last_updated_ts.desc())
-    else:
+        if schema_version >= 31:
+            stmt += lambda q: q.order_by(
+                States.entity_id, States.last_updated_ts.desc()
+            )
+        else:
+            stmt += lambda q: q.order_by(States.entity_id, States.last_updated.desc())
+    elif schema_version >= 31:
         stmt += lambda q: q.order_by(States.entity_id, States.last_updated_ts)
+    else:
+        stmt += lambda q: q.order_by(States.entity_id, States.last_updated)
 
     if limit:
         stmt += lambda q: q.limit(limit)
@@ -366,6 +461,7 @@ def state_changes_during_period(
     entity_ids = [entity_id.lower()]
     with session_scope(hass=hass, read_only=True) as session:
         stmt = _state_changed_during_period_stmt(
+            _schema_version(hass),
             start_time,
             end_time,
             entity_id,
@@ -388,21 +484,33 @@ def state_changes_during_period(
 
 
 def _get_last_state_changes_stmt(
-    number_of_states: int, entity_id: str
+    schema_version: int, number_of_states: int, entity_id: str
 ) -> StatementLambdaElement:
     stmt, join_attributes = _lambda_stmt_and_join_attributes(
-        False, include_last_changed=False
+        schema_version, False, include_last_changed=False
     )
-    stmt += lambda q: q.where(
-        States.state_id
-        == (
-            select(States.state_id)
-            .filter(States.entity_id == entity_id)
-            .order_by(States.last_updated_ts.desc())
-            .limit(number_of_states)
-            .subquery()
-        ).c.state_id
-    )
+    if schema_version >= 31:
+        stmt += lambda q: q.where(
+            States.state_id
+            == (
+                select(States.state_id)
+                .filter(States.entity_id == entity_id)
+                .order_by(States.last_updated_ts.desc())
+                .limit(number_of_states)
+                .subquery()
+            ).c.state_id
+        )
+    else:
+        stmt += lambda q: q.where(
+            States.state_id
+            == (
+                select(States.state_id)
+                .filter(States.entity_id == entity_id)
+                .order_by(States.last_updated.desc())
+                .limit(number_of_states)
+                .subquery()
+            ).c.state_id
+        )
     if join_attributes:
         stmt += lambda q: q.outerjoin(
             StateAttributes, States.attributes_id == StateAttributes.attributes_id
@@ -420,7 +528,9 @@ def get_last_state_changes(
     entity_ids = [entity_id_lower]
 
     with session_scope(hass=hass, read_only=True) as session:
-        stmt = _get_last_state_changes_stmt(number_of_states, entity_id_lower)
+        stmt = _get_last_state_changes_stmt(
+            _schema_version(hass), number_of_states, entity_id_lower
+        )
         states = list(execute_stmt_lambda_element(session, stmt))
         return cast(
             dict[str, list[State]],
@@ -436,40 +546,66 @@ def get_last_state_changes(
 
 
 def _get_states_for_entities_stmt(
-    run_start_ts: float,
+    schema_version: int,
+    run_start: datetime,
     utc_point_in_time: datetime,
     entity_ids: list[str],
     no_attributes: bool,
 ) -> StatementLambdaElement:
     """Baked query to get states for specific entities."""
     stmt, join_attributes = _lambda_stmt_and_join_attributes(
-        no_attributes, include_last_changed=True
+        schema_version, no_attributes, include_last_changed=True
     )
     # We got an include-list of entities, accelerate the query by filtering already
     # in the inner query.
-    utc_point_in_time_ts = utc_point_in_time.timestamp()
-    stmt += lambda q: q.join(
-        (
-            most_recent_states_for_entities_by_date := (
-                select(
+    if schema_version >= 31:
+        run_start_ts = process_timestamp(run_start).timestamp()
+        utc_point_in_time_ts = dt_util.utc_to_timestamp(utc_point_in_time)
+        stmt += lambda q: q.join(
+            (
+                most_recent_states_for_entities_by_date := (
+                    select(
+                        States.entity_id.label("max_entity_id"),
+                        func.max(States.last_updated_ts).label("max_last_updated"),
+                    )
+                    .filter(
+                        (States.last_updated_ts >= run_start_ts)
+                        & (States.last_updated_ts < utc_point_in_time_ts)
+                    )
+                    .filter(States.entity_id.in_(entity_ids))
+                    .group_by(States.entity_id)
+                    .subquery()
+                )
+            ),
+            and_(
+                States.entity_id
+                == most_recent_states_for_entities_by_date.c.max_entity_id,
+                States.last_updated_ts
+                == most_recent_states_for_entities_by_date.c.max_last_updated,
+            ),
+        )
+    else:
+        stmt += lambda q: q.join(
+            (
+                most_recent_states_for_entities_by_date := select(
                     States.entity_id.label("max_entity_id"),
-                    func.max(States.last_updated_ts).label("max_last_updated"),
+                    func.max(States.last_updated).label("max_last_updated"),
                 )
                 .filter(
-                    (States.last_updated_ts >= run_start_ts)
-                    & (States.last_updated_ts < utc_point_in_time_ts)
+                    (States.last_updated >= run_start)
+                    & (States.last_updated < utc_point_in_time)
                 )
                 .filter(States.entity_id.in_(entity_ids))
                 .group_by(States.entity_id)
                 .subquery()
-            )
-        ),
-        and_(
-            States.entity_id == most_recent_states_for_entities_by_date.c.max_entity_id,
-            States.last_updated_ts
-            == most_recent_states_for_entities_by_date.c.max_last_updated,
-        ),
-    )
+            ),
+            and_(
+                States.entity_id
+                == most_recent_states_for_entities_by_date.c.max_entity_id,
+                States.last_updated
+                == most_recent_states_for_entities_by_date.c.max_last_updated,
+            ),
+        )
     if join_attributes:
         stmt += lambda q: q.outerjoin(
             StateAttributes, (States.attributes_id == StateAttributes.attributes_id)
@@ -482,33 +618,36 @@ def _get_rows_with_session(
     session: Session,
     utc_point_in_time: datetime,
     entity_ids: list[str],
-    *,
+    run: RecorderRuns | None = None,
     no_attributes: bool = False,
 ) -> Iterable[Row]:
     """Return the states at a specific point in time."""
+    schema_version = _schema_version(hass)
     if len(entity_ids) == 1:
         return execute_stmt_lambda_element(
             session,
             _get_single_entity_states_stmt(
-                utc_point_in_time, entity_ids[0], no_attributes
+                schema_version, utc_point_in_time, entity_ids[0], no_attributes
             ),
         )
 
-    oldest_ts = get_instance(hass).states_manager.oldest_ts
+    if run is None:
+        run = recorder.get_instance(hass).recorder_runs_manager.get(utc_point_in_time)
 
-    if oldest_ts is None or oldest_ts > utc_point_in_time.timestamp():
-        # We don't have any states for the requested time
+    if run is None or process_timestamp(run.start) > utc_point_in_time:
+        # History did not run before utc_point_in_time
         return []
 
     # We have more than one entity to look at so we need to do a query on states
     # since the last recorder run started.
     stmt = _get_states_for_entities_stmt(
-        oldest_ts, utc_point_in_time, entity_ids, no_attributes
+        schema_version, run.start, utc_point_in_time, entity_ids, no_attributes
     )
     return execute_stmt_lambda_element(session, stmt)
 
 
 def _get_single_entity_states_stmt(
+    schema_version: int,
     utc_point_in_time: datetime,
     entity_id: str,
     no_attributes: bool = False,
@@ -516,17 +655,27 @@ def _get_single_entity_states_stmt(
     # Use an entirely different (and extremely fast) query if we only
     # have a single entity id
     stmt, join_attributes = _lambda_stmt_and_join_attributes(
-        no_attributes, include_last_changed=True
+        schema_version, no_attributes, include_last_changed=True
     )
-    utc_point_in_time_ts = utc_point_in_time.timestamp()
-    stmt += (
-        lambda q: q.filter(
-            States.last_updated_ts < utc_point_in_time_ts,
-            States.entity_id == entity_id,
+    if schema_version >= 31:
+        utc_point_in_time_ts = dt_util.utc_to_timestamp(utc_point_in_time)
+        stmt += (
+            lambda q: q.filter(
+                States.last_updated_ts < utc_point_in_time_ts,
+                States.entity_id == entity_id,
+            )
+            .order_by(States.last_updated_ts.desc())
+            .limit(1)
         )
-        .order_by(States.last_updated_ts.desc())
-        .limit(1)
-    )
+    else:
+        stmt += (
+            lambda q: q.filter(
+                States.last_updated < utc_point_in_time,
+                States.entity_id == entity_id,
+            )
+            .order_by(States.last_updated.desc())
+            .limit(1)
+        )
     if join_attributes:
         stmt += lambda q: q.outerjoin(
             StateAttributes, States.attributes_id == StateAttributes.attributes_id
@@ -556,15 +705,26 @@ def _sorted_states_to_dict(
     each list of states, otherwise our graphs won't start on the Y
     axis correctly.
     """
+    schema_version = _schema_version(hass)
+    _process_timestamp: Callable[[datetime], float | str]
+    field_map = _FIELD_MAP if schema_version >= 31 else _FIELD_MAP_PRE_SCHEMA_31
     state_class: Callable[
         [Row, dict[str, dict[str, Any]], datetime | None], State | dict[str, Any]
     ]
     if compressed_state_format:
-        state_class = legacy_row_to_compressed_state
+        if schema_version >= 31:
+            state_class = legacy_row_to_compressed_state
+        else:
+            state_class = legacy_row_to_compressed_state_pre_schema_31
+        _process_timestamp = process_datetime_to_timestamp
         attr_time = COMPRESSED_STATE_LAST_UPDATED
         attr_state = COMPRESSED_STATE_STATE
     else:
-        state_class = LegacyLazyState
+        if schema_version >= 31:
+            state_class = LegacyLazyState
+        else:
+            state_class = LegacyLazyStatePreSchema31
+        _process_timestamp = process_timestamp_to_utc_isoformat
         attr_time = LAST_CHANGED_KEY
         attr_state = STATE_KEY
 
@@ -621,7 +781,7 @@ def _sorted_states_to_dict(
             prev_state = first_state.state
             ent_results.append(state_class(first_state, attr_cache, None))
 
-        state_idx = _FIELD_MAP["state"]
+        state_idx = field_map["state"]
 
         #
         # minimal_response only makes sense with last_updated == last_updated
@@ -630,7 +790,20 @@ def _sorted_states_to_dict(
         #
         # With minimal response we do not care about attribute
         # changes so we can filter out duplicate states
-        last_updated_ts_idx = _FIELD_MAP["last_updated_ts"]
+        if schema_version < 31:
+            last_updated_idx = field_map["last_updated"]
+            for row in group:
+                if (state := row[state_idx]) != prev_state:
+                    ent_results.append(
+                        {
+                            attr_state: state,
+                            attr_time: _process_timestamp(row[last_updated_idx]),
+                        }
+                    )
+                    prev_state = state
+            continue
+
+        last_updated_ts_idx = field_map["last_updated_ts"]
         if compressed_state_format:
             for row in group:
                 if (state := row[state_idx]) != prev_state:

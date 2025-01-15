@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 
-from pyopenweathermap import create_owm_client
+from pyopenweathermap import OWMClient
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -33,7 +33,6 @@ class OpenweathermapData:
     """Runtime data definition."""
 
     name: str
-    mode: str
     coordinator: WeatherUpdateCoordinator
 
 
@@ -53,7 +52,7 @@ async def async_setup_entry(
     else:
         async_delete_issue(hass, entry.entry_id)
 
-    owm_client = create_owm_client(api_key, mode, lang=language)
+    owm_client = OWMClient(api_key, mode, lang=language)
     weather_coordinator = WeatherUpdateCoordinator(
         owm_client, latitude, longitude, hass
     )
@@ -62,7 +61,7 @@ async def async_setup_entry(
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
-    entry.runtime_data = OpenweathermapData(name, mode, weather_coordinator)
+    entry.runtime_data = OpenweathermapData(name, weather_coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -88,7 +87,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             version=CONFIG_FLOW_VERSION,
         )
 
-    _LOGGER.debug("Migration to version %s successful", CONFIG_FLOW_VERSION)
+    _LOGGER.info("Migration to version %s successful", CONFIG_FLOW_VERSION)
 
     return True
 

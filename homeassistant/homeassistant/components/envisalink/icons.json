@@ -1,10 +1,6 @@
 {
   "services": {
-    "alarm_keypress": {
-      "service": "mdi:alarm-panel"
-    },
-    "invoke_custom_function": {
-      "service": "mdi:console"
-    }
+    "alarm_keypress": "mdi:alarm-panel",
+    "invoke_custom_function": "mdi:console"
   }
 }

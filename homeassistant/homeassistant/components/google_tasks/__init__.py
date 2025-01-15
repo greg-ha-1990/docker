@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from aiohttp import ClientError, ClientResponseError
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
@@ -13,18 +12,11 @@ from homeassistant.helpers import config_entry_oauth2_flow
 
 from . import api
 from .const import DOMAIN
-from .coordinator import TaskUpdateCoordinator
-from .exceptions import GoogleTasksApiError
-from .types import GoogleTasksConfigEntry
-
-__all__ = [
-    "DOMAIN",
-]
 
 PLATFORMS: list[Platform] = [Platform.TODO]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: GoogleTasksConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Google Tasks from a config entry."""
     implementation = (
         await config_entry_oauth2_flow.async_get_config_entry_implementation(
@@ -44,36 +36,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: GoogleTasksConfigEntry) 
     except ClientError as err:
         raise ConfigEntryNotReady from err
 
-    try:
-        task_lists = await auth.list_task_lists()
-    except GoogleTasksApiError as err:
-        raise ConfigEntryNotReady from err
-
-    coordinators = [
-        TaskUpdateCoordinator(
-            hass,
-            auth,
-            task_list["id"],
-            task_list["title"],
-        )
-        for task_list in task_lists
-    ]
-    # Refresh all coordinators in parallel
-    await asyncio.gather(
-        *(
-            coordinator.async_config_entry_first_refresh()
-            for coordinator in coordinators
-        )
-    )
-    entry.runtime_data = coordinators
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = auth
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: GoogleTasksConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

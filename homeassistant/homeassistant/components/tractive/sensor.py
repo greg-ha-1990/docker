@@ -16,7 +16,6 @@ from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
     PERCENTAGE,
     EntityCategory,
-    UnitOfEnergy,
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -128,7 +127,7 @@ SENSOR_TYPES: tuple[TractiveSensorEntityDescription, ...] = (
     TractiveSensorEntityDescription(
         key=ATTR_CALORIES,
         translation_key="calories",
-        native_unit_of_measurement=UnitOfEnergy.KILO_CALORIE,
+        native_unit_of_measurement="kcal",
         signal_prefix=TRACKER_WELLNESS_STATUS_UPDATED,
         state_class=SensorStateClass.TOTAL,
     ),

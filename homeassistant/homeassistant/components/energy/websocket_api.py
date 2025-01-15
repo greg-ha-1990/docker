@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 import functools
 from itertools import chain
@@ -39,7 +39,7 @@ type EnergyWebSocketCommandHandler = Callable[
 ]
 type AsyncEnergyWebSocketCommandHandler = Callable[
     [HomeAssistant, websocket_api.ActiveConnection, dict[str, Any], EnergyManager],
-    Coroutine[Any, Any, None],
+    Awaitable[None],
 ]
 
 
@@ -81,10 +81,11 @@ async def async_get_energy_platforms(
 
 
 def _ws_with_manager(
-    func: AsyncEnergyWebSocketCommandHandler | EnergyWebSocketCommandHandler,
-) -> websocket_api.AsyncWebSocketCommandHandler:
+    func: Any,
+) -> websocket_api.WebSocketCommandHandler:
     """Decorate a function to pass in a manager."""
 
+    @websocket_api.async_response
     @functools.wraps(func)
     async def with_manager(
         hass: HomeAssistant,
@@ -106,13 +107,12 @@ def _ws_with_manager(
         vol.Required("type"): "energy/get_prefs",
     }
 )
-@websocket_api.async_response
 @_ws_with_manager
 @callback
 def ws_get_prefs(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
+    msg: dict,
     manager: EnergyManager,
 ) -> None:
     """Handle get prefs command."""
@@ -131,12 +131,11 @@ def ws_get_prefs(
         vol.Optional("device_consumption"): [DEVICE_CONSUMPTION_SCHEMA],
     }
 )
-@websocket_api.async_response
 @_ws_with_manager
 async def ws_save_prefs(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
+    msg: dict,
     manager: EnergyManager,
 ) -> None:
     """Handle get prefs command."""
@@ -188,7 +187,6 @@ async def ws_validate(
         vol.Required("type"): "energy/solar_forecast",
     }
 )
-@websocket_api.async_response
 @_ws_with_manager
 async def ws_solar_forecast(
     hass: HomeAssistant,

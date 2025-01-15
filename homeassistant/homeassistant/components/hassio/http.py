@@ -18,7 +18,6 @@ from aiohttp.hdrs import (
     CONTENT_ENCODING,
     CONTENT_LENGTH,
     CONTENT_TYPE,
-    RANGE,
     TRANSFER_ENCODING,
 )
 from aiohttp.web_exceptions import HTTPBadGateway
@@ -42,15 +41,6 @@ NO_TIMEOUT = re.compile(
     r"|backups/.+/full"
     r"|backups/.+/partial"
     r"|backups/[^/]+/(?:upload|download)"
-    r"|audio/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|cli/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|core/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|dns/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|host/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|multicast/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|observer/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|supervisor/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|addons/[^/]+/logs/(follow|boots/-?\d+(/follow)?)"
     r")$"
 )
 
@@ -68,16 +58,15 @@ PATHS_ADMIN = re.compile(
     r"^(?:"
     r"|backups/[a-f0-9]{8}(/info|/download|/restore/full|/restore/partial)?"
     r"|backups/new/upload"
-    r"|audio/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|cli/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|core/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|dns/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|host/logs(/follow|/boots(/-?\d+(/follow)?)?)?"
-    r"|multicast/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|observer/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|supervisor/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|addons/[^/]+/(changelog|documentation)"
-    r"|addons/[^/]+/logs(/follow|/boots/-?\d+(/follow)?)?"
+    r"|audio/logs"
+    r"|cli/logs"
+    r"|core/logs"
+    r"|dns/logs"
+    r"|host/logs"
+    r"|multicast/logs"
+    r"|observer/logs"
+    r"|supervisor/logs"
+    r"|addons/[^/]+/(changelog|documentation|logs)"
     r")$"
 )
 
@@ -94,37 +83,7 @@ NO_STORE = re.compile(
     r"|app/entrypoint.js"
     r")$"
 )
-
-# Follow logs should not be compressed, to be able to get streamed by frontend
-NO_COMPRESS = re.compile(
-    r"^(?:"
-    r"|audio/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|cli/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|core/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|dns/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|host/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|multicast/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|observer/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|supervisor/logs/(follow|boots/-?\d+(/follow)?)"
-    r"|addons/[^/]+/logs/(follow|boots/-?\d+(/follow)?)"
-    r")$"
-)
-
-PATHS_LOGS = re.compile(
-    r"^(?:"
-    r"|audio/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|cli/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|core/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|dns/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|host/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|multicast/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|observer/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|supervisor/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r"|addons/[^/]+/logs(/follow|/boots/-?\d+(/follow)?)?"
-    r")$"
-)
 # fmt: on
-
 
 RESPONSE_HEADERS_FILTER = {
     TRANSFER_ENCODING,
@@ -202,10 +161,6 @@ class HassIOView(HomeAssistantView):
                         assert isinstance(request._stored_content_type, str)  # noqa: SLF001
                     headers[CONTENT_TYPE] = request._stored_content_type  # noqa: SLF001
 
-            # forward range headers for logs
-            if PATHS_LOGS.match(path) and request.headers.get(RANGE):
-                headers[RANGE] = request.headers[RANGE]
-
         try:
             client = await self._websession.request(
                 method=request.method,
@@ -222,7 +177,7 @@ class HassIOView(HomeAssistantView):
             )
             response.content_type = client.content_type
 
-            if should_compress(response.content_type, path):
+            if should_compress(response.content_type):
                 response.enable_compression()
             await response.prepare(request)
             # In testing iter_chunked, iter_any, and iter_chunks:
@@ -262,10 +217,8 @@ def _get_timeout(path: str) -> ClientTimeout:
     return ClientTimeout(connect=10, total=300)
 
 
-def should_compress(content_type: str, path: str | None = None) -> bool:
+def should_compress(content_type: str) -> bool:
     """Return if we should compress a response."""
-    if path is not None and NO_COMPRESS.match(path):
-        return False
     if content_type.startswith("image/"):
         return "svg" in content_type
     if content_type.startswith("application/"):

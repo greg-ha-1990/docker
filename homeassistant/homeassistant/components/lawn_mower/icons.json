@@ -5,14 +5,8 @@
     }
   },
   "services": {
-    "dock": {
-      "service": "mdi:home-import-outline"
-    },
-    "pause": {
-      "service": "mdi:pause"
-    },
-    "start_mowing": {
-      "service": "mdi:play"
-    }
+    "dock": "mdi:home-import-outline",
+    "pause": "mdi:pause",
+    "start_mowing": "mdi:play"
   }
 }

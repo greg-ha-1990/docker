@@ -7,7 +7,6 @@ import asyncio
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
 from dataclasses import dataclass
 from functools import partial
-from hashlib import md5
 from itertools import groupby
 import logging
 from operator import attrgetter
@@ -19,16 +18,15 @@ from voluptuous.humanize import humanize_error
 
 from homeassistant.components import websocket_api
 from homeassistant.const import CONF_ID
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import slugify
 
 from . import entity_registry
 from .entity import Entity
 from .entity_component import EntityComponent
-from .json import json_bytes
 from .storage import Store
-from .typing import ConfigType, VolDictType
+from .typing import ConfigType
 
 STORAGE_VERSION = 1
 SAVE_DELAY = 10
@@ -41,8 +39,8 @@ _EntityT = TypeVar("_EntityT", bound=Entity, default=Entity)
 
 
 @dataclass(slots=True)
-class CollectionChange:
-    """Class to represent an item in a change set.
+class CollectionChangeSet:
+    """Class to represent a change set.
 
     change_type: One of CHANGE_*
     item_id: The id of the item
@@ -52,7 +50,6 @@ class CollectionChange:
     change_type: str
     item_id: str
     item: Any
-    item_hash: str | None = None
 
 
 type ChangeListener = Callable[
@@ -67,7 +64,7 @@ type ChangeListener = Callable[
     Awaitable[None],
 ]
 
-type ChangeSetListener = Callable[[Iterable[CollectionChange]], Awaitable[None]]
+type ChangeSetListener = Callable[[Iterable[CollectionChangeSet]], Awaitable[None]]
 
 
 class CollectionError(HomeAssistantError):
@@ -166,16 +163,16 @@ class ObservableCollection[_ItemT](ABC):
         self.change_set_listeners.append(listener)
         return partial(self.change_set_listeners.remove, listener)
 
-    async def notify_changes(self, change_set: Iterable[CollectionChange]) -> None:
+    async def notify_changes(self, change_sets: Iterable[CollectionChangeSet]) -> None:
         """Notify listeners of a change."""
         await asyncio.gather(
             *(
-                listener(change.change_type, change.item_id, change.item)
+                listener(change_set.change_type, change_set.item_id, change_set.item)
                 for listener in self.listeners
-                for change in change_set
+                for change_set in change_sets
             ),
             *(
-                change_set_listener(change_set)
+                change_set_listener(change_sets)
                 for change_set_listener in self.change_set_listeners
             ),
         )
@@ -204,7 +201,7 @@ class YamlCollection(ObservableCollection[dict]):
         """Load the YAML collection. Overrides existing data."""
         old_ids = set(self.data)
 
-        change_set = []
+        change_sets = []
 
         for item in data:
             item_id = item[CONF_ID]
@@ -219,15 +216,15 @@ class YamlCollection(ObservableCollection[dict]):
                 event = CHANGE_ADDED
 
             self.data[item_id] = item
-            change_set.append(CollectionChange(event, item_id, item))
+            change_sets.append(CollectionChangeSet(event, item_id, item))
 
-        change_set.extend(
-            CollectionChange(CHANGE_REMOVED, item_id, self.data.pop(item_id))
+        change_sets.extend(
+            CollectionChangeSet(CHANGE_REMOVED, item_id, self.data.pop(item_id))
             for item_id in old_ids
         )
 
-        if change_set:
-            await self.notify_changes(change_set)
+        if change_sets:
+            await self.notify_changes(change_sets)
 
 
 class SerializedStorageCollection(TypedDict):
@@ -276,9 +273,7 @@ class StorageCollection[_ItemT, _StoreT: SerializedStorageCollection](
 
         await self.notify_changes(
             [
-                CollectionChange(
-                    CHANGE_ADDED, item[CONF_ID], item, self._hash_item(item)
-                )
+                CollectionChangeSet(CHANGE_ADDED, item[CONF_ID], item)
                 for item in raw_storage["items"]
             ]
         )
@@ -318,16 +313,7 @@ class StorageCollection[_ItemT, _StoreT: SerializedStorageCollection](
         item = self._create_item(item_id, validated_data)
         self.data[item_id] = item
         self._async_schedule_save()
-        await self.notify_changes(
-            [
-                CollectionChange(
-                    CHANGE_ADDED,
-                    item_id,
-                    item,
-                    self._hash_item(self._serialize_item(item_id, item)),
-                )
-            ]
-        )
+        await self.notify_changes([CollectionChangeSet(CHANGE_ADDED, item_id, item)])
         return item
 
     async def async_update_item(self, item_id: str, updates: dict) -> _ItemT:
@@ -346,14 +332,7 @@ class StorageCollection[_ItemT, _StoreT: SerializedStorageCollection](
         self._async_schedule_save()
 
         await self.notify_changes(
-            [
-                CollectionChange(
-                    CHANGE_UPDATED,
-                    item_id,
-                    updated,
-                    self._hash_item(self._serialize_item(item_id, updated)),
-                )
-            ]
+            [CollectionChangeSet(CHANGE_UPDATED, item_id, updated)]
         )
 
         return self.data[item_id]
@@ -366,7 +345,7 @@ class StorageCollection[_ItemT, _StoreT: SerializedStorageCollection](
         item = self.data.pop(item_id)
         self._async_schedule_save()
 
-        await self.notify_changes([CollectionChange(CHANGE_REMOVED, item_id, item)])
+        await self.notify_changes([CollectionChangeSet(CHANGE_REMOVED, item_id, item)])
 
     @callback
     def _async_schedule_save(self) -> None:
@@ -387,10 +366,6 @@ class StorageCollection[_ItemT, _StoreT: SerializedStorageCollection](
     @callback
     def _data_to_save(self) -> _StoreT:
         """Return JSON-compatible date for storing to file."""
-
-    def _hash_item(self, item: dict) -> str:
-        """Return a hash of the item."""
-        return md5(json_bytes(item)).hexdigest()
 
 
 class DictStorageCollection(StorageCollection[dict, SerializedStorageCollection]):
@@ -423,7 +398,7 @@ class IDLessCollection(YamlCollection):
         """Load the collection. Overrides existing data."""
         await self.notify_changes(
             [
-                CollectionChange(CHANGE_REMOVED, item_id, item)
+                CollectionChangeSet(CHANGE_REMOVED, item_id, item)
                 for item_id, item in list(self.data.items())
             ]
         )
@@ -438,7 +413,7 @@ class IDLessCollection(YamlCollection):
 
         await self.notify_changes(
             [
-                CollectionChange(CHANGE_ADDED, item_id, item)
+                CollectionChangeSet(CHANGE_ADDED, item_id, item)
                 for item_id, item in self.data.items()
             ]
         )
@@ -469,14 +444,14 @@ class _CollectionLifeCycle(Generic[_EntityT]):
         self.entities.pop(item_id, None)
 
     @callback
-    def _add_entity(self, change_set: CollectionChange) -> CollectionEntity:
+    def _add_entity(self, change_set: CollectionChangeSet) -> CollectionEntity:
         item_id = change_set.item_id
         entity = self.collection.create_entity(self.entity_class, change_set.item)
         self.entities[item_id] = entity
         entity.async_on_remove(partial(self._entity_removed, item_id))
         return entity
 
-    async def _remove_entity(self, change_set: CollectionChange) -> None:
+    async def _remove_entity(self, change_set: CollectionChangeSet) -> None:
         item_id = change_set.item_id
         ent_reg = self.ent_reg
         entities = self.entities
@@ -489,31 +464,29 @@ class _CollectionLifeCycle(Generic[_EntityT]):
         # the entity registry event handled by Entity._async_registry_updated
         entities.pop(item_id, None)
 
-    async def _update_entity(self, change_set: CollectionChange) -> None:
+    async def _update_entity(self, change_set: CollectionChangeSet) -> None:
         if entity := self.entities.get(change_set.item_id):
-            if change_set.item_hash:
-                self.ent_reg.async_update_entity_options(
-                    entity.entity_id, "collection", {"hash": change_set.item_hash}
-                )
             await entity.async_update_config(change_set.item)
 
-    async def _collection_changed(self, change_set: Iterable[CollectionChange]) -> None:
+    async def _collection_changed(
+        self, change_sets: Iterable[CollectionChangeSet]
+    ) -> None:
         """Handle a collection change."""
         # Create a new bucket every time we have a different change type
         # to ensure operations happen in order. We only group
         # the same change type.
         new_entities: list[CollectionEntity] = []
         coros: list[Coroutine[Any, Any, CollectionEntity | None]] = []
-        grouped: Iterable[CollectionChange]
-        for _, grouped in groupby(change_set, _GROUP_BY_KEY):
-            for change in grouped:
-                change_type = change.change_type
+        grouped: Iterable[CollectionChangeSet]
+        for _, grouped in groupby(change_sets, _GROUP_BY_KEY):
+            for change_set in grouped:
+                change_type = change_set.change_type
                 if change_type == CHANGE_ADDED:
-                    new_entities.append(self._add_entity(change))
+                    new_entities.append(self._add_entity(change_set))
                 elif change_type == CHANGE_REMOVED:
-                    coros.append(self._remove_entity(change))
+                    coros.append(self._remove_entity(change_set))
                 elif change_type == CHANGE_UPDATED:
-                    coros.append(self._update_entity(change))
+                    coros.append(self._update_entity(change_set))
 
         if coros:
             await asyncio.gather(*coros)
@@ -546,8 +519,8 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
         storage_collection: _StorageCollectionT,
         api_prefix: str,
         model_name: str,
-        create_schema: VolDictType,
-        update_schema: VolDictType,
+        create_schema: dict,
+        update_schema: dict,
     ) -> None:
         """Initialize a websocket CRUD."""
         self.storage_collection = storage_collection
@@ -555,9 +528,6 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
         self.model_name = model_name
         self.create_schema = create_schema
         self.update_schema = update_schema
-
-        self._remove_subscription: CALLBACK_TYPE | None = None
-        self._subscribers: set[tuple[websocket_api.ActiveConnection, int]] = set()
 
         assert self.api_prefix[-1] != "/", "API prefix should not end in /"
 
@@ -567,39 +537,38 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
         return f"{self.model_name}_id"
 
     @callback
-    def async_setup(self, hass: HomeAssistant) -> None:
+    def async_setup(
+        self,
+        hass: HomeAssistant,
+        *,
+        create_list: bool = True,
+        create_create: bool = True,
+    ) -> None:
         """Set up the websocket commands."""
-        websocket_api.async_register_command(
-            hass,
-            f"{self.api_prefix}/list",
-            self.ws_list_item,
-            websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
-                {vol.Required("type"): f"{self.api_prefix}/list"}
-            ),
-        )
+        if create_list:
+            websocket_api.async_register_command(
+                hass,
+                f"{self.api_prefix}/list",
+                self.ws_list_item,
+                websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
+                    {vol.Required("type"): f"{self.api_prefix}/list"}
+                ),
+            )
 
-        websocket_api.async_register_command(
-            hass,
-            f"{self.api_prefix}/create",
-            websocket_api.require_admin(
-                websocket_api.async_response(self.ws_create_item)
-            ),
-            websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
-                {
-                    **self.create_schema,
-                    vol.Required("type"): f"{self.api_prefix}/create",
-                }
-            ),
-        )
-
-        websocket_api.async_register_command(
-            hass,
-            f"{self.api_prefix}/subscribe",
-            self._ws_subscribe,
-            websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
-                {vol.Required("type"): f"{self.api_prefix}/subscribe"}
-            ),
-        )
+        if create_create:
+            websocket_api.async_register_command(
+                hass,
+                f"{self.api_prefix}/create",
+                websocket_api.require_admin(
+                    websocket_api.async_response(self.ws_create_item)
+                ),
+                websocket_api.BASE_COMMAND_MESSAGE_SCHEMA.extend(
+                    {
+                        **self.create_schema,
+                        vol.Required("type"): f"{self.api_prefix}/create",
+                    }
+                ),
+            )
 
         websocket_api.async_register_command(
             hass,
@@ -640,7 +609,7 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
     async def ws_create_item(
         self, hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
     ) -> None:
-        """Create an item."""
+        """Create a item."""
         try:
             data = dict(msg)
             data.pop("id")
@@ -650,66 +619,18 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
         except vol.Invalid as err:
             connection.send_error(
                 msg["id"],
-                websocket_api.ERR_INVALID_FORMAT,
+                websocket_api.const.ERR_INVALID_FORMAT,
                 humanize_error(data, err),
             )
         except ValueError as err:
-            connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
-
-    @callback
-    def _ws_subscribe(
-        self, hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
-    ) -> None:
-        """Subscribe to collection updates."""
-
-        async def async_change_listener(
-            change_set: Iterable[CollectionChange],
-        ) -> None:
-            json_msg = [
-                {
-                    "change_type": change.change_type,
-                    self.item_id_key: change.item_id,
-                    "item": change.item,
-                }
-                for change in change_set
-            ]
-            for conn, msg_id in self._subscribers:
-                conn.send_message(websocket_api.event_message(msg_id, json_msg))
-
-        if not self._subscribers:
-            self._remove_subscription = (
-                self.storage_collection.async_add_change_set_listener(
-                    async_change_listener
-                )
+            connection.send_error(
+                msg["id"], websocket_api.const.ERR_INVALID_FORMAT, str(err)
             )
-
-        self._subscribers.add((connection, msg["id"]))
-
-        @callback
-        def cancel_subscription() -> None:
-            self._subscribers.remove((connection, msg["id"]))
-            if not self._subscribers and self._remove_subscription:
-                self._remove_subscription()
-                self._remove_subscription = None
-
-        connection.subscriptions[msg["id"]] = cancel_subscription
-
-        connection.send_message(websocket_api.result_message(msg["id"]))
-
-        json_msg = [
-            {
-                "change_type": CHANGE_ADDED,
-                self.item_id_key: item_id,
-                "item": item,
-            }
-            for item_id, item in self.storage_collection.data.items()
-        ]
-        connection.send_message(websocket_api.event_message(msg["id"], json_msg))
 
     async def ws_update_item(
         self, hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
     ) -> None:
-        """Update an item."""
+        """Update a item."""
         data = dict(msg)
         msg_id = data.pop("id")
         item_id = data.pop(self.item_id_key)
@@ -721,28 +642,30 @@ class StorageCollectionWebsocket[_StorageCollectionT: StorageCollection]:
         except ItemNotFound:
             connection.send_error(
                 msg["id"],
-                websocket_api.ERR_NOT_FOUND,
+                websocket_api.const.ERR_NOT_FOUND,
                 f"Unable to find {self.item_id_key} {item_id}",
             )
         except vol.Invalid as err:
             connection.send_error(
                 msg["id"],
-                websocket_api.ERR_INVALID_FORMAT,
+                websocket_api.const.ERR_INVALID_FORMAT,
                 humanize_error(data, err),
             )
         except ValueError as err:
-            connection.send_error(msg_id, websocket_api.ERR_INVALID_FORMAT, str(err))
+            connection.send_error(
+                msg_id, websocket_api.const.ERR_INVALID_FORMAT, str(err)
+            )
 
     async def ws_delete_item(
         self, hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
     ) -> None:
-        """Delete an item."""
+        """Delete a item."""
         try:
             await self.storage_collection.async_delete_item(msg[self.item_id_key])
         except ItemNotFound:
             connection.send_error(
                 msg["id"],
-                websocket_api.ERR_NOT_FOUND,
+                websocket_api.const.ERR_NOT_FOUND,
                 f"Unable to find {self.item_id_key} {msg[self.item_id_key]}",
             )
 

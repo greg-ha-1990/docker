@@ -7,7 +7,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.components.switch import (
-    PLATFORM_SCHEMA as SWITCH_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     SwitchEntity,
     SwitchEntityDescription,
 )
@@ -17,9 +17,11 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .const import DOMAIN
-from .entity import WirelessTagBaseSensor
-from .util import async_migrate_unique_id
+from . import (
+    DOMAIN as WIRELESSTAG_DOMAIN,
+    WirelessTagBaseSensor,
+    async_migrate_unique_id,
+)
 
 SWITCH_TYPES: tuple[SwitchEntityDescription, ...] = (
     SwitchEntityDescription(
@@ -46,7 +48,7 @@ SWITCH_TYPES: tuple[SwitchEntityDescription, ...] = (
 
 SWITCH_KEYS: list[str] = [desc.key for desc in SWITCH_TYPES]
 
-PLATFORM_SCHEMA = SWITCH_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_MONITORED_CONDITIONS, default=[]): vol.All(
             cv.ensure_list, [vol.In(SWITCH_KEYS)]
@@ -62,7 +64,7 @@ async def async_setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up switches for a Wireless Sensor Tags."""
-    platform = hass.data[DOMAIN]
+    platform = hass.data[WIRELESSTAG_DOMAIN]
 
     tags = platform.load_tags()
     monitored_conditions = config[CONF_MONITORED_CONDITIONS]

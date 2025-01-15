@@ -1,11 +1,9 @@
-"""Config flow for Squeezebox integration."""
-
-from __future__ import annotations
+"""Config flow for Logitech Squeezebox integration."""
 
 import asyncio
 from http import HTTPStatus
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pysqueezebox import Server, async_discover
 import voluptuous as vol
@@ -26,11 +24,9 @@ _LOGGER = logging.getLogger(__name__)
 TIMEOUT = 5
 
 
-def _base_schema(
-    discovery_info: dict[str, Any] | None = None,
-) -> vol.Schema:
+def _base_schema(discovery_info=None):
     """Generate base schema."""
-    base_schema: dict[Any, Any] = {}
+    base_schema = {}
     if discovery_info and CONF_HOST in discovery_info:
         base_schema.update(
             {
@@ -68,21 +64,21 @@ def _base_schema(
 
 
 class SqueezeboxConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Squeezebox."""
+    """Handle a config flow for Logitech Squeezebox."""
 
     VERSION = 1
 
     def __init__(self) -> None:
         """Initialize an instance of the squeezebox config flow."""
         self.data_schema = _base_schema()
-        self.discovery_info: dict[str, Any] | None = None
+        self.discovery_info = None
 
-    async def _discover(self, uuid: str | None = None) -> None:
+    async def _discover(self, uuid=None):
         """Discover an unconfigured LMS server."""
         self.discovery_info = None
         discovery_event = asyncio.Event()
 
-        def _discovery_callback(server: Server) -> None:
+        def _discovery_callback(server):
             if server.uuid:
                 # ignore already configured uuids
                 for entry in self._async_current_entries():
@@ -106,7 +102,7 @@ class SqueezeboxConfigFlow(ConfigFlow, domain=DOMAIN):
         # update with suggested values from discovery
         self.data_schema = _base_schema(self.discovery_info)
 
-    async def _validate_input(self, data: dict[str, Any]) -> str | None:
+    async def _validate_input(self, data):
         """Validate the user input allows us to connect.
 
         Retrieve unique id and abort if already configured.
@@ -133,11 +129,7 @@ class SqueezeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(status["uuid"])
             self._abort_if_unique_id_configured()
 
-        return None
-
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
         errors = {}
         if user_input and CONF_HOST in user_input:
@@ -160,9 +152,7 @@ class SqueezeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_edit(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_edit(self, user_input=None):
         """Edit a discovered or manually inputted server."""
         errors = {}
         if user_input:
@@ -177,9 +167,7 @@ class SqueezeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="edit", data_schema=self.data_schema, errors=errors
         )
 
-    async def async_step_integration_discovery(
-        self, discovery_info: dict[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_integration_discovery(self, discovery_info):
         """Handle discovery of a server."""
         _LOGGER.debug("Reached server discovery flow with info: %s", discovery_info)
         if "uuid" in discovery_info:

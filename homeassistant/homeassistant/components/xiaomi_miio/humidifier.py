@@ -37,7 +37,7 @@ from .const import (
     MODELS_HUMIDIFIER_MIOT,
     MODELS_HUMIDIFIER_MJJSQ,
 )
-from .entity import XiaomiCoordinatedMiioEntity
+from .device import XiaomiCoordinatedMiioEntity
 
 _LOGGER = logging.getLogger(__name__)
 

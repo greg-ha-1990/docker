@@ -10,8 +10,9 @@ from aiohttp import ClientConnectorError
 from aiomusiccast import MusicCastConnectionException, MusicCastDevice
 import voluptuous as vol
 
+from homeassistant import data_entry_flow
 from homeassistant.components import ssdp
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -32,7 +33,7 @@ class MusicCastFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    ) -> data_entry_flow.ConfigFlowResult:
         """Handle a flow initiated by the user."""
         # Request user input, unless we are preparing discovery flow
         if user_input is None:
@@ -72,7 +73,9 @@ class MusicCastFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self._show_setup_form(errors)
 
-    def _show_setup_form(self, errors: dict | None = None) -> ConfigFlowResult:
+    def _show_setup_form(
+        self, errors: dict | None = None
+    ) -> data_entry_flow.ConfigFlowResult:
         """Show the setup form to the user."""
         return self.async_show_form(
             step_id="user",
@@ -82,7 +85,7 @@ class MusicCastFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_ssdp(
         self, discovery_info: ssdp.SsdpServiceInfo
-    ) -> ConfigFlowResult:
+    ) -> data_entry_flow.ConfigFlowResult:
         """Handle ssdp discoveries."""
         if not await MusicCastDevice.check_yamaha_ssdp(
             discovery_info.ssdp_location, async_get_clientsession(self.hass)
@@ -114,7 +117,9 @@ class MusicCastFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_confirm()
 
-    async def async_step_confirm(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_confirm(
+        self, user_input=None
+    ) -> data_entry_flow.ConfigFlowResult:
         """Allow the user to confirm adding the device."""
         if user_input is not None:
             return self.async_create_entry(

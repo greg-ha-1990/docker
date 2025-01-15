@@ -20,7 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DEFAULT_WATERING_TIME, DOMAIN
-from .coordinator import HydrawiseUpdateCoordinators
+from .coordinator import HydrawiseDataUpdateCoordinator
 from .entity import HydrawiseEntity
 
 
@@ -66,10 +66,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Hydrawise switch platform."""
-    coordinators: HydrawiseUpdateCoordinators = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: HydrawiseDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
     async_add_entities(
-        HydrawiseSwitch(coordinators.main, description, controller, zone_id=zone.id)
-        for controller in coordinators.main.data.controllers.values()
+        HydrawiseSwitch(coordinator, description, controller, zone_id=zone.id)
+        for controller in coordinator.data.controllers.values()
         for zone in controller.zones
         for description in SWITCH_TYPES
     )

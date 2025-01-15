@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import chain
 import logging
 from typing import cast
 
@@ -15,7 +16,7 @@ from homeassistant.util.dt import utc_from_timestamp
 
 from .const import CONF_AGENCY, CONF_ROUTE, DOMAIN
 from .coordinator import NextBusDataUpdateCoordinator
-from .util import maybe_first
+from .util import listify, maybe_first
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,10 +29,8 @@ async def async_setup_entry(
     """Load values from configuration and initialize the platform."""
     _LOGGER.debug(config.data)
     entry_agency = config.data[CONF_AGENCY]
-    entry_stop = config.data[CONF_STOP]
-    coordinator_key = f"{entry_agency}-{entry_stop}"
 
-    coordinator: NextBusDataUpdateCoordinator = hass.data[DOMAIN].get(coordinator_key)
+    coordinator: NextBusDataUpdateCoordinator = hass.data[DOMAIN].get(entry_agency)
 
     async_add_entities(
         (
@@ -77,11 +76,7 @@ class NextBusDepartureSensor(
         self.agency = agency
         self.route = route
         self.stop = stop
-        self._attr_extra_state_attributes: dict[str, str] = {
-            "agency": agency,
-            "route": route,
-            "stop": stop,
-        }
+        self._attr_extra_state_attributes: dict[str, str] = {}
         self._attr_unique_id = unique_id
         self._attr_name = name
 
@@ -104,10 +99,11 @@ class NextBusDepartureSensor(
     def _handle_coordinator_update(self) -> None:
         """Update sensor with new departures times."""
         results = self.coordinator.get_prediction_data(self.stop, self.route)
+        self._attr_attribution = self.coordinator.get_attribution()
 
         self._log_debug("Predictions results: %s", results)
 
-        if not results:
+        if not results or "Error" in results:
             self._log_err("Error getting predictions: %s", str(results))
             self._attr_native_value = None
             self._attr_extra_state_attributes.pop("upcoming", None)
@@ -116,13 +112,31 @@ class NextBusDepartureSensor(
         # Set detailed attributes
         self._attr_extra_state_attributes.update(
             {
-                "route": str(results["route"]["title"]),
-                "stop": str(results["stop"]["name"]),
+                "agency": str(results.get("agencyTitle")),
+                "route": str(results.get("routeTitle")),
+                "stop": str(results.get("stopTitle")),
             }
         )
 
+        # List all messages in the attributes
+        messages = listify(results.get("message", []))
+        self._log_debug("Messages: %s", messages)
+        self._attr_extra_state_attributes["message"] = " -- ".join(
+            message.get("text", "") for message in messages
+        )
+
+        # List out all directions in the attributes
+        directions = listify(results.get("direction", []))
+        self._attr_extra_state_attributes["direction"] = ", ".join(
+            direction.get("title", "") for direction in directions
+        )
+
         # Chain all predictions together
-        predictions = results["values"]
+        predictions = list(
+            chain(
+                *(listify(direction.get("prediction", [])) for direction in directions)
+            )
+        )
 
         # Short circuit if we don't have any actual bus predictions
         if not predictions:
@@ -132,12 +146,12 @@ class NextBusDepartureSensor(
         else:
             # Generate list of upcoming times
             self._attr_extra_state_attributes["upcoming"] = ", ".join(
-                str(p["minutes"]) for p in predictions
+                sorted((p["minutes"] for p in predictions), key=int)
             )
 
             latest_prediction = maybe_first(predictions)
             self._attr_native_value = utc_from_timestamp(
-                latest_prediction["timestamp"] / 1000
+                int(latest_prediction["epochTime"]) / 1000
             )
 
         self.async_write_ha_state()

@@ -7,7 +7,6 @@ import logging
 import os.path
 from typing import Any, cast
 
-import aiohttp
 import nextcord
 from nextcord.abc import Messageable
 
@@ -82,7 +81,7 @@ class DiscordNotificationService(BaseNotificationService):
         async with session.get(
             url,
             ssl=verify_ssl,
-            timeout=aiohttp.ClientTimeout(total=30),
+            timeout=30,
             raise_for_status=True,
         ) as resp:
             content_length = resp.headers.get("Content-Length")
@@ -124,7 +123,7 @@ class DiscordNotificationService(BaseNotificationService):
 
         if ATTR_TARGET not in kwargs:
             _LOGGER.error("No target specified")
-            return
+            return None
 
         data = kwargs.get(ATTR_DATA) or {}
 

@@ -13,7 +13,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_CONNECTION_TYPE, DOMAIN, HTTP
+from .const import DOMAIN, HTTP
 from .exceptions import CannotConnect, PoweredOff
 
 PLATFORMS = [Platform.MEDIA_PLAYER]
@@ -22,17 +22,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def validate_projector(
-    hass: HomeAssistant,
-    host: str,
-    conn_type: str,
-    check_power: bool = True,
-    check_powered_on: bool = True,
+    hass: HomeAssistant, host, check_power=True, check_powered_on=True
 ):
     """Validate the given projector host allows us to connect."""
     epson_proj = Projector(
         host=host,
         websession=async_get_clientsession(hass, verify_ssl=False),
-        type=conn_type,
+        type=HTTP,
     )
     if check_power:
         _power = await epson_proj.get_power()
@@ -50,7 +46,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     projector = await validate_projector(
         hass=hass,
         host=entry.data[CONF_HOST],
-        conn_type=entry.data[CONF_CONNECTION_TYPE],
         check_power=False,
         check_powered_on=False,
     )
@@ -65,33 +60,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        projector = hass.data[DOMAIN].pop(entry.entry_id)
-        projector.close()
+        hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
-
-
-async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Migrate old entry."""
-    _LOGGER.debug(
-        "Migrating configuration from version %s.%s",
-        config_entry.version,
-        config_entry.minor_version,
-    )
-
-    if config_entry.version > 1 or config_entry.minor_version > 1:
-        # This means the user has downgraded from a future version
-        return False
-
-    if config_entry.version == 1 and config_entry.minor_version == 1:
-        new_data = {**config_entry.data}
-        new_data[CONF_CONNECTION_TYPE] = HTTP
-
-        hass.config_entries.async_update_entry(
-            config_entry, data=new_data, version=1, minor_version=2
-        )
-
-    _LOGGER.debug(
-        "Migration to configuration version %s successful", config_entry.version
-    )
-
-    return True

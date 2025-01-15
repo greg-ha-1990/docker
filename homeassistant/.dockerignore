@@ -7,7 +7,6 @@ docs
 # Development
 .devcontainer
 .vscode
-.tool-versions
 
 # Test related files
 tests

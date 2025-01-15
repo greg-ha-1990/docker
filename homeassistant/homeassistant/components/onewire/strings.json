@@ -94,9 +94,6 @@
     }
   },
   "options": {
-    "abort": {
-      "no_configurable_devices": "No configurable devices found"
-    },
     "error": {
       "device_not_selected": "Select devices to configure"
     },

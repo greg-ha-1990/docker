@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.mjpeg import MjpegCamera, filter_urllib3_logging
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
     CONF_PASSWORD,
@@ -14,17 +15,21 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .coordinator import AndroidIPCamConfigEntry, AndroidIPCamDataUpdateCoordinator
+from .coordinator import AndroidIPCamDataUpdateCoordinator
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: AndroidIPCamConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the IP Webcam camera from config entry."""
     filter_urllib3_logging()
-    async_add_entities([IPWebcamCamera(config_entry.runtime_data)])
+    coordinator: AndroidIPCamDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
+
+    async_add_entities([IPWebcamCamera(coordinator)])
 
 
 class IPWebcamCamera(MjpegCamera):

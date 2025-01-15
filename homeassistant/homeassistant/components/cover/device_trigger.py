@@ -19,6 +19,10 @@ from homeassistant.const import (
     CONF_PLATFORM,
     CONF_TYPE,
     CONF_VALUE_TEMPLATE,
+    STATE_CLOSED,
+    STATE_CLOSING,
+    STATE_OPEN,
+    STATE_OPENING,
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_registry as er
@@ -26,7 +30,7 @@ from homeassistant.helpers.entity import get_supported_features
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
-from . import DOMAIN, CoverEntityFeature, CoverState
+from . import DOMAIN, CoverEntityFeature
 
 POSITION_TRIGGER_TYPES = {"position", "tilt_position"}
 STATE_TRIGGER_TYPES = {"opened", "closed", "opening", "closing"}
@@ -143,13 +147,13 @@ async def async_attach_trigger(
     """Attach a trigger."""
     if config[CONF_TYPE] in STATE_TRIGGER_TYPES:
         if config[CONF_TYPE] == "opened":
-            to_state = CoverState.OPEN
+            to_state = STATE_OPEN
         elif config[CONF_TYPE] == "closed":
-            to_state = CoverState.CLOSED
+            to_state = STATE_CLOSED
         elif config[CONF_TYPE] == "opening":
-            to_state = CoverState.OPENING
+            to_state = STATE_OPENING
         elif config[CONF_TYPE] == "closing":
-            to_state = CoverState.CLOSING
+            to_state = STATE_CLOSING
 
         state_config = {
             CONF_PLATFORM: "state",

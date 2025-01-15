@@ -18,9 +18,6 @@ class LawnMowerActivity(StrEnum):
     DOCKED = "docked"
     """Device is docked."""
 
-    RETURNING = "returning"
-    """Device is returning."""
-
 
 class LawnMowerEntityFeature(IntFlag):
     """Supported features of the lawn mower entity."""

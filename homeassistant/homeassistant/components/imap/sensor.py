@@ -7,45 +7,47 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import CONF_USERNAME, EntityCategory
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import ImapConfigEntry
+from . import ImapPollingDataUpdateCoordinator, ImapPushDataUpdateCoordinator
 from .const import DOMAIN
-from .coordinator import ImapDataUpdateCoordinator
-
-# Coordinator is used to centralize the data updates
-PARALLEL_UPDATES = 0
 
 IMAP_MAIL_COUNT_DESCRIPTION = SensorEntityDescription(
     key="imap_mail_count",
-    entity_category=EntityCategory.DIAGNOSTIC,
     state_class=SensorStateClass.MEASUREMENT,
     suggested_display_precision=0,
     translation_key="imap_mail_count",
+    name=None,
 )
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ImapConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the Imap sensor."""
 
-    coordinator = entry.runtime_data
+    coordinator: ImapPushDataUpdateCoordinator | ImapPollingDataUpdateCoordinator = (
+        hass.data[DOMAIN][entry.entry_id]
+    )
     async_add_entities([ImapSensor(coordinator, IMAP_MAIL_COUNT_DESCRIPTION)])
 
 
-class ImapSensor(CoordinatorEntity[ImapDataUpdateCoordinator], SensorEntity):
+class ImapSensor(
+    CoordinatorEntity[ImapPushDataUpdateCoordinator | ImapPollingDataUpdateCoordinator],
+    SensorEntity,
+):
     """Representation of an IMAP sensor."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: ImapDataUpdateCoordinator,
+        coordinator: ImapPushDataUpdateCoordinator | ImapPollingDataUpdateCoordinator,
         description: SensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""

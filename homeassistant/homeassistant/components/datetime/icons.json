@@ -5,8 +5,6 @@
     }
   },
   "services": {
-    "set_value": {
-      "service": "mdi:calendar-edit"
-    }
+    "set_value": "mdi:calendar-edit"
   }
 }

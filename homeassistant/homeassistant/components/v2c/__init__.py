@@ -9,6 +9,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 
+from .const import DOMAIN
 from .coordinator import V2CUpdateCoordinator
 
 PLATFORMS: list[Platform] = [
@@ -19,10 +20,7 @@ PLATFORMS: list[Platform] = [
 ]
 
 
-type V2CConfigEntry = ConfigEntry[V2CUpdateCoordinator]
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: V2CConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up V2C from a config entry."""
 
     host = entry.data[CONF_HOST]
@@ -31,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: V2CConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     if coordinator.data.ID and entry.unique_id != coordinator.data.ID:
         hass.config_entries.async_update_entry(entry, unique_id=coordinator.data.ID)
@@ -43,4 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: V2CConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

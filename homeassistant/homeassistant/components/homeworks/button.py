@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import HomeworksData
+from . import HomeworksData, HomeworksEntity
 from .const import (
     CONF_ADDR,
     CONF_BUTTONS,
@@ -23,7 +23,6 @@ from .const import (
     CONF_RELEASE_DELAY,
     DOMAIN,
 )
-from .entity import HomeworksEntity
 
 
 async def async_setup_entry(

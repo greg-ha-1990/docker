@@ -3,7 +3,7 @@
 from devolo_home_control_api.devices.zwave import Zwave
 from devolo_home_control_api.homecontrol import HomeControl
 
-from .entity import DevoloDeviceEntity
+from .devolo_device import DevoloDeviceEntity
 
 
 class DevoloMultiLevelSwitchDeviceEntity(DevoloDeviceEntity):

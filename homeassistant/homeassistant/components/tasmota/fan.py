@@ -24,7 +24,7 @@ from homeassistant.util.percentage import (
 
 from .const import DATA_REMOVE_DISCOVER_COMPONENT
 from .discovery import TASMOTA_DISCOVERY_ENTITY_NEW
-from .entity import TasmotaAvailability, TasmotaDiscoveryUpdate
+from .mixins import TasmotaAvailability, TasmotaDiscoveryUpdate
 
 ORDERED_NAMED_FAN_SPEEDS = [
     tasmota_const.FAN_SPEED_LOW,
@@ -65,11 +65,7 @@ class TasmotaFan(
 ):
     """Representation of a Tasmota fan."""
 
-    _attr_supported_features = (
-        FanEntityFeature.SET_SPEED
-        | FanEntityFeature.TURN_OFF
-        | FanEntityFeature.TURN_ON
-    )
+    _attr_supported_features = FanEntityFeature.SET_SPEED
     _fan_speed = tasmota_const.FAN_SPEED_MEDIUM
     _tasmota_entity: tasmota_fan.TasmotaFan
 

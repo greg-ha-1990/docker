@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
+from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
-from homeassistant.const import STATE_HOME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import TeslemetryConfigEntry
 from .entity import TeslemetryVehicleEntity
 from .models import TeslemetryVehicleData
-
-PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -62,6 +60,11 @@ class TeslemetryDeviceTrackerEntity(TeslemetryVehicleEntity, TrackerEntity):
         """Return longitude value of the device."""
         return self.get(self.lon_key)
 
+    @property
+    def source_type(self) -> SourceType:
+        """Return the source type of the device tracker."""
+        return SourceType.GPS
+
 
 class TeslemetryDeviceTrackerLocationEntity(TeslemetryDeviceTrackerEntity):
     """Vehicle location device tracker class."""
@@ -81,7 +84,4 @@ class TeslemetryDeviceTrackerRouteEntity(TeslemetryDeviceTrackerEntity):
     @property
     def location_name(self) -> str | None:
         """Return a location name for the current location of the device."""
-        location = self.get("drive_state_active_route_destination")
-        if location == "Home":
-            return STATE_HOME
-        return location
+        return self.get("drive_state_active_route_destination")

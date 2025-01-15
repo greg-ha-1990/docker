@@ -14,8 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
-from .entity import WiLightDevice
+from . import DOMAIN, WiLightDevice
 from .parent_device import WiLightParent
 from .support import wilight_to_hass_trigger, wilight_trigger as wl_trigger
 

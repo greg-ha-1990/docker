@@ -28,6 +28,13 @@ PACKAGE_REGEX = re.compile(
 PIP_REGEX = re.compile(r"^(--.+\s)?([-_\.\w\d]+.*(?:==|>=|<=|~=|!=|<|>|===)?.*$)")
 PIP_VERSION_RANGE_SEPARATOR = re.compile(r"^(==|>=|<=|~=|!=|<|>|===)?(.*)$")
 
+IGNORE_STANDARD_LIBRARY_VIOLATIONS = {
+    # Integrations which have standard library requirements.
+    "electrasmart",
+    "slide",
+    "suez_water",
+}
+
 
 def validate(integrations: dict[str, Integration], config: Config) -> None:
     """Handle requirements for integrations."""
@@ -78,19 +85,18 @@ def validate_requirements_format(integration: Integration) -> bool:
         if not version:
             continue
 
-        if integration.core:
-            for part in version.split(";", 1)[0].split(","):
-                version_part = PIP_VERSION_RANGE_SEPARATOR.match(part)
-                if (
-                    version_part
-                    and AwesomeVersion(version_part.group(2)).strategy
-                    == AwesomeVersionStrategy.UNKNOWN
-                ):
-                    integration.add_error(
-                        "requirements",
-                        f"Unable to parse package version ({version}) for {pkg}.",
-                    )
-                    continue
+        for part in version.split(";", 1)[0].split(","):
+            version_part = PIP_VERSION_RANGE_SEPARATOR.match(part)
+            if (
+                version_part
+                and AwesomeVersion(version_part.group(2)).strategy
+                == AwesomeVersionStrategy.UNKNOWN
+            ):
+                integration.add_error(
+                    "requirements",
+                    f"Unable to parse package version ({version}) for {pkg}.",
+                )
+                continue
 
     return len(integration.errors) == start_errors
 
@@ -138,12 +144,27 @@ def validate_requirements(integration: Integration) -> None:
         if req in sys.stdlib_module_names:
             standard_library_violations.add(req)
 
-    if standard_library_violations:
+    if (
+        standard_library_violations
+        and integration.domain not in IGNORE_STANDARD_LIBRARY_VIOLATIONS
+    ):
         integration.add_error(
             "requirements",
             (
                 f"Package {req} has dependencies {standard_library_violations} which "
                 "are not compatible with the Python standard library"
+            ),
+        )
+    elif (
+        not standard_library_violations
+        and integration.domain in IGNORE_STANDARD_LIBRARY_VIOLATIONS
+    ):
+        integration.add_error(
+            "requirements",
+            (
+                f"Integration {integration.domain} no longer has requirements which are"
+                " incompatible with the Python standard library, remove it from "
+                "IGNORE_STANDARD_LIBRARY_VIOLATIONS"
             ),
         )
 

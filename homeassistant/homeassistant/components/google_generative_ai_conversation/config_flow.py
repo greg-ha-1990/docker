@@ -10,12 +10,11 @@ from typing import Any
 
 from google.ai import generativelanguage_v1beta
 from google.api_core.client_options import ClientOptions
-from google.api_core.exceptions import ClientError, GoogleAPIError
+from google.api_core.exceptions import ClientError, GoogleAPICallError
 import google.generativeai as genai
 import voluptuous as vol
 
 from homeassistant.config_entries import (
-    SOURCE_REAUTH,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -86,6 +85,10 @@ class GoogleGenerativeAIConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        """Initialize a new GoogleGenerativeAIConfigFlow."""
+        self.reauth_entry: ConfigEntry | None = None
+
     async def async_step_api(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -94,7 +97,7 @@ class GoogleGenerativeAIConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 await validate_input(self.hass, user_input)
-            except GoogleAPIError as err:
+            except GoogleAPICallError as err:
                 if isinstance(err, ClientError) and err.reason == "API_KEY_INVALID":
                     errors["base"] = "invalid_auth"
                 else:
@@ -103,9 +106,9 @@ class GoogleGenerativeAIConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                if self.source == SOURCE_REAUTH:
+                if self.reauth_entry:
                     return self.async_update_reload_and_abort(
-                        self._get_reauth_entry(),
+                        self.reauth_entry,
                         data=user_input,
                     )
                 return self.async_create_entry(
@@ -132,6 +135,9 @@ class GoogleGenerativeAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle configuration by re-auth."""
+        self.reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -140,13 +146,12 @@ class GoogleGenerativeAIConfigFlow(ConfigFlow, domain=DOMAIN):
         """Dialog that informs the user that reauth is required."""
         if user_input is not None:
             return await self.async_step_api()
-
-        reauth_entry = self._get_reauth_entry()
+        assert self.reauth_entry
         return self.async_show_form(
             step_id="reauth_confirm",
             description_placeholders={
-                CONF_NAME: reauth_entry.title,
-                CONF_API_KEY: reauth_entry.data.get(CONF_API_KEY, ""),
+                CONF_NAME: self.reauth_entry.title,
+                CONF_API_KEY: self.reauth_entry.data.get(CONF_API_KEY, ""),
             },
         )
 
@@ -163,6 +168,7 @@ class GoogleGenerativeAIOptionsFlow(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
+        self.config_entry = config_entry
         self.last_rendered_recommended = config_entry.options.get(
             CONF_RECOMMENDED, False
         )

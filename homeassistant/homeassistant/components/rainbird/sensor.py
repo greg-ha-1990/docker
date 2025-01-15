@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import DOMAIN
 from .coordinator import RainbirdUpdateCoordinator
-from .types import RainbirdConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,14 +25,14 @@ RAIN_DELAY_ENTITY_DESCRIPTION = SensorEntityDescription(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: RainbirdConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up entry for a Rain Bird sensor."""
     async_add_entities(
         [
             RainBirdSensor(
-                config_entry.runtime_data.coordinator,
+                hass.data[DOMAIN][config_entry.entry_id].coordinator,
                 RAIN_DELAY_ENTITY_DESCRIPTION,
             )
         ]

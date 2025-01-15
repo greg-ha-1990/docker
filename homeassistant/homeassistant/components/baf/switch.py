@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import BAFConfigEntry
-from .entity import BAFDescriptionEntity
+from .entity import BAFEntity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -118,10 +118,16 @@ async def async_setup_entry(
     async_add_entities(BAFSwitch(device, description) for description in descriptions)
 
 
-class BAFSwitch(BAFDescriptionEntity, SwitchEntity):
+class BAFSwitch(BAFEntity, SwitchEntity):
     """BAF switch component."""
 
     entity_description: BAFSwitchDescription
+
+    def __init__(self, device: Device, description: BAFSwitchDescription) -> None:
+        """Initialize the entity."""
+        self.entity_description = description
+        super().__init__(device)
+        self._attr_unique_id = f"{self._device.mac_address}-{description.key}"
 
     @callback
     def _async_update_attrs(self) -> None:

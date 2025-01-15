@@ -1,20 +1,22 @@
 """Support for Nexia / Trane XL Thermostats."""
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
+from .coordinator import NexiaDataUpdateCoordinator
 from .entity import NexiaThermostatEntity
-from .types import NexiaConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: NexiaConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for a Nexia device."""
-    coordinator = config_entry.runtime_data
+    coordinator: NexiaDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     nexia_home = coordinator.nexia_home
 
     entities = []

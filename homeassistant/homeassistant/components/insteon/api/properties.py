@@ -85,11 +85,11 @@ def get_schema(prop, name, groups):
     if name == LOAD_BUTTON:
         button_list = {group: groups[group].name for group in groups}
         return _list_schema(name, button_list)
-    if prop.value_type is bool:
+    if prop.value_type == bool:
         return _bool_schema(name)
-    if prop.value_type is int:
+    if prop.value_type == int:
         return _byte_schema(name)
-    if prop.value_type is float:
+    if prop.value_type == float:
         return _float_schema(name)
     if prop.value_type == ToggleMode:
         return _list_schema(name, TOGGLE_MODES)

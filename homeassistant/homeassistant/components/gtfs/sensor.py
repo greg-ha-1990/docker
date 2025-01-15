@@ -270,7 +270,7 @@ def get_next_departure(
     schedule: Any,
     start_station_id: Any,
     end_station_id: Any,
-    offset: datetime.timedelta,
+    offset: cv.time_period,
     include_tomorrow: bool = False,
 ) -> dict:
     """Get the next departure for the given schedule."""
@@ -405,7 +405,7 @@ def get_next_departure(
 
     item = {}
     for key in sorted(timetable.keys()):
-        if (value := dt_util.parse_datetime(key)) is not None and value > now:
+        if dt_util.parse_datetime(key) > now:
             item = timetable[key]
             _LOGGER.debug(
                 "Departure found for station %s @ %s -> %s", start_station_id, key, item

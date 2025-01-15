@@ -8,12 +8,9 @@ import json
 import logging
 from typing import Any, Concatenate, TypeGuard
 
-from homematicip.base.enums import FunctionalChannelType
-from homematicip.device import Device
-
 from homeassistant.exceptions import HomeAssistantError
 
-from .entity import HomematicipGenericEntity
+from . import HomematicipGenericEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,12 +47,3 @@ def handle_errors[_HomematicipGenericEntityT: HomematicipGenericEntity, **_P](
             )
 
     return inner
-
-
-def get_channels_from_device(device: Device, channel_type: FunctionalChannelType):
-    """Get all channels matching with channel_type from device."""
-    return [
-        ch
-        for ch in device.functionalChannels
-        if ch.functionalChannelType == channel_type
-    ]

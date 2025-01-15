@@ -22,16 +22,14 @@ from .const import (
 )
 
 UPDATE_LOOP_SLEEP_TIME = 5
-PLATFORMS = [Platform.CLIMATE, Platform.HUMIDIFIER, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH]
 
 MIGRATE_OPTIONS_KEYS = {CONF_COOL_AWAY_TEMPERATURE, CONF_HEAT_AWAY_TEMPERATURE}
-
-type HoneywellConfigEntry = ConfigEntry[HoneywellData]
 
 
 @callback
 def _async_migrate_data_to_options(
-    hass: HomeAssistant, config_entry: HoneywellConfigEntry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> None:
     if not MIGRATE_OPTIONS_KEYS.intersection(config_entry.data):
         return
@@ -47,9 +45,7 @@ def _async_migrate_data_to_options(
     )
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, config_entry: HoneywellConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up the Honeywell thermostat."""
     _async_migrate_data_to_options(hass, config_entry)
 
@@ -88,7 +84,8 @@ async def async_setup_entry(
     if len(devices) == 0:
         _LOGGER.debug("No devices found")
         return False
-    config_entry.runtime_data = HoneywellData(config_entry.entry_id, client, devices)
+    data = HoneywellData(config_entry.entry_id, client, devices)
+    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = data
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     config_entry.async_on_unload(config_entry.add_update_listener(update_listener))
@@ -96,18 +93,19 @@ async def async_setup_entry(
     return True
 
 
-async def update_listener(
-    hass: HomeAssistant, config_entry: HoneywellConfigEntry
-) -> None:
+async def update_listener(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Update listener."""
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, config_entry: HoneywellConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Unload the config and platforms."""
-    return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        config_entry, PLATFORMS
+    )
+    if unload_ok:
+        hass.data[DOMAIN].pop(config_entry.entry_id)
+    return unload_ok
 
 
 @dataclass

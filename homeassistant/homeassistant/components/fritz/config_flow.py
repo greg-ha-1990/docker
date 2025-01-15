@@ -6,7 +6,7 @@ from collections.abc import Mapping
 import ipaddress
 import logging
 import socket
-from typing import Any, Self
+from typing import Any
 from urllib.parse import ParseResult, urlparse
 
 from fritzconnection import FritzConnection
@@ -23,6 +23,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    OptionsFlowWithConfigEntry,
 )
 from homeassistant.const import (
     CONF_HOST,
@@ -32,7 +33,6 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.typing import VolDictType
 
 from .const import (
     CONF_OLD_DISCOVERY,
@@ -57,28 +57,22 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _host: str
-
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: ConfigEntry,
-    ) -> FritzBoxToolsOptionsFlowHandler:
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return FritzBoxToolsOptionsFlowHandler()
+        return FritzBoxToolsOptionsFlowHandler(config_entry)
 
     def __init__(self) -> None:
         """Initialize FRITZ!Box Tools flow."""
+        self._host: str | None = None
+        self._entry: ConfigEntry | None = None
         self._name: str = ""
         self._password: str = ""
         self._use_tls: bool = False
         self._port: int | None = None
         self._username: str = ""
         self._model: str = ""
-
-    async def async_fritz_tools_init(self) -> str | None:
-        """Initialize FRITZ!Box Tools class."""
-        return await self.hass.async_add_executor_job(self.fritz_tools_init)
 
     def fritz_tools_init(self) -> str | None:
         """Initialize FRITZ!Box Tools class."""
@@ -113,6 +107,7 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_check_configured_entry(self) -> ConfigEntry | None:
         """Check if entry is configured."""
+        assert self._host
         current_host = await self.hass.async_add_executor_job(
             socket.gethostbyname, self._host
         )
@@ -154,25 +149,25 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle a flow initialized by discovery."""
         ssdp_location: ParseResult = urlparse(discovery_info.ssdp_location or "")
-        host = ssdp_location.hostname
-        if not host or ipaddress.ip_address(host).is_link_local:
-            return self.async_abort(reason="ignore_ip6_link_local")
-
-        self._host = host
+        self._host = ssdp_location.hostname
         self._name = (
             discovery_info.upnp.get(ssdp.ATTR_UPNP_FRIENDLY_NAME)
             or discovery_info.upnp[ssdp.ATTR_UPNP_MODEL_NAME]
         )
+        self.context[CONF_HOST] = self._host
 
-        uuid: str | None
+        if not self._host or ipaddress.ip_address(self._host).is_link_local:
+            return self.async_abort(reason="ignore_ip6_link_local")
+
         if uuid := discovery_info.upnp.get(ssdp.ATTR_UPNP_UDN):
             if uuid.startswith("uuid:"):
                 uuid = uuid[5:]
             await self.async_set_unique_id(uuid)
             self._abort_if_unique_id_configured({CONF_HOST: self._host})
 
-        if self.hass.config_entries.flow.async_has_matching_flow(self):
-            return self.async_abort(reason="already_in_progress")
+        for progress in self._async_in_progress():
+            if progress.get("context", {}).get(CONF_HOST) == self._host:
+                return self.async_abort(reason="already_in_progress")
 
         if entry := await self.async_check_configured_entry():
             if uuid and not entry.unique_id:
@@ -188,10 +183,6 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_confirm()
 
-    def is_matching(self, other_flow: Self) -> bool:
-        """Return True if other_flow is matching this flow."""
-        return other_flow._host == self._host  # noqa: SLF001
-
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -206,7 +197,7 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
         self._use_tls = user_input[CONF_SSL]
         self._port = self._determine_port(user_input)
 
-        error = await self.async_fritz_tools_init()
+        error = await self.hass.async_add_executor_job(self.fritz_tools_init)
 
         if error:
             errors["base"] = error
@@ -219,7 +210,7 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Show the setup form to the user."""
 
-        advanced_data_schema: VolDictType = {}
+        advanced_data_schema = {}
         if self.show_advanced_options:
             advanced_data_schema = {
                 vol.Optional(CONF_PORT): vol.Coerce(int),
@@ -269,7 +260,7 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
 
         self._port = self._determine_port(user_input)
 
-        if not (error := await self.async_fritz_tools_init()):
+        if not (error := await self.hass.async_add_executor_job(self.fritz_tools_init)):
             self._name = self._model
 
             if await self.async_check_configured_entry():
@@ -284,6 +275,7 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle flow upon an API authentication error."""
+        self._entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         self._host = entry_data[CONF_HOST]
         self._port = entry_data[CONF_PORT]
         self._username = entry_data[CONF_USERNAME]
@@ -321,13 +313,14 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
         self._username = user_input[CONF_USERNAME]
         self._password = user_input[CONF_PASSWORD]
 
-        if error := await self.async_fritz_tools_init():
+        if error := await self.hass.async_add_executor_job(self.fritz_tools_init):
             return self._show_setup_form_reauth_confirm(
                 user_input=user_input, errors={"base": error}
             )
 
-        return self.async_update_reload_and_abort(
-            self._get_reauth_entry(),
+        assert isinstance(self._entry, ConfigEntry)
+        self.hass.config_entries.async_update_entry(
+            self._entry,
             data={
                 CONF_HOST: self._host,
                 CONF_PASSWORD: self._password,
@@ -336,19 +329,33 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_SSL: self._use_tls,
             },
         )
+        await self.hass.config_entries.async_reload(self._entry.entry_id)
+        return self.async_abort(reason="reauth_successful")
 
-    def _show_setup_form_reconfigure(
+    async def async_step_reconfigure(self, _: Mapping[str, Any]) -> ConfigFlowResult:
+        """Handle reconfigure flow ."""
+        self._entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        assert self._entry
+        self._host = self._entry.data[CONF_HOST]
+        self._port = self._entry.data[CONF_PORT]
+        self._username = self._entry.data[CONF_USERNAME]
+        self._password = self._entry.data[CONF_PASSWORD]
+        self._use_tls = self._entry.data.get(CONF_SSL, DEFAULT_SSL)
+
+        return await self.async_step_reconfigure_confirm()
+
+    def _show_setup_form_reconfigure_confirm(
         self, user_input: dict[str, Any], errors: dict[str, str] | None = None
     ) -> ConfigFlowResult:
         """Show the reconfigure form to the user."""
-        advanced_data_schema: VolDictType = {}
+        advanced_data_schema = {}
         if self.show_advanced_options:
             advanced_data_schema = {
                 vol.Optional(CONF_PORT, default=user_input[CONF_PORT]): vol.Coerce(int),
             }
 
         return self.async_show_form(
-            step_id="reconfigure",
+            step_id="reconfigure_confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_HOST, default=user_input[CONF_HOST]): str,
@@ -356,21 +363,20 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_SSL, default=user_input[CONF_SSL]): bool,
                 }
             ),
-            description_placeholders={"host": user_input[CONF_HOST]},
+            description_placeholders={"host": self._host},
             errors=errors or {},
         )
 
-    async def async_step_reconfigure(
+    async def async_step_reconfigure_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle reconfigure flow."""
         if user_input is None:
-            reconfigure_entry_data = self._get_reconfigure_entry().data
-            return self._show_setup_form_reconfigure(
+            return self._show_setup_form_reconfigure_confirm(
                 {
-                    CONF_HOST: reconfigure_entry_data[CONF_HOST],
-                    CONF_PORT: reconfigure_entry_data[CONF_PORT],
-                    CONF_SSL: reconfigure_entry_data.get(CONF_SSL, DEFAULT_SSL),
+                    CONF_HOST: self._host,
+                    CONF_PORT: self._port,
+                    CONF_SSL: self._use_tls,
                 }
             )
 
@@ -378,25 +384,27 @@ class FritzBoxToolsFlowHandler(ConfigFlow, domain=DOMAIN):
         self._use_tls = user_input[CONF_SSL]
         self._port = self._determine_port(user_input)
 
-        reconfigure_entry = self._get_reconfigure_entry()
-        self._username = reconfigure_entry.data[CONF_USERNAME]
-        self._password = reconfigure_entry.data[CONF_PASSWORD]
-        if error := await self.async_fritz_tools_init():
-            return self._show_setup_form_reconfigure(
+        if error := await self.hass.async_add_executor_job(self.fritz_tools_init):
+            return self._show_setup_form_reconfigure_confirm(
                 user_input={**user_input, CONF_PORT: self._port}, errors={"base": error}
             )
 
-        return self.async_update_reload_and_abort(
-            reconfigure_entry,
-            data_updates={
+        assert isinstance(self._entry, ConfigEntry)
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            data={
                 CONF_HOST: self._host,
+                CONF_PASSWORD: self._password,
                 CONF_PORT: self._port,
+                CONF_USERNAME: self._username,
                 CONF_SSL: self._use_tls,
             },
         )
+        await self.hass.config_entries.async_reload(self._entry.entry_id)
+        return self.async_abort(reason="reconfigure_successful")
 
 
-class FritzBoxToolsOptionsFlowHandler(OptionsFlow):
+class FritzBoxToolsOptionsFlowHandler(OptionsFlowWithConfigEntry):
     """Handle an options flow."""
 
     async def async_step_init(
@@ -407,18 +415,19 @@ class FritzBoxToolsOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        options = self.config_entry.options
         data_schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_CONSIDER_HOME,
-                    default=options.get(
+                    default=self.options.get(
                         CONF_CONSIDER_HOME, DEFAULT_CONSIDER_HOME.total_seconds()
                     ),
                 ): vol.All(vol.Coerce(int), vol.Clamp(min=0, max=900)),
                 vol.Optional(
                     CONF_OLD_DISCOVERY,
-                    default=options.get(CONF_OLD_DISCOVERY, DEFAULT_CONF_OLD_DISCOVERY),
+                    default=self.options.get(
+                        CONF_OLD_DISCOVERY, DEFAULT_CONF_OLD_DISCOVERY
+                    ),
                 ): bool,
             }
         )

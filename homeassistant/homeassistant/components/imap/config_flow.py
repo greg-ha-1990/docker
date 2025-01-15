@@ -9,14 +9,13 @@ from typing import Any
 from aioimaplib import AioImapException
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.const import (
-    CONF_NAME,
-    CONF_PASSWORD,
-    CONF_PORT,
-    CONF_USERNAME,
-    CONF_VERIFY_SSL,
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithConfigEntry,
 )
+from homeassistant.const import CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers import config_validation as cv
@@ -30,7 +29,6 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util.ssl import SSLCipherList
 
-from . import ImapConfigEntry
 from .const import (
     CONF_CHARSET,
     CONF_CUSTOM_EVENT_DATA_TEMPLATE,
@@ -146,6 +144,7 @@ class IMAPConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for imap."""
 
     VERSION = 1
+    _reauth_entry: ConfigEntry | None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -178,6 +177,9 @@ class IMAPConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Perform reauth upon an API authentication error."""
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -185,16 +187,17 @@ class IMAPConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Confirm reauth dialog."""
         errors = {}
-        reauth_entry = self._get_reauth_entry()
+        assert self._reauth_entry
         if user_input is not None:
-            user_input = {**reauth_entry.data, **user_input}
+            user_input = {**self._reauth_entry.data, **user_input}
             if not (errors := await validate_input(self.hass, user_input)):
-                return self.async_update_reload_and_abort(reauth_entry, data=user_input)
+                return self.async_update_reload_and_abort(
+                    self._reauth_entry, data=user_input
+                )
 
         return self.async_show_form(
             description_placeholders={
-                CONF_USERNAME: reauth_entry.data[CONF_USERNAME],
-                CONF_NAME: reauth_entry.title,
+                CONF_USERNAME: self._reauth_entry.data[CONF_USERNAME]
             },
             step_id="reauth_confirm",
             data_schema=vol.Schema(
@@ -208,13 +211,13 @@ class IMAPConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: ImapConfigEntry,
-    ) -> ImapOptionsFlow:
+        config_entry: ConfigEntry,
+    ) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return ImapOptionsFlow()
+        return OptionsFlow(config_entry)
 
 
-class ImapOptionsFlow(OptionsFlow):
+class OptionsFlow(OptionsFlowWithConfigEntry):
     """Option flow handler."""
 
     async def async_step_init(
@@ -222,13 +225,13 @@ class ImapOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage the options."""
         errors: dict[str, str] | None = None
-        entry_data: dict[str, Any] = dict(self.config_entry.data)
+        entry_data: dict[str, Any] = dict(self._config_entry.data)
         if user_input is not None:
             try:
                 self._async_abort_entries_match(
                     {
-                        CONF_SERVER: self.config_entry.data[CONF_SERVER],
-                        CONF_USERNAME: self.config_entry.data[CONF_USERNAME],
+                        CONF_SERVER: self._config_entry.data[CONF_SERVER],
+                        CONF_USERNAME: self._config_entry.data[CONF_USERNAME],
                         CONF_FOLDER: user_input[CONF_FOLDER],
                         CONF_SEARCH: user_input[CONF_SEARCH],
                     }

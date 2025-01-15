@@ -25,8 +25,6 @@ from .const import (
     TOKEN_URL,
 )
 
-type SmappeeConfigEntry = ConfigEntry[SmappeeBase]
-
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
@@ -74,7 +72,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: SmappeeConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Smappee from a zeroconf or config entry."""
     if CONF_IP_ADDRESS in entry.data:
         if helper.is_smappee_genius(entry.data[CONF_SERIALNUMBER]):
@@ -105,28 +103,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: SmappeeConfigEntry) -> b
         smappee = Smappee(api=smappee_api)
         await hass.async_add_executor_job(smappee.load_service_locations)
 
-    entry.runtime_data = SmappeeBase(hass, smappee)
+    hass.data[DOMAIN][entry.entry_id] = SmappeeBase(hass, smappee)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: SmappeeConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unload_ok
 
 
 class SmappeeBase:
     """An object to hold the PySmappee instance."""
 
-    def __init__(self, hass: HomeAssistant, smappee: Smappee) -> None:
+    def __init__(self, hass, smappee):
         """Initialize the Smappee API wrapper class."""
         self.hass = hass
         self.smappee = smappee
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def async_update(self) -> None:
+    async def async_update(self):
         """Update all Smappee trends and appliance states."""
         await self.hass.async_add_executor_job(
             self.smappee.update_trends_and_appliance_states

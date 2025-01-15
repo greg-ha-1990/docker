@@ -9,8 +9,7 @@
   },
   "iot_class": "cloud_polling",
   "loggers": ["pyecobee"],
-  "requirements": ["python-ecobee-api==0.2.20"],
-  "single_config_entry": true,
+  "requirements": ["python-ecobee-api==0.2.18"],
   "zeroconf": [
     {
       "type": "_ecobee._tcp.local."

@@ -40,8 +40,6 @@ async def async_setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up the Command line Binary Sensor."""
-    if not discovery_info:
-        return
 
     discovery_info = cast(DiscoveryInfoType, discovery_info)
     binary_sensor_config = discovery_info
@@ -53,7 +51,9 @@ async def async_setup_platform(
     scan_interval: timedelta = binary_sensor_config.get(
         CONF_SCAN_INTERVAL, SCAN_INTERVAL
     )
-    value_template: Template | None = binary_sensor_config.get(CONF_VALUE_TEMPLATE)
+
+    if value_template := binary_sensor_config.get(CONF_VALUE_TEMPLATE):
+        value_template.hass = hass
 
     data = CommandSensorData(hass, command, command_timeout)
 

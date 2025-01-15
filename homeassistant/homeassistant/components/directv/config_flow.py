@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urlparse
 
 from directv import DIRECTV, DIRECTVError
@@ -40,9 +40,9 @@ class DirecTVConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
+    def __init__(self):
         """Set up the instance."""
-        self.discovery_info: dict[str, Any] = {}
+        self.discovery_info = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -70,9 +70,7 @@ class DirecTVConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: ssdp.SsdpServiceInfo
     ) -> ConfigFlowResult:
         """Handle SSDP discovery."""
-        # We can cast the hostname to str because the ssdp_location is not bytes and
-        # not a relative url
-        host = cast(str, urlparse(discovery_info.ssdp_location).hostname)
+        host = urlparse(discovery_info.ssdp_location).hostname
         receiver_id = None
 
         if discovery_info.upnp.get(ssdp.ATTR_UPNP_SERIAL):

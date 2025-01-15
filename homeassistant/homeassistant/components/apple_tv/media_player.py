@@ -42,9 +42,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.util.dt as dt_util
 
-from . import AppleTvConfigEntry, AppleTVManager
+from . import AppleTvConfigEntry, AppleTVEntity, AppleTVManager
 from .browse_media import build_app_list
-from .entity import AppleTVEntity
 
 _LOGGER = logging.getLogger(__name__)
 

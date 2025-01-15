@@ -35,7 +35,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator: DataUpdateCoordinator[Domain | None] = DataUpdateCoordinator(
         hass,
         LOGGER,
-        config_entry=entry,
         name=f"{DOMAIN}_APK",
         update_interval=SCAN_INTERVAL,
         update_method=_async_query_domain,

@@ -9,10 +9,7 @@ import logging
 import requests
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -29,7 +26,6 @@ AUTHORITIES = [
     "Barking and Dagenham",
     "Bexley",
     "Brent",
-    "Bromley",
     "Camden",
     "City of London",
     "Croydon",
@@ -58,7 +54,7 @@ AUTHORITIES = [
 
 URL = "http://api.erg.kcl.ac.uk/AirQuality/Hourly/MonitoringIndex/GroupName=London/Json"
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_LOCATIONS, default=AUTHORITIES): vol.All(
             cv.ensure_list, [vol.In(AUTHORITIES)]

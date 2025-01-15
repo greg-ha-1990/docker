@@ -6,42 +6,31 @@ import logging
 
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
-from homeassistant.const import CONF_MONITORED_CONDITIONS, PERCENTAGE, UnitOfTime
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
+from homeassistant.const import CONF_MONITORED_CONDITIONS
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .const import DATA_RAINCLOUD, ICON_MAP
-from .entity import RainCloudEntity
+from . import (
+    DATA_RAINCLOUD,
+    ICON_MAP,
+    SENSORS,
+    UNIT_OF_MEASUREMENT_MAP,
+    RainCloudEntity,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-SENSORS = ["battery", "next_cycle", "rain_delay", "watering_time"]
-
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_MONITORED_CONDITIONS, default=list(SENSORS)): vol.All(
             cv.ensure_list, [vol.In(SENSORS)]
         )
     }
 )
-
-UNIT_OF_MEASUREMENT_MAP = {
-    "auto_watering": "",
-    "battery": PERCENTAGE,
-    "is_watering": "",
-    "manual_watering": "",
-    "next_cycle": "",
-    "rain_delay": UnitOfTime.DAYS,
-    "status": "",
-    "watering_time": UnitOfTime.MINUTES,
-}
 
 
 def setup_platform(

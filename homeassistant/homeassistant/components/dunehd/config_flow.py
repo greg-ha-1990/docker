@@ -39,7 +39,7 @@ class DuneHDConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 try:
                     if self.host_already_configured(host):
-                        raise AlreadyConfigured  # noqa: TRY301
+                        raise AlreadyConfigured
                     await self.init_device(host)
                 except CannotConnect:
                     errors[CONF_HOST] = "cannot_connect"

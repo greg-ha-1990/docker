@@ -47,12 +47,12 @@ class TibberConfigFlow(ConfigFlow, domain=DOMAIN):
                 await tibber_connection.update_info()
             except TimeoutError:
                 errors[CONF_ACCESS_TOKEN] = ERR_TIMEOUT
-            except tibber.InvalidLoginError:
+            except tibber.InvalidLogin:
                 errors[CONF_ACCESS_TOKEN] = ERR_TOKEN
             except (
                 aiohttp.ClientError,
-                tibber.RetryableHttpExceptionError,
-                tibber.FatalHttpExceptionError,
+                tibber.RetryableHttpException,
+                tibber.FatalHttpException,
             ):
                 errors[CONF_ACCESS_TOKEN] = ERR_CLIENT
 

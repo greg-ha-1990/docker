@@ -32,7 +32,6 @@ from ..const import (
     ATTR_PROPERTY_KEY_NAME,
     ATTR_PROPERTY_NAME,
     DOMAIN,
-    EVENT_VALUE_UPDATED,
 )
 from ..helpers import async_get_nodes_from_targets, get_device_id
 from .trigger_helpers import async_bypass_dynamic_config_validation
@@ -129,9 +128,14 @@ async def async_attach_trigger(
             (prev_value, prev_value_raw, from_value),
             (curr_value, curr_value_raw, to_value),
         ):
-            if match not in (MATCH_ALL, value_to_eval, raw_value_to_eval) and not (
-                isinstance(match, list)
-                and (value_to_eval in match or raw_value_to_eval in match)
+            if (
+                match != MATCH_ALL
+                and value_to_eval != match
+                and not (
+                    isinstance(match, list)
+                    and (value_to_eval in match or raw_value_to_eval in match)
+                )
+                and raw_value_to_eval != match
             ):
                 return
 
@@ -185,7 +189,7 @@ async def async_attach_trigger(
             # We need to store the current value and device for the callback
             unsubs.append(
                 node.on(
-                    EVENT_VALUE_UPDATED,
+                    "value updated",
                     functools.partial(async_on_value_updated, value, device),
                 )
             )

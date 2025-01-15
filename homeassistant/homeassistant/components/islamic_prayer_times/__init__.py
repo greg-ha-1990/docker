@@ -7,21 +7,19 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 
+from .const import DOMAIN
 from .coordinator import IslamicPrayerDataUpdateCoordinator
 
 PLATFORMS = [Platform.SENSOR]
 
+CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
 _LOGGER = logging.getLogger(__name__)
 
-type IslamicPrayerTimesConfigEntry = ConfigEntry[IslamicPrayerDataUpdateCoordinator]
 
-
-async def async_setup_entry(
-    hass: HomeAssistant, config_entry: IslamicPrayerTimesConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up the Islamic Prayer Component."""
 
     @callback
@@ -39,7 +37,7 @@ async def async_setup_entry(
     coordinator = IslamicPrayerDataUpdateCoordinator(hass)
     await coordinator.async_config_entry_first_refresh()
 
-    config_entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
     config_entry.async_on_unload(
         config_entry.add_update_listener(async_options_updated)
     )
@@ -74,24 +72,24 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, config_entry: IslamicPrayerTimesConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Unload Islamic Prayer entry from config_entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(
         config_entry, PLATFORMS
     ):
-        coordinator = config_entry.runtime_data
+        coordinator: IslamicPrayerDataUpdateCoordinator = hass.data[DOMAIN].pop(
+            config_entry.entry_id
+        )
         if coordinator.event_unsub:
             coordinator.event_unsub()
+        if not hass.data[DOMAIN]:
+            del hass.data[DOMAIN]
     return unload_ok
 
 
-async def async_options_updated(
-    hass: HomeAssistant, entry: IslamicPrayerTimesConfigEntry
-) -> None:
+async def async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Triggered by config entry options updates."""
-    coordinator = entry.runtime_data
+    coordinator: IslamicPrayerDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     if coordinator.event_unsub:
         coordinator.event_unsub()
     await coordinator.async_request_refresh()

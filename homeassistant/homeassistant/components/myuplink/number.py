@@ -4,15 +4,16 @@ from aiohttp import ClientError
 from myuplink import DevicePoint
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import MyUplinkConfigEntry, MyUplinkDataCoordinator
-from .const import DOMAIN, F_SERIES
+from . import MyUplinkDataCoordinator
+from .const import DOMAIN
 from .entity import MyUplinkEntity
-from .helpers import find_matching_platform, skip_entity, transform_model_series
+from .helpers import find_matching_platform, skip_entity
 
 DEVICE_POINT_UNIT_DESCRIPTIONS: dict[str, NumberEntityDescription] = {
     "DM": NumberEntityDescription(
@@ -23,13 +24,6 @@ DEVICE_POINT_UNIT_DESCRIPTIONS: dict[str, NumberEntityDescription] = {
 }
 
 CATEGORY_BASED_DESCRIPTIONS: dict[str, dict[str, NumberEntityDescription]] = {
-    F_SERIES: {
-        "40940": NumberEntityDescription(
-            key="degree_minutes",
-            translation_key="degree_minutes",
-            native_unit_of_measurement="DM",
-        ),
-    },
     "NIBEF": {
         "40940": NumberEntityDescription(
             key="degree_minutes",
@@ -49,7 +43,6 @@ def get_description(device_point: DevicePoint) -> NumberEntityDescription | None
     3. Default to None
     """
     prefix, _, _ = device_point.category.partition(" ")
-    prefix = transform_model_series(prefix)
     description = CATEGORY_BASED_DESCRIPTIONS.get(prefix, {}).get(
         device_point.parameter_id
     )
@@ -62,12 +55,12 @@ def get_description(device_point: DevicePoint) -> NumberEntityDescription | None
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: MyUplinkConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up myUplink number."""
     entities: list[NumberEntity] = []
-    coordinator = config_entry.runtime_data
+    coordinator: MyUplinkDataCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     # Setup device point number entities
     for device_id, point_data in coordinator.data.points.items():
@@ -110,16 +103,13 @@ class MyUplinkNumber(MyUplinkEntity, NumberEntity):
         # Internal properties
         self.point_id = device_point.parameter_id
         self._attr_name = device_point.parameter_name
-        _scale = float(device_point.scale_value if device_point.scale_value else 1.0)
         self._attr_native_min_value = (
-            device_point.min_value if device_point.min_value else -30000
-        ) * _scale
+            device_point.raw["minValue"] if device_point.raw["minValue"] else -30000
+        ) * float(device_point.raw.get("scaleValue", 1))
         self._attr_native_max_value = (
-            device_point.max_value if device_point.max_value else 30000
-        ) * _scale
-        self._attr_native_step = (
-            device_point.step_value if device_point.step_value else 1.0
-        ) * _scale
+            device_point.raw["maxValue"] if device_point.raw["maxValue"] else 30000
+        ) * float(device_point.raw.get("scaleValue", 1))
+        self._attr_step_value = device_point.raw.get("stepValue", 20)
         if entity_description is not None:
             self.entity_description = entity_description
 
@@ -137,13 +127,7 @@ class MyUplinkNumber(MyUplinkEntity, NumberEntity):
             )
         except ClientError as err:
             raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="set_number_error",
-                translation_placeholders={
-                    "entity": self.entity_id,
-                    "point": self.point_id,
-                    "value": str(value),
-                },
+                f"Failed to set new value {value} for {self.point_id}/{self.entity_id}"
             ) from err
 
         await self.coordinator.async_request_refresh()

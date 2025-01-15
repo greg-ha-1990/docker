@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+from typing import Any
 
 from fyta_cli.fyta_connector import FytaConnector
 
@@ -15,10 +16,9 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util.dt import async_get_time_zone
 
-from .const import CONF_EXPIRATION
+from .const import CONF_EXPIRATION, DOMAIN
 from .coordinator import FytaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,10 +26,9 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [
     Platform.SENSOR,
 ]
-type FytaConfigEntry = ConfigEntry[FytaCoordinator]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: FytaConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Fyta integration."""
     tz: str = hass.config.time_zone
 
@@ -40,30 +39,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: FytaConfigEntry) -> bool
         entry.data[CONF_EXPIRATION]
     ).astimezone(await async_get_time_zone(tz))
 
-    fyta = FytaConnector(
-        username, password, access_token, expiration, tz, async_get_clientsession(hass)
-    )
+    fyta = FytaConnector(username, password, access_token, expiration, tz)
 
     coordinator = FytaCoordinator(hass, fyta)
 
     await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: FytaConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Fyta entity."""
 
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
 
 
-async def async_migrate_entry(
-    hass: HomeAssistant, config_entry: FytaConfigEntry
-) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Migrate old entry."""
     _LOGGER.debug("Migrating from version %s", config_entry.version)
 
@@ -77,11 +76,11 @@ async def async_migrate_entry(
             fyta = FytaConnector(
                 config_entry.data[CONF_USERNAME], config_entry.data[CONF_PASSWORD]
             )
-            credentials = await fyta.login()
+            credentials: dict[str, Any] = await fyta.login()
             await fyta.client.close()
 
-            new[CONF_ACCESS_TOKEN] = credentials.access_token
-            new[CONF_EXPIRATION] = credentials.expiration.isoformat()
+            new[CONF_ACCESS_TOKEN] = credentials[CONF_ACCESS_TOKEN]
+            new[CONF_EXPIRATION] = credentials[CONF_EXPIRATION].isoformat()
 
             hass.config_entries.async_update_entry(
                 config_entry, data=new, minor_version=2, version=1

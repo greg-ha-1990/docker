@@ -15,4 +15,3 @@ send_magic_packet:
         number:
           min: 1
           max: 65535
-          mode: "box"

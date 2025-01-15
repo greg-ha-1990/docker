@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from spotifyaio import Image
+from typing import Any
+
 import yarl
 
 from .const import MEDIA_PLAYER_PREFIX
@@ -18,11 +19,12 @@ def resolve_spotify_media_type(media_content_type: str) -> str:
     return media_content_type.removeprefix(MEDIA_PLAYER_PREFIX)
 
 
-def fetch_image_url(images: list[Image]) -> str | None:
+def fetch_image_url(item: dict[str, Any], key="images") -> str | None:
     """Fetch image url."""
-    if not images:
-        return None
-    return images[0].url
+    source = item.get(key, [])
+    if isinstance(source, list) and source:
+        return source[0].get("url")
+    return None
 
 
 def spotify_uri_from_media_browser_url(media_content_id: str) -> str:

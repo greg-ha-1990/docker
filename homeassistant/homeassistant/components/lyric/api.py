@@ -36,7 +36,8 @@ class ConfigEntryLyricClient(LyricClient):
 
     async def async_get_access_token(self):
         """Return a valid access token."""
-        await self._oauth_session.async_ensure_token_valid()
+        if not self._oauth_session.valid_token:
+            await self._oauth_session.async_ensure_token_valid()
 
         return self._oauth_session.token["access_token"]
 

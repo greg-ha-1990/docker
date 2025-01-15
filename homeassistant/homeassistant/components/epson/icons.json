@@ -1,7 +1,5 @@
 {
   "services": {
-    "select_cmode": {
-      "service": "mdi:palette"
-    }
+    "select_cmode": "mdi:palette"
   }
 }

@@ -15,13 +15,14 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfInformation
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import RadarrConfigEntry
+from . import RadarrEntity
+from .const import DOMAIN
 from .coordinator import RadarrDataUpdateCoordinator, T
-from .entity import RadarrEntity
 
 
 def get_space(data: list[Diskspace], name: str) -> str:
@@ -116,13 +117,16 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: RadarrConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Radarr sensors based on a config entry."""
+    coordinators: dict[str, RadarrDataUpdateCoordinator[Any]] = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     entities: list[RadarrSensor[Any]] = []
     for coordinator_type, description in SENSOR_TYPES.items():
-        coordinator = getattr(entry.runtime_data, coordinator_type)
+        coordinator = coordinators[coordinator_type]
         if coordinator_type != "disk_space":
             entities.append(RadarrSensor(coordinator, description))
         else:

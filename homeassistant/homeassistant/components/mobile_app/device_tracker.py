@@ -5,6 +5,7 @@ from homeassistant.components.device_tracker import (
     ATTR_GPS,
     ATTR_GPS_ACCURACY,
     ATTR_LOCATION_NAME,
+    SourceType,
     TrackerEntity,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -101,6 +102,11 @@ class MobileAppEntity(TrackerEntity, RestoreEntity):
     def name(self):
         """Return the name of the device."""
         return self._entry.data[ATTR_DEVICE_NAME]
+
+    @property
+    def source_type(self) -> SourceType:
+        """Return the source type, eg gps or router, of the device."""
+        return SourceType.GPS
 
     @property
     def device_info(self):

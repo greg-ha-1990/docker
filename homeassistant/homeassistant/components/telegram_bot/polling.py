@@ -25,22 +25,14 @@ async def async_setup_platform(hass, bot, config):
 
 async def process_error(update: Update, context: CallbackContext) -> None:
     """Telegram bot error handler."""
-    if context.error:
-        error_callback(context.error, update)
-
-
-def error_callback(error: Exception, update: Update | None = None) -> None:
-    """Log the error."""
     try:
-        raise error
+        if context.error:
+            raise context.error
     except (TimedOut, NetworkError, RetryAfter):
         # Long polling timeout or connection problem. Nothing serious.
         pass
     except TelegramError:
-        if update is not None:
-            _LOGGER.error('Update "%s" caused error: "%s"', update, error)
-        else:
-            _LOGGER.error("%s: %s", error.__class__.__name__, error)
+        _LOGGER.error('Update "%s" caused error: "%s"', update, context.error)
 
 
 class PollBot(BaseTelegramBotEntity):
@@ -61,7 +53,7 @@ class PollBot(BaseTelegramBotEntity):
         """Start the polling task."""
         _LOGGER.debug("Starting polling")
         await self.application.initialize()
-        await self.application.updater.start_polling(error_callback=error_callback)
+        await self.application.updater.start_polling()
         await self.application.start()
 
     async def stop_polling(self, event=None):

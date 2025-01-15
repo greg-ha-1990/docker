@@ -4,10 +4,7 @@
     "step": {
       "user": {
         "data": {
-          "address": "Device"
-        },
-        "data_description": {
-          "address": "The bluetooth device for the desk."
+          "address": "Bluetooth address"
         }
       }
     },

@@ -9,6 +9,7 @@ from bthome_ble.const import (
     ExtendedSensorDeviceClass as BTHomeExtendedSensorDeviceClass,
 )
 
+from homeassistant import config_entries
 from homeassistant.components.bluetooth.passive_update_processor import (
     PassiveBluetoothDataUpdate,
     PassiveBluetoothProcessorEntity,
@@ -27,7 +28,6 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
-    UnitOfConductivity,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -45,9 +45,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
 
-from .coordinator import BTHomePassiveBluetoothDataProcessor
+from .const import DOMAIN
+from .coordinator import (
+    BTHomePassiveBluetoothDataProcessor,
+    BTHomePassiveBluetoothProcessorCoordinator,
+)
 from .device import device_key_to_bluetooth_entity_key
-from .types import BTHomeConfigEntry
 
 SENSOR_DESCRIPTIONS = {
     # Acceleration (m/s²)
@@ -357,16 +360,6 @@ SENSOR_DESCRIPTIONS = {
         native_unit_of_measurement=UnitOfVolume.LITERS,
         state_class=SensorStateClass.TOTAL,
     ),
-    # Conductivity (µS/cm)
-    (
-        BTHomeSensorDeviceClass.CONDUCTIVITY,
-        Units.CONDUCTIVITY,
-    ): SensorEntityDescription(
-        key=f"{BTHomeSensorDeviceClass.CONDUCTIVITY}_{Units.CONDUCTIVITY}",
-        device_class=SensorDeviceClass.CONDUCTIVITY,
-        native_unit_of_measurement=UnitOfConductivity.MICROSIEMENS_PER_CM,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
 }
 
 
@@ -401,11 +394,13 @@ def sensor_update_to_bluetooth_data_update(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: BTHomeConfigEntry,
+    entry: config_entries.ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the BTHome BLE sensors."""
-    coordinator = entry.runtime_data
+    coordinator: BTHomePassiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     processor = BTHomePassiveBluetoothDataProcessor(
         sensor_update_to_bluetooth_data_update
     )

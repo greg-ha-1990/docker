@@ -19,8 +19,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import AppleTvConfigEntry
-from .entity import AppleTVEntity
+from . import AppleTvConfigEntry, AppleTVEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +85,7 @@ class AppleTVRemote(AppleTVEntity, RemoteEntity):
                 if not attr_value:
                     raise ValueError("Command not found. Exiting sequence")
 
-                _LOGGER.debug("Sending command %s", single_command)
+                _LOGGER.info("Sending command %s", single_command)
 
                 if hold_secs >= 1:
                     await attr_value(action=InputAction.Hold)

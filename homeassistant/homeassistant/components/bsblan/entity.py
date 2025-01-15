@@ -1,35 +1,41 @@
-"""BSBLan base entity."""
+"""Base entity for the BSBLAN integration."""
 
 from __future__ import annotations
 
+from bsblan import BSBLAN, Device, Info, StaticState
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_HOST
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceInfo,
     format_mac,
 )
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import Entity
 
-from . import BSBLanData
 from .const import DOMAIN
-from .coordinator import BSBLanUpdateCoordinator
 
 
-class BSBLanEntity(CoordinatorEntity[BSBLanUpdateCoordinator]):
-    """Defines a base BSBLan entity."""
+class BSBLANEntity(Entity):
+    """Defines a BSBLAN entity."""
 
-    _attr_has_entity_name = True
+    def __init__(
+        self,
+        client: BSBLAN,
+        device: Device,
+        info: Info,
+        static: StaticState,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize an BSBLAN entity."""
+        self.client = client
 
-    def __init__(self, coordinator: BSBLanUpdateCoordinator, data: BSBLanData) -> None:
-        """Initialize BSBLan entity."""
-        super().__init__(coordinator, data)
-        host = coordinator.config_entry.data["host"]
-        mac = data.device.MAC
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, mac)},
-            connections={(CONNECTION_NETWORK_MAC, format_mac(mac))},
-            name=data.device.name,
+            connections={(CONNECTION_NETWORK_MAC, format_mac(device.MAC))},
+            identifiers={(DOMAIN, format_mac(device.MAC))},
             manufacturer="BSBLAN Inc.",
-            model=data.info.device_identification.value,
-            sw_version=data.device.version,
-            configuration_url=f"http://{host}",
+            model=info.device_identification.value,
+            name=device.name,
+            sw_version=f"{device.version})",
+            configuration_url=f"http://{entry.data[CONF_HOST]}",
         )

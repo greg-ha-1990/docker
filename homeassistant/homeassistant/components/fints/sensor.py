@@ -4,18 +4,15 @@ from __future__ import annotations
 
 from collections import namedtuple
 from datetime import timedelta
+from functools import cached_property
 import logging
 from typing import Any
 
 from fints.client import FinTS3PinTanClient
 from fints.models import SEPAAccount
-from propcache import cached_property
 import voluptuous as vol
 
-from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorEntity,
-)
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_NAME, CONF_PIN, CONF_URL, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -28,7 +25,7 @@ SCAN_INTERVAL = timedelta(hours=4)
 
 ICON = "mdi:currency-eur"
 
-BankCredentials = namedtuple("BankCredentials", "blz login pin url")  # noqa: PYI024
+BankCredentials = namedtuple("BankCredentials", "blz login pin url")
 
 CONF_BIN = "bank_identification_number"
 CONF_ACCOUNTS = "accounts"
@@ -46,7 +43,7 @@ SCHEMA_ACCOUNTS = vol.Schema(
     }
 )
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_BIN): cv.string,
         vol.Required(CONF_USERNAME): cv.string,
@@ -89,7 +86,7 @@ def setup_platform(
 
     for account in balance_accounts:
         if config[CONF_ACCOUNTS] and account.iban not in account_config:
-            _LOGGER.debug("Skipping account %s for bank %s", account.iban, fints_name)
+            _LOGGER.info("Skipping account %s for bank %s", account.iban, fints_name)
             continue
 
         if not (account_name := account_config.get(account.iban)):
@@ -99,7 +96,7 @@ def setup_platform(
 
     for account in holdings_accounts:
         if config[CONF_HOLDINGS] and account.accountnumber not in holdings_config:
-            _LOGGER.debug(
+            _LOGGER.info(
                 "Skipping holdings %s for bank %s", account.accountnumber, fints_name
             )
             continue

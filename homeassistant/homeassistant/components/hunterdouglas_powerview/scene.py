@@ -9,13 +9,14 @@ from aiopvapi.helpers.constants import ATTR_NAME
 from aiopvapi.resources.scene import Scene as PvScene
 
 from homeassistant.components.scene import Scene
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import STATE_ATTRIBUTE_ROOM_NAME
+from .const import DOMAIN, STATE_ATTRIBUTE_ROOM_NAME
 from .coordinator import PowerviewShadeUpdateCoordinator
 from .entity import HDEntity
-from .model import PowerviewConfigEntry, PowerviewDeviceInfo
+from .model import PowerviewDeviceInfo, PowerviewEntryData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,12 +24,12 @@ RESYNC_DELAY = 60
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: PowerviewConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up powerview scene entries."""
-    pv_entry = entry.runtime_data
+
+    pv_entry: PowerviewEntryData = hass.data[DOMAIN][entry.entry_id]
+
     pvscenes: list[PowerViewScene] = []
     for scene in pv_entry.scene_data.values():
         room_name = getattr(pv_entry.room_data.get(scene.room_id), ATTR_NAME, "")

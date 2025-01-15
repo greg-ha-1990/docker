@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import hmac
+from typing import Any, cast
 
 import voluptuous as vol
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 
-from ..models import AuthFlowContext, AuthFlowResult, Credentials, UserMeta
+from ..models import AuthFlowResult, Credentials, UserMeta
 from . import AUTH_PROVIDER_SCHEMA, AUTH_PROVIDERS, AuthProvider, LoginFlow
 
 USER_SCHEMA = vol.Schema(
@@ -35,9 +36,7 @@ class InvalidAuthError(HomeAssistantError):
 class ExampleAuthProvider(AuthProvider):
     """Example auth provider based on hardcoded usernames and passwords."""
 
-    async def async_login_flow(
-        self, context: AuthFlowContext | None
-    ) -> ExampleLoginFlow:
+    async def async_login_flow(self, context: dict[str, Any] | None) -> LoginFlow:
         """Return a flow to login."""
         return ExampleLoginFlow(self)
 
@@ -94,7 +93,7 @@ class ExampleAuthProvider(AuthProvider):
         return UserMeta(name=name, is_active=True)
 
 
-class ExampleLoginFlow(LoginFlow[ExampleAuthProvider]):
+class ExampleLoginFlow(LoginFlow):
     """Handler for the login flow."""
 
     async def async_step_init(
@@ -105,7 +104,7 @@ class ExampleLoginFlow(LoginFlow[ExampleAuthProvider]):
 
         if user_input is not None:
             try:
-                self._auth_provider.async_validate_login(
+                cast(ExampleAuthProvider, self._auth_provider).async_validate_login(
                     user_input["username"], user_input["password"]
                 )
             except InvalidAuthError:

@@ -45,7 +45,7 @@ from homeassistant.helpers import (
     service,
     storage,
 )
-from homeassistant.helpers.typing import ConfigType, VolDictType
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import bind_hass
 from homeassistant.util.location import distance
 
@@ -62,7 +62,7 @@ ENTITY_ID_HOME = ENTITY_ID_FORMAT.format(HOME_ZONE)
 ICON_HOME = "mdi:home"
 ICON_IMPORT = "mdi:import"
 
-CREATE_FIELDS: VolDictType = {
+CREATE_FIELDS = {
     vol.Required(CONF_NAME): cv.string,
     vol.Required(CONF_LATITUDE): cv.latitude,
     vol.Required(CONF_LONGITUDE): cv.longitude,
@@ -72,7 +72,7 @@ CREATE_FIELDS: VolDictType = {
 }
 
 
-UPDATE_FIELDS: VolDictType = {
+UPDATE_FIELDS = {
     vol.Optional(CONF_NAME): cv.string,
     vol.Optional(CONF_LATITUDE): cv.latitude,
     vol.Optional(CONF_LONGITUDE): cv.longitude,
@@ -302,7 +302,7 @@ def _home_conf(hass: HomeAssistant) -> dict:
         CONF_NAME: hass.config.location_name,
         CONF_LATITUDE: hass.config.latitude,
         CONF_LONGITUDE: hass.config.longitude,
-        CONF_RADIUS: hass.config.radius,
+        CONF_RADIUS: DEFAULT_RADIUS,
         CONF_ICON: ICON_HOME,
         CONF_PASSIVE: False,
     }

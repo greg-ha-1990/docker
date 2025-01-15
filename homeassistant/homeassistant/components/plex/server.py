@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import copy
 import logging
 import ssl
 import time
@@ -425,7 +424,9 @@ class PlexServer:
                 client = resource.connect(timeout=3)
                 _LOGGER.debug("Resource connection successful to plex.tv: %s", client)
             except NotFound:
-                _LOGGER.info("Resource connection failed to plex.tv: %s", resource.name)
+                _LOGGER.error(
+                    "Resource connection failed to plex.tv: %s", resource.name
+                )
             else:
                 client.proxyThroughServer(value=False, server=self._plex_server)
                 self._client_device_cache[client.machineIdentifier] = client
@@ -663,14 +664,3 @@ class PlexServer:
     def sensor_attributes(self):
         """Return active session information for use in activity sensor."""
         return {x.sensor_user: x.sensor_title for x in self.active_sessions.values()}
-
-    def set_plex_server(self, plex_server: PlexServer) -> None:
-        """Set the PlexServer instance."""
-        self._plex_server = plex_server
-
-    def switch_user(self, username: str) -> PlexServer:
-        """Return a shallow copy of a PlexServer as the provided user."""
-        new_server = copy(self)
-        new_server.set_plex_server(self.plex_server.switchUser(username))
-
-        return new_server

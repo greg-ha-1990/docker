@@ -9,12 +9,7 @@ from pygti.auth import GTI_DEFAULT_HOST
 from pygti.exceptions import CannotConnect, InvalidAuth
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_OFFSET, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers import aiohttp_client
@@ -49,16 +44,13 @@ class HVVDeparturesConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    hub: GTIHub
-    data: dict[str, Any]
-
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize component."""
-        self.stations: dict[str, Any] = {}
+        self.hub = None
+        self.data = None
+        self.stations = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
 
@@ -87,9 +79,7 @@ class HVVDeparturesConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=SCHEMA_STEP_USER, errors=errors
         )
 
-    async def async_step_station(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_station(self, user_input=None):
         """Handle the step where the user inputs his/her station."""
         if user_input is not None:
             errors = {}
@@ -119,9 +109,7 @@ class HVVDeparturesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="station", data_schema=SCHEMA_STEP_STATION)
 
-    async def async_step_station_select(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_station_select(self, user_input=None):
         """Handle the step where the user inputs his/her station."""
 
         schema = vol.Schema({vol.Required(CONF_STATION): vol.In(list(self.stations))})
@@ -141,19 +129,19 @@ class HVVDeparturesConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> OptionsFlowHandler:
         """Get options flow."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
 
 class OptionsFlowHandler(OptionsFlow):
     """Options flow handler."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize HVV Departures options flow."""
+        self.config_entry = config_entry
+        self.options = dict(config_entry.options)
         self.departure_filters: dict[str, Any] = {}
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input=None):
         """Manage the options."""
         errors = {}
         if not self.departure_filters:
@@ -182,7 +170,7 @@ class OptionsFlowHandler(OptionsFlow):
             if not errors:
                 self.departure_filters = {
                     str(i): departure_filter
-                    for i, departure_filter in enumerate(departure_list["filter"])
+                    for i, departure_filter in enumerate(departure_list.get("filter"))
                 }
 
         if user_input is not None and not errors:
@@ -200,7 +188,7 @@ class OptionsFlowHandler(OptionsFlow):
             old_filter = [
                 i
                 for (i, f) in self.departure_filters.items()
-                if f in self.config_entry.options[CONF_FILTER]
+                if f in self.config_entry.options.get(CONF_FILTER)
             ]
         else:
             old_filter = []

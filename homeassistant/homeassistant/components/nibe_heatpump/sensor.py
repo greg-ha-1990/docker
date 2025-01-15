@@ -26,8 +26,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .coordinator import CoilCoordinator
-from .entity import CoilEntity
+from .coordinator import CoilEntity, Coordinator
 
 UNIT_DESCRIPTIONS = {
     "°C": SensorEntityDescription(
@@ -131,7 +130,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up platform."""
 
-    coordinator: CoilCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: Coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     async_add_entities(
         Sensor(coordinator, coil, UNIT_DESCRIPTIONS.get(coil.unit))
@@ -145,7 +144,7 @@ class Sensor(CoilEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: CoilCoordinator,
+        coordinator: Coordinator,
         coil: Coil,
         entity_description: SensorEntityDescription | None,
     ) -> None:

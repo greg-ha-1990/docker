@@ -10,20 +10,18 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
+from .const import DOMAIN
 from .coordinator import SchlageDataUpdateCoordinator
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.LOCK,
-    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 ]
 
-type SchlageConfigEntry = ConfigEntry[SchlageDataUpdateCoordinator]
 
-
-async def async_setup_entry(hass: HomeAssistant, entry: SchlageConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Schlage from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
@@ -33,12 +31,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: SchlageConfigEntry) -> b
         raise ConfigEntryAuthFailed from ex
 
     coordinator = SchlageDataUpdateCoordinator(hass, username, pyschlage.Schlage(auth))
-    entry.runtime_data = coordinator
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: SchlageConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok

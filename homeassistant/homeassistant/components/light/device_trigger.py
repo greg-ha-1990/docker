@@ -10,7 +10,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from . import DOMAIN
 
 TRIGGER_SCHEMA = vol.All(
     toggle_entity.TRIGGER_SCHEMA,

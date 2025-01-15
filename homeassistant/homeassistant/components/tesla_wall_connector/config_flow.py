@@ -46,6 +46,7 @@ class TeslaWallConnectorConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialize config flow."""
         super().__init__()
         self.ip_address: str | None = None
+        self.serial_number = None
 
     async def async_step_dhcp(
         self, discovery_info: dhcp.DhcpServiceInfo
@@ -69,21 +70,23 @@ class TeslaWallConnectorConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             return self.async_abort(reason="cannot_connect")
 
-        serial_number: str = version.serial_number
+        self.serial_number = version.serial_number
 
-        await self.async_set_unique_id(serial_number)
+        await self.async_set_unique_id(self.serial_number)
         self._abort_if_unique_id_configured(updates={CONF_HOST: self.ip_address})
 
         _LOGGER.debug(
             "No entry found for wall connector with IP %s. Serial nr: %s",
             self.ip_address,
-            serial_number,
+            self.serial_number,
         )
 
-        self.context["title_placeholders"] = {
+        placeholders = {
             CONF_HOST: self.ip_address,
-            WALLCONNECTOR_SERIAL_NUMBER: serial_number,
+            WALLCONNECTOR_SERIAL_NUMBER: self.serial_number,
         }
+
+        self.context["title_placeholders"] = placeholders
         return await self.async_step_user()
 
     async def async_step_user(

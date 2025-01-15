@@ -56,9 +56,7 @@ WEBHOOK_SCHEMA = vol.Schema(
 )
 
 
-async def handle_webhook(
-    hass: HomeAssistant, webhook_id: str, request: web.Request
-) -> web.Response:
+async def handle_webhook(hass, webhook_id, request):
     """Handle incoming webhook with Traccar Client request."""
     try:
         data = WEBHOOK_SCHEMA(dict(request.query))

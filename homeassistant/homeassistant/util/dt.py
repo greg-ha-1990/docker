@@ -13,8 +13,6 @@ import zoneinfo
 from aiozoneinfo import async_get_time_zone as _async_get_time_zone
 import ciso8601
 
-from homeassistant.helpers.deprecation import deprecated_function
-
 DATE_STR_FORMAT = "%Y-%m-%d"
 UTC = dt.UTC
 DEFAULT_TIME_ZONE: dt.tzinfo = dt.UTC
@@ -97,7 +95,7 @@ def set_default_time_zone(time_zone: dt.tzinfo) -> None:
     get_default_time_zone.cache_clear()
 
 
-def get_time_zone(time_zone_str: str) -> zoneinfo.ZoneInfo | None:
+def get_time_zone(time_zone_str: str) -> dt.tzinfo | None:
     """Get time zone from string. Return None if unable to determine.
 
     Must be run in the executor if the ZoneInfo is not already
@@ -109,7 +107,7 @@ def get_time_zone(time_zone_str: str) -> zoneinfo.ZoneInfo | None:
         return None
 
 
-async def async_get_time_zone(time_zone_str: str) -> zoneinfo.ZoneInfo | None:
+async def async_get_time_zone(time_zone_str: str) -> dt.tzinfo | None:
     """Get time zone from string. Return None if unable to determine.
 
     Async friendly.
@@ -172,7 +170,6 @@ utc_from_timestamp = partial(dt.datetime.fromtimestamp, tz=UTC)
 """Return a UTC time from a timestamp."""
 
 
-@deprecated_function("datetime.timestamp", breaks_in_ha_version="2026.1")
 def utc_to_timestamp(utc_dt: dt.datetime) -> float:
     """Fast conversion of a datetime in UTC to a timestamp."""
     # Taken from

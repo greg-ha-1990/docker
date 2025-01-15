@@ -9,7 +9,6 @@ from aioharmony.const import ClientCallbackType, SendCommandDevice
 import aioharmony.exceptions as aioexc
 from aioharmony.harmonyapi import HarmonyAPI as HarmonyClient
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -18,9 +17,6 @@ from .const import ACTIVITY_POWER_OFF
 from .subscriber import HarmonySubscriberMixin
 
 _LOGGER = logging.getLogger(__name__)
-
-
-type HarmonyConfigEntry = ConfigEntry[HarmonyData]
 
 
 class HarmonyData(HarmonySubscriberMixin):

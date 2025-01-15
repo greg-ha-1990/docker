@@ -6,7 +6,7 @@ from homeassistant.helpers import entity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import DOMAIN
-from .devices import SatelliteDevice
+from .satellite import SatelliteDevice
 
 
 class WyomingSatelliteEntity(entity.Entity):

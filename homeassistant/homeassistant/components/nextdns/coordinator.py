@@ -1,5 +1,6 @@
 """NextDns coordinator."""
 
+import asyncio
 from datetime import timedelta
 import logging
 from typing import TypeVar
@@ -18,10 +19,8 @@ from nextdns import (
     Settings,
 )
 from nextdns.model import NextDnsData
-from tenacity import RetryError
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -59,15 +58,10 @@ class NextDnsUpdateCoordinator(DataUpdateCoordinator[CoordinatorDataT]):
     async def _async_update_data(self) -> CoordinatorDataT:
         """Update data via internal method."""
         try:
-            return await self._async_update_data_internal()
-        except (
-            ApiError,
-            ClientConnectorError,
-            RetryError,
-        ) as err:
+            async with asyncio.timeout(10):
+                return await self._async_update_data_internal()
+        except (ApiError, ClientConnectorError, InvalidApiKeyError) as err:
             raise UpdateFailed(err) from err
-        except InvalidApiKeyError as err:
-            raise ConfigEntryAuthFailed from err
 
     async def _async_update_data_internal(self) -> CoordinatorDataT:
         """Update data via library."""

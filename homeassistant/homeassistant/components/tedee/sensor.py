@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from aiotedee import TedeeLock
+from pytedee_async import TedeeLock
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -15,11 +15,8 @@ from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import TedeeConfigEntry
+from . import TedeeConfigEntry
 from .entity import TedeeDescriptionEntity
-
-# Coordinator is used to centralize the data updates
-PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True, kw_only=True)

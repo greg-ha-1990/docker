@@ -1,7 +1,5 @@
 {
   "services": {
-    "request_image": {
-      "service": "mdi:image-sync"
-    }
+    "request_image": "mdi:image-sync"
   }
 }

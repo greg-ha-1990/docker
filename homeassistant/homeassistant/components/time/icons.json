@@ -5,8 +5,6 @@
     }
   },
   "services": {
-    "set_value": {
-      "service": "mdi:clock-edit"
-    }
+    "set_value": "mdi:clock-edit"
   }
 }

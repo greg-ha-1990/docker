@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
+from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.device_tracker.config_entry import TrackerEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import TessieConfigEntry
+from .coordinator import TessieStateUpdateCoordinator
 from .entity import TessieEntity
-from .models import TessieVehicleData
-
-PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -37,10 +36,15 @@ class TessieDeviceTrackerEntity(TessieEntity, TrackerEntity):
 
     def __init__(
         self,
-        vehicle: TessieVehicleData,
+        coordinator: TessieStateUpdateCoordinator,
     ) -> None:
         """Initialize the device tracker."""
-        super().__init__(vehicle, self.key)
+        super().__init__(coordinator, self.key)
+
+    @property
+    def source_type(self) -> SourceType | str:
+        """Return the source type of the device tracker."""
+        return SourceType.GPS
 
 
 class TessieDeviceTrackerLocationEntity(TessieDeviceTrackerEntity):

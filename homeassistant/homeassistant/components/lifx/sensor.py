@@ -65,6 +65,7 @@ class LIFXRssiSensor(LIFXEntity, SensorEntity):
         """Handle coordinator updates."""
         self._attr_native_value = self.coordinator.rssi
 
+    @callback
     async def async_added_to_hass(self) -> None:
         """Enable RSSI updates."""
         self.async_on_remove(self.coordinator.async_enable_rssi_updates())

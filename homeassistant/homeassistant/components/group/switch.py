@@ -7,11 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components.switch import (
-    DOMAIN as SWITCH_DOMAIN,
-    PLATFORM_SCHEMA as SWITCH_PLATFORM_SCHEMA,
-    SwitchEntity,
-)
+from homeassistant.components.switch import DOMAIN, PLATFORM_SCHEMA, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -37,9 +33,9 @@ CONF_ALL = "all"
 # No limit on parallel updates to enable a group calling another group
 PARALLEL_UPDATES = 0
 
-PLATFORM_SCHEMA = SWITCH_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Required(CONF_ENTITIES): cv.entities_domain(SWITCH_DOMAIN),
+        vol.Required(CONF_ENTITIES): cv.entities_domain(DOMAIN),
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
         vol.Optional(CONF_UNIQUE_ID): cv.string,
         vol.Optional(CONF_ALL, default=False): cv.boolean,
@@ -132,7 +128,7 @@ class SwitchGroup(GroupEntity, SwitchEntity):
         _LOGGER.debug("Forwarded turn_on command: %s", data)
 
         await self.hass.services.async_call(
-            SWITCH_DOMAIN,
+            DOMAIN,
             SERVICE_TURN_ON,
             data,
             blocking=True,
@@ -143,7 +139,7 @@ class SwitchGroup(GroupEntity, SwitchEntity):
         """Forward the turn_off command to all switches in the group."""
         data = {ATTR_ENTITY_ID: self._entity_ids}
         await self.hass.services.async_call(
-            SWITCH_DOMAIN,
+            DOMAIN,
             SERVICE_TURN_OFF,
             data,
             blocking=True,

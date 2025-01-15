@@ -7,10 +7,7 @@ import logging
 
 from pyialarm import IAlarm
 
-from homeassistant.components.alarm_control_panel import (
-    SCAN_INTERVAL,
-    AlarmControlPanelState,
-)
+from homeassistant.components.alarm_control_panel import SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -25,7 +22,7 @@ class IAlarmDataUpdateCoordinator(DataUpdateCoordinator[None]):
     def __init__(self, hass: HomeAssistant, ialarm: IAlarm, mac: str) -> None:
         """Initialize global iAlarm data updater."""
         self.ialarm = ialarm
-        self.state: AlarmControlPanelState | None = None
+        self.state: str | None = None
         self.host: str = ialarm.host
         self.mac = mac
 

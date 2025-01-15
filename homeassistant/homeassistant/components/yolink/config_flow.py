@@ -6,7 +6,7 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.helpers import config_entry_oauth2_flow
 
 from .const import DOMAIN
@@ -18,6 +18,7 @@ class OAuth2FlowHandler(
     """Config flow to handle yolink OAuth2 authentication."""
 
     DOMAIN = DOMAIN
+    _reauth_entry: ConfigEntry | None = None
 
     @property
     def logger(self) -> logging.Logger:
@@ -34,6 +35,9 @@ class OAuth2FlowHandler(
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Perform reauth upon an API authentication error."""
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(self, user_input=None) -> ConfigFlowResult:
@@ -44,10 +48,12 @@ class OAuth2FlowHandler(
 
     async def async_oauth_create_entry(self, data: dict) -> ConfigFlowResult:
         """Create an oauth config entry or update existing entry for reauth."""
-        if self.source == SOURCE_REAUTH:
-            return self.async_update_reload_and_abort(
-                self._get_reauth_entry(), data_updates=data
+        if existing_entry := self._reauth_entry:
+            self.hass.config_entries.async_update_entry(
+                existing_entry, data=existing_entry.data | data
             )
+            await self.hass.config_entries.async_reload(existing_entry.entry_id)
+            return self.async_abort(reason="reauth_successful")
         return self.async_create_entry(title="YoLink", data=data)
 
     async def async_step_user(
@@ -55,6 +61,6 @@ class OAuth2FlowHandler(
     ) -> ConfigFlowResult:
         """Handle a flow start."""
         existing_entry = await self.async_set_unique_id(DOMAIN)
-        if existing_entry and self.source != SOURCE_REAUTH:
+        if existing_entry and not self._reauth_entry:
             return self.async_abort(reason="already_configured")
         return await super().async_step_user(user_input)

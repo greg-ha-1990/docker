@@ -18,9 +18,9 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.color import rgb_hex_to_rgb_list
 
-from . import setup_mysensors_platform
+from .. import mysensors
 from .const import MYSENSORS_DISCOVERY, DiscoveryInfo, SensorType
-from .entity import MySensorsChildEntity
+from .device import MySensorsChildEntity
 from .helpers import on_unload
 
 
@@ -38,7 +38,7 @@ async def async_setup_entry(
 
     async def async_discover(discovery_info: DiscoveryInfo) -> None:
         """Discover and add a MySensors light."""
-        setup_mysensors_platform(
+        mysensors.setup_mysensors_platform(
             hass,
             Platform.LIGHT,
             discovery_info,
@@ -57,7 +57,7 @@ async def async_setup_entry(
     )
 
 
-class MySensorsLight(MySensorsChildEntity, LightEntity):
+class MySensorsLight(mysensors.device.MySensorsChildEntity, LightEntity):
     """Representation of a MySensors Light child node."""
 
     def __init__(self, *args: Any) -> None:
@@ -173,8 +173,7 @@ class MySensorsLightRGB(MySensorsLight):
         new_rgb: tuple[int, int, int] | None = kwargs.get(ATTR_RGB_COLOR)
         if new_rgb is None:
             return
-        red, green, blue = new_rgb
-        hex_color = f"{red:02x}{green:02x}{blue:02x}"
+        hex_color = "{:02x}{:02x}{:02x}".format(*new_rgb)
         self.gateway.set_child_value(
             self.node_id, self.child_id, self.value_type, hex_color, ack=1
         )
@@ -221,8 +220,7 @@ class MySensorsLightRGBW(MySensorsLightRGB):
         new_rgbw: tuple[int, int, int, int] | None = kwargs.get(ATTR_RGBW_COLOR)
         if new_rgbw is None:
             return
-        red, green, blue, white = new_rgbw
-        hex_color = f"{red:02x}{green:02x}{blue:02x}{white:02x}"
+        hex_color = "{:02x}{:02x}{:02x}{:02x}".format(*new_rgbw)
         self.gateway.set_child_value(
             self.node_id, self.child_id, self.value_type, hex_color, ack=1
         )

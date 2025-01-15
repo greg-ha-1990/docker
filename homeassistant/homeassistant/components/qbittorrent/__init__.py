@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from qbittorrentapi import APIConnectionError, Forbidden403Error, LoginFailed
+from qbittorrent.client import LoginRequired
+from requests.exceptions import RequestException
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -34,7 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
-PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.SENSOR]
 
 CONF_ENTRY = "entry"
 
@@ -117,13 +118,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry.data[CONF_PASSWORD],
             config_entry.data[CONF_VERIFY_SSL],
         )
-    except LoginFailed as err:
+    except LoginRequired as err:
         raise ConfigEntryNotReady("Invalid credentials") from err
-    except Forbidden403Error as err:
-        raise ConfigEntryNotReady("Fail to log in, banned user ?") from err
-    except APIConnectionError as exc:
-        raise ConfigEntryNotReady("Fail to connect to qBittorrent") from exc
-
+    except RequestException as err:
+        raise ConfigEntryNotReady("Failed to connect") from err
     coordinator = QBittorrentDataCoordinator(hass, client)
 
     await coordinator.async_config_entry_first_refresh()

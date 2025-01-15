@@ -5,17 +5,19 @@ from __future__ import annotations
 from typing import cast
 
 from homeassistant.components.media_player import BrowseError, MediaClass
-from homeassistant.components.media_source import (
+from homeassistant.components.media_source.error import Unresolvable
+from homeassistant.components.media_source.models import (
     BrowseMediaSource,
     MediaSource,
     MediaSourceItem,
     PlayMedia,
-    Unresolvable,
 )
 from homeassistant.const import ATTR_FRIENDLY_NAME
 from homeassistant.core import HomeAssistant, State
+from homeassistant.helpers.entity_component import EntityComponent
 
-from .const import DATA_COMPONENT, DOMAIN
+from . import ImageEntity
+from .const import DOMAIN
 
 
 async def async_get_media_source(hass: HomeAssistant) -> ImageMediaSource:
@@ -35,7 +37,8 @@ class ImageMediaSource(MediaSource):
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
         """Resolve media to a url."""
-        image = self.hass.data[DATA_COMPONENT].get_entity(item.identifier)
+        component: EntityComponent[ImageEntity] = self.hass.data[DOMAIN]
+        image = component.get_entity(item.identifier)
 
         if not image:
             raise Unresolvable(f"Could not resolve media item: {item.identifier}")
@@ -52,6 +55,7 @@ class ImageMediaSource(MediaSource):
         if item.identifier:
             raise BrowseError("Unknown item")
 
+        component: EntityComponent[ImageEntity] = self.hass.data[DOMAIN]
         children = [
             BrowseMediaSource(
                 domain=DOMAIN,
@@ -65,7 +69,7 @@ class ImageMediaSource(MediaSource):
                 can_play=True,
                 can_expand=False,
             )
-            for image in self.hass.data[DATA_COMPONENT].entities
+            for image in component.entities
         ]
 
         return BrowseMediaSource(

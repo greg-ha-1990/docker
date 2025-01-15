@@ -6,5 +6,6 @@
   "documentation": "https://www.home-assistant.io/integrations/tailscale",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "requirements": ["tailscale==0.6.1"]
+  "quality_scale": "platinum",
+  "requirements": ["tailscale==0.6.0"]
 }

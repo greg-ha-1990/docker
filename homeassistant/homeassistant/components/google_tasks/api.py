@@ -9,7 +9,6 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import BatchHttpRequest, HttpRequest
-from httplib2 import ServerNotFoundError
 
 from homeassistant.const import CONF_ACCESS_TOKEN
 from homeassistant.core import HomeAssistant
@@ -47,7 +46,8 @@ class AsyncConfigEntryAuth:
 
     async def async_get_access_token(self) -> str:
         """Return a valid access token."""
-        await self._oauth_session.async_ensure_token_valid()
+        if not self._oauth_session.valid_token:
+            await self._oauth_session.async_ensure_token_valid()
         return self._oauth_session.token[CONF_ACCESS_TOKEN]
 
     async def _get_service(self) -> Resource:
@@ -68,10 +68,7 @@ class AsyncConfigEntryAuth:
         """Get all Task resources for the task list."""
         service = await self._get_service()
         cmd: HttpRequest = service.tasks().list(
-            tasklist=task_list_id,
-            maxResults=MAX_TASK_RESULTS,
-            showCompleted=True,
-            showHidden=True,
+            tasklist=task_list_id, maxResults=MAX_TASK_RESULTS
         )
         result = await self._execute(cmd)
         return result["items"]
@@ -116,7 +113,7 @@ class AsyncConfigEntryAuth:
         def response_handler(_, response, exception: HttpError) -> None:
             if exception is not None:
                 raise GoogleTasksApiError(
-                    f"Google Tasks API responded with error ({exception.reason or exception.status_code})"
+                    f"Google Tasks API responded with error ({exception.status_code})"
                 ) from exception
             if response:
                 data = json.loads(response)
@@ -151,9 +148,9 @@ class AsyncConfigEntryAuth:
     async def _execute(self, request: HttpRequest | BatchHttpRequest) -> Any:
         try:
             result = await self._hass.async_add_executor_job(request.execute)
-        except (HttpError, ServerNotFoundError) as err:
+        except HttpError as err:
             raise GoogleTasksApiError(
-                f"Google Tasks API responded with: {err.reason or err.status_code})"
+                f"Google Tasks API responded with error ({err.status_code})"
             ) from err
         if result:
             _raise_if_error(result)

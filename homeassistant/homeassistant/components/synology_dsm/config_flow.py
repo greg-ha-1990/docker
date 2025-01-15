@@ -41,7 +41,7 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.typing import DiscoveryInfoType, VolDictType
+from homeassistant.helpers.typing import DiscoveryInfoType
 from homeassistant.util.network import is_ip_address as is_ip
 
 from .const import (
@@ -79,7 +79,7 @@ def _reauth_schema() -> vol.Schema:
 
 
 def _user_schema_with_defaults(user_input: dict[str, Any]) -> vol.Schema:
-    user_schema: VolDictType = {
+    user_schema = {
         vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
     }
     user_schema.update(_ordered_shared_schema(user_input))
@@ -87,7 +87,9 @@ def _user_schema_with_defaults(user_input: dict[str, Any]) -> vol.Schema:
     return vol.Schema(user_schema)
 
 
-def _ordered_shared_schema(schema_input: dict[str, Any]) -> VolDictType:
+def _ordered_shared_schema(
+    schema_input: dict[str, Any],
+) -> dict[vol.Required | vol.Optional, Any]:
     return {
         vol.Required(CONF_USERNAME, default=schema_input.get(CONF_USERNAME, "")): str,
         vol.Required(CONF_PASSWORD, default=schema_input.get(CONF_PASSWORD, "")): str,
@@ -118,7 +120,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> SynologyDSMOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return SynologyDSMOptionsFlowHandler()
+        return SynologyDSMOptionsFlowHandler(config_entry)
 
     def __init__(self) -> None:
         """Initialize the synology_dsm config flow."""
@@ -138,7 +140,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
             user_input = {}
 
         description_placeholders = {}
-        data_schema = None
+        data_schema = {}
 
         if step_id == "link":
             user_input.update(self.discovered_conf)
@@ -289,7 +291,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
             and existing_entry.data[CONF_HOST] != host
             and ip(existing_entry.data[CONF_HOST]).version == ip(host).version
         ):
-            _LOGGER.debug(
+            _LOGGER.info(
                 "Update host from '%s' to '%s' for NAS '%s' via discovery",
                 existing_entry.data[CONF_HOST],
                 host,
@@ -326,11 +328,7 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Perform reauth upon an API authentication error."""
         self.reauth_conf = entry_data
-        placeholders = {
-            **self.context["title_placeholders"],
-            CONF_HOST: entry_data[CONF_HOST],
-        }
-        self.context["title_placeholders"] = placeholders
+        self.context["title_placeholders"][CONF_HOST] = entry_data[CONF_HOST]
 
         return await self.async_step_reauth_confirm()
 
@@ -375,6 +373,10 @@ class SynologyDSMFlowHandler(ConfigFlow, domain=DOMAIN):
 
 class SynologyDSMOptionsFlowHandler(OptionsFlow):
     """Handle a option flow."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

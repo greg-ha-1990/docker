@@ -11,7 +11,6 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import websocket_api
 from homeassistant.components.frontend import DATA_PANELS
 from homeassistant.const import CONF_FILENAME
 from homeassistant.core import HomeAssistant, callback
@@ -56,7 +55,7 @@ class LovelaceConfig(ABC):
             self.config = None
 
     @property
-    def url_path(self) -> str | None:
+    def url_path(self) -> str:
         """Return url path."""
         return self.config[CONF_URL_PATH] if self.config else None
 
@@ -298,24 +297,3 @@ class DashboardsCollection(collection.DictStorageCollection):
             updated.pop(CONF_ICON)
 
         return updated
-
-
-class DashboardsCollectionWebSocket(collection.DictStorageCollectionWebsocket):
-    """Class to expose storage collection management over websocket."""
-
-    @callback
-    def ws_list_item(
-        self,
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ) -> None:
-        """Send Lovelace UI resources over WebSocket connection."""
-        connection.send_result(
-            msg["id"],
-            [
-                dashboard.config
-                for dashboard in hass.data[DOMAIN]["dashboards"].values()
-                if dashboard.config
-            ],
-        )

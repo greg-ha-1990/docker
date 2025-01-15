@@ -29,9 +29,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.service_info.mqtt import ReceivePayloadType
 from homeassistant.helpers.template import Template
-from homeassistant.helpers.typing import ConfigType, VolSchemaType
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.util.percentage import (
     percentage_to_ranged_value,
     ranged_value_to_percentage,
@@ -47,17 +46,16 @@ from .const import (
     CONF_STATE_VALUE_TEMPLATE,
     PAYLOAD_NONE,
 )
-from .entity import MqttEntity, async_setup_entity_entry_helper
+from .mixins import MqttEntity, async_setup_entity_entry_helper
 from .models import (
     MqttCommandTemplate,
     MqttValueTemplate,
     PublishPayloadType,
     ReceiveMessage,
+    ReceivePayloadType,
 )
 from .schemas import MQTT_ENTITY_COMMON_SCHEMA
 from .util import valid_publish_topic, valid_subscribe_topic
-
-PARALLEL_UPDATES = 0
 
 CONF_DIRECTION_STATE_TOPIC = "direction_state_topic"
 CONF_DIRECTION_COMMAND_TOPIC = "direction_command_topic"
@@ -228,7 +226,7 @@ class MqttFan(MqttEntity, FanEntity):
     _speed_range: tuple[int, int]
 
     @staticmethod
-    def config_schema() -> VolSchemaType:
+    def config_schema() -> vol.Schema:
         """Return the config schema."""
         return DISCOVERY_SCHEMA
 
@@ -291,9 +289,7 @@ class MqttFan(MqttEntity, FanEntity):
             optimistic or self._topic[CONF_PRESET_MODE_STATE_TOPIC] is None
         )
 
-        self._attr_supported_features = (
-            FanEntityFeature.TURN_OFF | FanEntityFeature.TURN_ON
-        )
+        self._attr_supported_features = FanEntityFeature(0)
         self._attr_supported_features |= (
             self._topic[CONF_OSCILLATION_COMMAND_TOPIC] is not None
             and FanEntityFeature.OSCILLATE

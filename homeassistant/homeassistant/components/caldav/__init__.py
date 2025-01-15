@@ -17,7 +17,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
-type CalDavConfigEntry = ConfigEntry[caldav.DAVClient]
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,14 +25,16 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.CALENDAR, Platform.TODO]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: CalDavConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up CalDAV from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
     client = caldav.DAVClient(
         entry.data[CONF_URL],
         username=entry.data[CONF_USERNAME],
         password=entry.data[CONF_PASSWORD],
         ssl_verify_cert=entry.data[CONF_VERIFY_SSL],
-        timeout=30,
+        timeout=10,
     )
     try:
         await hass.async_add_executor_job(client.principal)
@@ -48,7 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CalDavConfigEntry) -> bo
     except DAVError as err:
         raise ConfigEntryNotReady("CalDAV client error") from err
 
-    entry.runtime_data = client
+    hass.data[DOMAIN][entry.entry_id] = client
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

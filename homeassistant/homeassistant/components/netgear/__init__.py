@@ -48,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if port != router.port or ssl != router.ssl:
         data = {**entry.data, CONF_PORT: router.port, CONF_SSL: router.ssl}
         hass.config_entries.async_update_entry(entry, data=data)
-        _LOGGER.warning(
+        _LOGGER.info(
             (
                 "Netgear port-SSL combination updated from (%i, %r) to (%i, %r), "
                 "this should only occur after a firmware update"
@@ -93,7 +93,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Devices",
         update_method=async_update_devices,
         update_interval=SCAN_INTERVAL,
@@ -101,7 +100,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator_traffic_meter = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Traffic meter",
         update_method=async_update_traffic_meter,
         update_interval=SCAN_INTERVAL,
@@ -109,7 +107,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator_speed_test = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Speed test",
         update_method=async_update_speed_test,
         update_interval=SPEED_TEST_INTERVAL,
@@ -117,7 +114,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator_firmware = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Firmware",
         update_method=async_check_firmware,
         update_interval=SCAN_INTERVAL_FIRMWARE,
@@ -125,7 +121,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator_utilization = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Utilization",
         update_method=async_update_utilization,
         update_interval=SCAN_INTERVAL,
@@ -133,7 +128,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator_link = DataUpdateCoordinator(
         hass,
         _LOGGER,
-        config_entry=entry,
         name=f"{router.device_name} Ethernet Link Status",
         update_method=async_check_link_status,
         update_interval=SCAN_INTERVAL,

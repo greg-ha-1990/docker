@@ -7,6 +7,7 @@ from typing import cast
 from xiaomi_ble import DeviceClass, SensorUpdate, Units
 from xiaomi_ble.parser import ExtendedSensorDeviceClass
 
+from homeassistant import config_entries
 from homeassistant.components.bluetooth.passive_update_processor import (
     PassiveBluetoothDataUpdate,
     PassiveBluetoothProcessorEntity,
@@ -19,11 +20,11 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
+    CONDUCTIVITY,
     LIGHT_LUX,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
-    UnitOfConductivity,
     UnitOfElectricPotential,
     UnitOfMass,
     UnitOfPressure,
@@ -34,9 +35,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
 
-from .coordinator import XiaomiPassiveBluetoothDataProcessor
+from .const import DOMAIN
+from .coordinator import (
+    XiaomiActiveBluetoothProcessorCoordinator,
+    XiaomiPassiveBluetoothDataProcessor,
+)
 from .device import device_key_to_bluetooth_entity_key
-from .types import XiaomiBLEConfigEntry
 
 SENSOR_DESCRIPTIONS = {
     (DeviceClass.BATTERY, Units.PERCENTAGE): SensorEntityDescription(
@@ -48,8 +52,8 @@ SENSOR_DESCRIPTIONS = {
     ),
     (DeviceClass.CONDUCTIVITY, Units.CONDUCTIVITY): SensorEntityDescription(
         key=str(Units.CONDUCTIVITY),
-        device_class=SensorDeviceClass.CONDUCTIVITY,
-        native_unit_of_measurement=UnitOfConductivity.MICROSIEMENS_PER_CM,
+        device_class=None,
+        native_unit_of_measurement=CONDUCTIVITY,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     (
@@ -155,24 +159,6 @@ SENSOR_DESCRIPTIONS = {
     (ExtendedSensorDeviceClass.LOCK_METHOD, None): SensorEntityDescription(
         key=str(ExtendedSensorDeviceClass.LOCK_METHOD), icon="mdi:key-variant"
     ),
-    # Duration of detected status (in minutes) for Occpancy Sensor
-    (
-        ExtendedSensorDeviceClass.DURATION_DETECTED,
-        Units.TIME_MINUTES,
-    ): SensorEntityDescription(
-        key=str(ExtendedSensorDeviceClass.DURATION_DETECTED),
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    # Duration of cleared status (in minutes) for Occpancy Sensor
-    (
-        ExtendedSensorDeviceClass.DURATION_CLEARED,
-        Units.TIME_MINUTES,
-    ): SensorEntityDescription(
-        key=str(ExtendedSensorDeviceClass.DURATION_CLEARED),
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
 }
 
 
@@ -207,11 +193,13 @@ def sensor_update_to_bluetooth_data_update(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: XiaomiBLEConfigEntry,
+    entry: config_entries.ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi BLE sensors."""
-    coordinator = entry.runtime_data
+    coordinator: XiaomiActiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
+        entry.entry_id
+    ]
     processor = XiaomiPassiveBluetoothDataProcessor(
         sensor_update_to_bluetooth_data_update
     )

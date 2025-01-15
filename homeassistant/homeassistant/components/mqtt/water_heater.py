@@ -38,7 +38,7 @@ from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
-from homeassistant.helpers.typing import ConfigType, VolSchemaType
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .climate import MqttTemperatureControlEntity
@@ -65,14 +65,12 @@ from .const import (
     DEFAULT_OPTIMISTIC,
     PAYLOAD_NONE,
 )
-from .entity import async_setup_entity_entry_helper
+from .mixins import async_setup_entity_entry_helper
 from .models import MqttCommandTemplate, MqttValueTemplate, ReceiveMessage
 from .schemas import MQTT_ENTITY_COMMON_SCHEMA
 from .util import valid_publish_topic, valid_subscribe_topic
 
 _LOGGER = logging.getLogger(__name__)
-
-PARALLEL_UPDATES = 0
 
 DEFAULT_NAME = "MQTT Water Heater"
 
@@ -190,7 +188,7 @@ class MqttWaterHeater(MqttTemperatureControlEntity, WaterHeaterEntity):
     _attr_target_temperature_high: float | None = None
 
     @staticmethod
-    def config_schema() -> VolSchemaType:
+    def config_schema() -> vol.Schema:
         """Return the config schema."""
         return DISCOVERY_SCHEMA
 

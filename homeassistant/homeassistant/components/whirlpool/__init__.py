@@ -20,10 +20,8 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.CLIMATE, Platform.SENSOR]
 
-type WhirlpoolConfigEntry = ConfigEntry[WhirlpoolData]
 
-
-async def async_setup_entry(hass: HomeAssistant, entry: WhirlpoolConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Whirlpool Sixth Sense from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
@@ -49,15 +47,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: WhirlpoolConfigEntry) ->
         _LOGGER.error("Cannot fetch appliances")
         return False
 
-    entry.runtime_data = WhirlpoolData(appliances_manager, auth, backend_selector)
+    hass.data[DOMAIN][entry.entry_id] = WhirlpoolData(
+        appliances_manager, auth, backend_selector
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: WhirlpoolConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
 
 
 @dataclass

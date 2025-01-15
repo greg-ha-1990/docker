@@ -7,7 +7,6 @@ from collections.abc import Callable
 from datetime import datetime
 import json
 import logging
-from types import MappingProxyType
 from typing import Any
 
 from azure.eventhub import EventData, EventDataBatch
@@ -20,12 +19,11 @@ from homeassistant.const import MATCH_ALL
 from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.exceptions import ConfigEntryNotReady
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entityfilter import FILTER_SCHEMA, EntityFilter
+from homeassistant.helpers.entityfilter import FILTER_SCHEMA
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.json import JSONEncoder
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util.dt import utcnow
-from homeassistant.util.hass_dict import HassKey
 
 from .client import AzureEventHubClient
 from .const import (
@@ -37,12 +35,12 @@ from .const import (
     CONF_FILTER,
     CONF_MAX_DELAY,
     CONF_SEND_INTERVAL,
+    DATA_FILTER,
+    DATA_HUB,
     DEFAULT_MAX_DELAY,
     DOMAIN,
     FILTER_STATES,
 )
-
-type AzureEventHubConfigEntry = ConfigEntry[AzureEventHub]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,7 +61,6 @@ CONFIG_SCHEMA = vol.Schema(
     },
     extra=vol.ALLOW_EXTRA,
 )
-DATA_COMPONENT: HassKey[EntityFilter] = HassKey(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, yaml_config: ConfigType) -> bool:
@@ -74,10 +71,10 @@ async def async_setup(hass: HomeAssistant, yaml_config: ConfigType) -> bool:
     If config is empty after getting the filter, return, otherwise emit
     deprecated warning and pass the rest to the config flow.
     """
+    hass.data.setdefault(DOMAIN, {DATA_FILTER: FILTER_SCHEMA({})})
     if DOMAIN not in yaml_config:
-        hass.data[DATA_COMPONENT] = FILTER_SCHEMA({})
         return True
-    hass.data[DATA_COMPONENT] = yaml_config[DOMAIN].pop(CONF_FILTER)
+    hass.data[DOMAIN][DATA_FILTER] = yaml_config[DOMAIN].pop(CONF_FILTER)
 
     if not yaml_config[DOMAIN]:
         return True
@@ -95,37 +92,33 @@ async def async_setup(hass: HomeAssistant, yaml_config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: AzureEventHubConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Do the setup based on the config entry and the filter from yaml."""
+    hass.data.setdefault(DOMAIN, {DATA_FILTER: FILTER_SCHEMA({})})
     hub = AzureEventHub(
         hass,
         entry,
-        hass.data[DATA_COMPONENT],
+        hass.data[DOMAIN][DATA_FILTER],
     )
     try:
         await hub.async_test_connection()
     except EventHubError as err:
         raise ConfigEntryNotReady("Could not connect to Azure Event Hub") from err
-    entry.runtime_data = hub
-    entry.async_on_unload(hub.async_stop)
+    hass.data[DOMAIN][DATA_HUB] = hub
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
     await hub.async_start()
     return True
 
 
-async def async_update_listener(
-    hass: HomeAssistant, entry: AzureEventHubConfigEntry
-) -> None:
+async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Update listener for options."""
-    entry.runtime_data.update_options(entry.options)
+    hass.data[DOMAIN][DATA_HUB].update_options(entry.options)
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: AzureEventHubConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    hub = hass.data[DOMAIN].pop(DATA_HUB)
+    await hub.async_stop()
     return True
 
 
@@ -136,7 +129,7 @@ class AzureEventHub:
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
-        entities_filter: EntityFilter,
+        entities_filter: vol.Schema,
     ) -> None:
         """Initialize the listener."""
         self.hass = hass
@@ -179,7 +172,7 @@ class AzureEventHub:
         await self.async_send(None)
         await self._queue.join()
 
-    def update_options(self, new_options: MappingProxyType[str, Any]) -> None:
+    def update_options(self, new_options: dict[str, Any]) -> None:
         """Update options."""
         self._send_interval = new_options[CONF_SEND_INTERVAL]
 

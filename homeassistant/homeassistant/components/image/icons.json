@@ -3,10 +3,5 @@
     "_": {
       "default": "mdi:image"
     }
-  },
-  "services": {
-    "snapshot": {
-      "service": "mdi:camera"
-    }
   }
 }

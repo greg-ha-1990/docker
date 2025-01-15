@@ -10,7 +10,9 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
+    StateType,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_MAC,
     PERCENTAGE,
@@ -20,10 +22,10 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .coordinator import RAVEnConfigEntry, RAVEnDataCoordinator
+from .const import DOMAIN
+from .coordinator import RAVEnDataCoordinator
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -78,12 +80,10 @@ DIAGNOSTICS = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: RAVEnConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up a config entry."""
-    coordinator = entry.runtime_data
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[RAVEnSensor] = [
         RAVEnSensor(coordinator, description) for description in DIAGNOSTICS
     ]

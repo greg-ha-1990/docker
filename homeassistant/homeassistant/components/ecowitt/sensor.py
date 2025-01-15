@@ -6,7 +6,7 @@ import dataclasses
 from datetime import datetime
 from typing import Final
 
-from aioecowitt import EcoWittSensor, EcoWittSensorTypes
+from aioecowitt import EcoWittListener, EcoWittSensor, EcoWittSensorTypes
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     CONCENTRATION_PARTS_PER_MILLION,
@@ -36,7 +37,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 
-from . import EcowittConfigEntry
+from .const import DOMAIN
 from .entity import EcowittEntity
 
 _METRIC: Final = (
@@ -124,7 +125,6 @@ ECOWITT_SENSORS_MAPPING: Final = {
         device_class=SensorDeviceClass.VOLTAGE,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     EcoWittSensorTypes.LIGHTNING_COUNT: SensorEntityDescription(
         key="LIGHTNING_COUNT",
@@ -216,12 +216,10 @@ ECOWITT_SENSORS_MAPPING: Final = {
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: EcowittConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Add sensors if new."""
-    ecowitt = entry.runtime_data
+    ecowitt: EcoWittListener = hass.data[DOMAIN][entry.entry_id]
 
     def _new_sensor(sensor: EcoWittSensor) -> None:
         """Add new sensor."""

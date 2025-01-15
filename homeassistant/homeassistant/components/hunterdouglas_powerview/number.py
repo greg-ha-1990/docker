@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
 from typing import Final
 
 from aiopvapi.helpers.constants import ATTR_NAME, MOTION_VELOCITY
@@ -12,13 +13,17 @@ from homeassistant.components.number import (
     NumberMode,
     RestoreNumber,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import PowerviewShadeUpdateCoordinator
 from .entity import ShadeEntity
-from .model import PowerviewConfigEntry, PowerviewDeviceInfo
+from .model import PowerviewDeviceInfo, PowerviewEntryData
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,12 +57,12 @@ NUMBERS: Final = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: PowerviewConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the hunter douglas number entities."""
-    pv_entry = entry.runtime_data
+
+    pv_entry: PowerviewEntryData = hass.data[DOMAIN][entry.entry_id]
+
     entities: list[PowerViewNumber] = []
     for shade in pv_entry.shade_data.values():
         room_name = getattr(pv_entry.room_data.get(shade.room_id), ATTR_NAME, "")
@@ -95,7 +100,7 @@ class PowerViewNumber(ShadeEntity, RestoreNumber):
         self.entity_description = description
         self._attr_unique_id = f"{self._attr_unique_id}_{description.key}"
 
-    async def async_set_native_value(self, value: float) -> None:
+    def set_native_value(self, value: float) -> None:
         """Update the current value."""
         self._attr_native_value = value
         self.entity_description.store_value_fn(self.coordinator, self._shade.id, value)

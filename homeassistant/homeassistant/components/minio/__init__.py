@@ -73,11 +73,11 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 BUCKET_KEY_SCHEMA = vol.Schema(
-    {vol.Required(ATTR_BUCKET): cv.string, vol.Required(ATTR_KEY): cv.string}
+    {vol.Required(ATTR_BUCKET): cv.template, vol.Required(ATTR_KEY): cv.template}
 )
 
 BUCKET_KEY_FILE_SCHEMA = BUCKET_KEY_SCHEMA.extend(
-    {vol.Required(ATTR_FILE_PATH): cv.string}
+    {vol.Required(ATTR_FILE_PATH): cv.template}
 )
 
 
@@ -125,11 +125,16 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
         get_minio_endpoint(host, port), access_key, secret_key, secure
     )
 
+    def _render_service_value(service, key):
+        value = service.data[key]
+        value.hass = hass
+        return value.async_render(parse_result=False)
+
     def put_file(service: ServiceCall) -> None:
         """Upload file service."""
-        bucket = service.data[ATTR_BUCKET]
-        key = service.data[ATTR_KEY]
-        file_path = service.data[ATTR_FILE_PATH]
+        bucket = _render_service_value(service, ATTR_BUCKET)
+        key = _render_service_value(service, ATTR_KEY)
+        file_path = _render_service_value(service, ATTR_FILE_PATH)
 
         if not hass.config.is_allowed_path(file_path):
             raise ValueError(f"Invalid file_path {file_path}")
@@ -138,9 +143,9 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     def get_file(service: ServiceCall) -> None:
         """Download file service."""
-        bucket = service.data[ATTR_BUCKET]
-        key = service.data[ATTR_KEY]
-        file_path = service.data[ATTR_FILE_PATH]
+        bucket = _render_service_value(service, ATTR_BUCKET)
+        key = _render_service_value(service, ATTR_KEY)
+        file_path = _render_service_value(service, ATTR_FILE_PATH)
 
         if not hass.config.is_allowed_path(file_path):
             raise ValueError(f"Invalid file_path {file_path}")
@@ -149,8 +154,8 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     def remove_file(service: ServiceCall) -> None:
         """Delete file service."""
-        bucket = service.data[ATTR_BUCKET]
-        key = service.data[ATTR_KEY]
+        bucket = _render_service_value(service, ATTR_BUCKET)
+        key = _render_service_value(service, ATTR_KEY)
 
         minio_client.remove_object(bucket, key)
 
@@ -177,7 +182,7 @@ class QueueListener(threading.Thread):
 
     def run(self):
         """Listen to queue events, and forward them to Home Assistant event bus."""
-        _LOGGER.debug("Running QueueListener")
+        _LOGGER.info("Running QueueListener")
         while True:
             if (event := self._queue.get()) is None:
                 break
@@ -199,10 +204,10 @@ class QueueListener(threading.Thread):
 
     def stop(self):
         """Stop run by putting None into queue and join the thread."""
-        _LOGGER.debug("Stopping QueueListener")
+        _LOGGER.info("Stopping QueueListener")
         self._queue.put(None)
         self.join()
-        _LOGGER.debug("Stopped QueueListener")
+        _LOGGER.info("Stopped QueueListener")
 
     def start_handler(self, _):
         """Start handler helper method."""

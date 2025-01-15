@@ -7,9 +7,6 @@ from collections import defaultdict
 import logging
 from typing import TYPE_CHECKING, Any
 
-from aiohasupervisor import SupervisorError
-from aiohasupervisor.models import StoreInfo
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_MANUFACTURER, ATTR_NAME
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -56,7 +53,7 @@ from .const import (
     SUPERVISOR_CONTAINER,
     SupervisorEntityModel,
 )
-from .handler import HassIO, HassioAPIError, get_supervisor_client
+from .handler import HassIO, HassioAPIError
 
 if TYPE_CHECKING:
     from .issues import SupervisorIssues
@@ -318,7 +315,6 @@ class HassioDataUpdateCoordinator(DataUpdateCoordinator):
         self._container_updates: defaultdict[str, dict[str, set[str]]] = defaultdict(
             lambda: defaultdict(set)
         )
-        self.supervisor_client = get_supervisor_client(hass)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library."""
@@ -334,15 +330,12 @@ class HassioDataUpdateCoordinator(DataUpdateCoordinator):
         addons_info = get_addons_info(self.hass) or {}
         addons_stats = get_addons_stats(self.hass)
         addons_changelogs = get_addons_changelogs(self.hass)
-        store_data = get_store(self.hass)
+        store_data = get_store(self.hass) or {}
 
-        if store_data:
-            repositories = {
-                repo.slug: repo.name
-                for repo in StoreInfo.from_dict(store_data).repositories
-            }
-        else:
-            repositories = {}
+        repositories = {
+            repo[ATTR_SLUG]: repo[ATTR_NAME]
+            for repo in store_data.get("repositories", [])
+        }
 
         new_data[DATA_KEY_ADDONS] = {
             addon[ATTR_SLUG]: {
@@ -503,17 +496,17 @@ class HassioDataUpdateCoordinator(DataUpdateCoordinator):
     async def _update_addon_stats(self, slug: str) -> tuple[str, dict[str, Any] | None]:
         """Update single addon stats."""
         try:
-            stats = await self.supervisor_client.addons.addon_stats(slug)
-        except SupervisorError as err:
+            stats = await self.hassio.get_addon_stats(slug)
+        except HassioAPIError as err:
             _LOGGER.warning("Could not fetch stats for %s: %s", slug, err)
             return (slug, None)
-        return (slug, stats.to_dict())
+        return (slug, stats)
 
     async def _update_addon_changelog(self, slug: str) -> tuple[str, str | None]:
         """Return the changelog for an add-on."""
         try:
-            changelog = await self.supervisor_client.store.addon_changelog(slug)
-        except SupervisorError as err:
+            changelog = await self.hassio.get_addon_changelog(slug)
+        except HassioAPIError as err:
             _LOGGER.warning("Could not fetch changelog for %s: %s", slug, err)
             return (slug, None)
         return (slug, changelog)
@@ -521,15 +514,11 @@ class HassioDataUpdateCoordinator(DataUpdateCoordinator):
     async def _update_addon_info(self, slug: str) -> tuple[str, dict[str, Any] | None]:
         """Return the info for an add-on."""
         try:
-            info = await self.supervisor_client.addons.addon_info(slug)
-        except SupervisorError as err:
+            info = await self.hassio.get_addon_info(slug)
+        except HassioAPIError as err:
             _LOGGER.warning("Could not fetch info for %s: %s", slug, err)
             return (slug, None)
-        # Translate to legacy hassio names for compatibility
-        info_dict = info.to_dict()
-        info_dict["hassio_api"] = info_dict.pop("supervisor_api")
-        info_dict["hassio_role"] = info_dict.pop("supervisor_role")
-        return (slug, info_dict)
+        return (slug, info)
 
     @callback
     def async_enable_container_updates(
@@ -563,8 +552,8 @@ class HassioDataUpdateCoordinator(DataUpdateCoordinator):
             # updates if this is not a scheduled refresh and
             # we are not doing the first refresh.
             try:
-                await self.supervisor_client.refresh_updates()
-            except SupervisorError as err:
+                await self.hassio.refresh_updates()
+            except HassioAPIError as err:
                 _LOGGER.warning("Error on Supervisor API: %s", err)
 
         await super()._async_refresh(

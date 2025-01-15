@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .coordinator import TailwindConfigEntry
+from .typing import TailwindConfigEntry
 
 
 async def async_get_config_entry_diagnostics(

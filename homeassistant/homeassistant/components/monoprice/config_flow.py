@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from pymonoprice import get_monoprice
 from serial import SerialException
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_PORT
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.typing import VolDictType
 
 from .const import (
     CONF_SOURCE_1,
@@ -42,7 +35,7 @@ SOURCES = [
     CONF_SOURCE_6,
 ]
 
-OPTIONS_FOR_DATA: VolDictType = {vol.Optional(source): str for source in SOURCES}
+OPTIONS_FOR_DATA = {vol.Optional(source): str for source in SOURCES}
 
 DATA_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str, **OPTIONS_FOR_DATA})
 
@@ -82,9 +75,7 @@ class MonoPriceConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
         if user_input is not None:
@@ -108,7 +99,7 @@ class MonoPriceConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> MonopriceOptionsFlowHandler:
         """Define the config flow to handle options."""
-        return MonopriceOptionsFlowHandler()
+        return MonopriceOptionsFlowHandler(config_entry)
 
 
 @callback
@@ -126,6 +117,10 @@ def _key_for_source(index, source, previous_sources):
 class MonopriceOptionsFlowHandler(OptionsFlow):
     """Handle a Monoprice options flow."""
 
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize."""
+        self.config_entry = config_entry
+
     @callback
     def _previous_sources(self):
         if CONF_SOURCES in self.config_entry.options:
@@ -135,9 +130,7 @@ class MonopriceOptionsFlowHandler(OptionsFlow):
 
         return previous
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(

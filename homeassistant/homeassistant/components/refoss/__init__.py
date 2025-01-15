@@ -15,7 +15,6 @@ from .const import COORDINATORS, DATA_DISCOVERY_SERVICE, DISCOVERY_SCAN_INTERVAL
 from .util import refoss_discovery_server
 
 PLATFORMS: Final = [
-    Platform.SENSOR,
     Platform.SWITCH,
 ]
 

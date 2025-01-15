@@ -89,7 +89,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuyaConfigEntry) -> bool
             manufacturer="Tuya",
             name=device.name,
             model=f"{device.product_name} (unsupported)",
-            model_id=device.product_id,
         )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -146,21 +145,14 @@ class DeviceListener(SharingDeviceListener):
         self.hass = hass
         self.manager = manager
 
-    def update_device(
-        self, device: CustomerDevice, updated_status_properties: list[str] | None
-    ) -> None:
+    def update_device(self, device: CustomerDevice) -> None:
         """Update device status."""
         LOGGER.debug(
-            "Received update for device %s: %s (updated properties: %s)",
+            "Received update for device %s: %s",
             device.id,
             self.manager.device_map[device.id].status,
-            updated_status_properties,
         )
-        dispatcher_send(
-            self.hass,
-            f"{TUYA_HA_SIGNAL_UPDATE_ENTITY}_{device.id}",
-            updated_status_properties,
-        )
+        dispatcher_send(self.hass, f"{TUYA_HA_SIGNAL_UPDATE_ENTITY}_{device.id}")
 
     def add_device(self, device: CustomerDevice) -> None:
         """Add device added listener."""

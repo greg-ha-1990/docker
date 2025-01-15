@@ -14,7 +14,7 @@ import voluptuous as vol
 
 from homeassistant.components.notify import (
     ATTR_DATA,
-    PLATFORM_SCHEMA as NOTIFY_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     BaseNotificationService,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_ROOM, CONF_URL, CONF_USERNAME
@@ -24,7 +24,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORM_SCHEMA = NOTIFY_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_URL): vol.Url(),
         vol.Required(CONF_USERNAME): cv.string,
@@ -52,10 +52,8 @@ def get_service(
     except RocketConnectionException:
         _LOGGER.warning("Unable to connect to Rocket.Chat server at %s", url)
     except RocketAuthenticationException:
-        _LOGGER.warning(
-            "Rocket.Chat authentication failed for user %s. Please check your username/password",
-            username,
-        )
+        _LOGGER.warning("Rocket.Chat authentication failed for user %s", username)
+        _LOGGER.info("Please check your username/password")
 
     return None
 

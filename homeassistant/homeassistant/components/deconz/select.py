@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pydeconz.models.event import EventType
-from pydeconz.models.sensor.air_purifier import AirPurifier, AirPurifierFanMode
 from pydeconz.models.sensor.presence import (
     Presence,
     PresenceConfigDeviceMode,
@@ -11,13 +10,13 @@ from pydeconz.models.sensor.presence import (
     PresenceConfigTriggerDistance,
 )
 
-from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
+from homeassistant.components.select import DOMAIN, SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .entity import DeconzDevice
+from .deconz_device import DeconzDevice
 from .hub import DeconzHub
 
 SENSITIVITY_TO_DECONZ = {
@@ -35,18 +34,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the deCONZ button entity."""
     hub = DeconzHub.get_hub(hass, config_entry)
-    hub.entities[SELECT_DOMAIN] = set()
-
-    @callback
-    def async_add_air_purifier_sensor(_: EventType, sensor_id: str) -> None:
-        """Add air purifier select entity from deCONZ."""
-        sensor = hub.api.sensors.air_purifier[sensor_id]
-        async_add_entities([DeconzAirPurifierFanMode(sensor, hub)])
-
-    hub.register_platform_add_device_callback(
-        async_add_air_purifier_sensor,
-        hub.api.sensors.air_purifier,
-    )
+    hub.entities[DOMAIN] = set()
 
     @callback
     def async_add_presence_sensor(_: EventType, sensor_id: str) -> None:
@@ -67,39 +55,6 @@ async def async_setup_entry(
     )
 
 
-class DeconzAirPurifierFanMode(DeconzDevice[AirPurifier], SelectEntity):
-    """Representation of a deCONZ air purifier fan mode entity."""
-
-    _name_suffix = "Fan Mode"
-    unique_id_suffix = "fan_mode"
-    _update_key = "mode"
-
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_options = [
-        AirPurifierFanMode.OFF.value,
-        AirPurifierFanMode.AUTO.value,
-        AirPurifierFanMode.SPEED_1.value,
-        AirPurifierFanMode.SPEED_2.value,
-        AirPurifierFanMode.SPEED_3.value,
-        AirPurifierFanMode.SPEED_4.value,
-        AirPurifierFanMode.SPEED_5.value,
-    ]
-
-    TYPE = SELECT_DOMAIN
-
-    @property
-    def current_option(self) -> str:
-        """Return the selected entity option to represent the entity state."""
-        return self._device.fan_mode.value
-
-    async def async_select_option(self, option: str) -> None:
-        """Change the selected option."""
-        await self.hub.api.sensors.air_purifier.set_config(
-            id=self._device.resource_id,
-            fan_mode=AirPurifierFanMode(option),
-        )
-
-
 class DeconzPresenceDeviceModeSelect(DeconzDevice[Presence], SelectEntity):
     """Representation of a deCONZ presence device mode entity."""
 
@@ -113,7 +68,7 @@ class DeconzPresenceDeviceModeSelect(DeconzDevice[Presence], SelectEntity):
         PresenceConfigDeviceMode.UNDIRECTED.value,
     ]
 
-    TYPE = SELECT_DOMAIN
+    TYPE = DOMAIN
 
     @property
     def current_option(self) -> str | None:
@@ -140,7 +95,7 @@ class DeconzPresenceSensitivitySelect(DeconzDevice[Presence], SelectEntity):
     _attr_entity_category = EntityCategory.CONFIG
     _attr_options = list(SENSITIVITY_TO_DECONZ)
 
-    TYPE = SELECT_DOMAIN
+    TYPE = DOMAIN
 
     @property
     def current_option(self) -> str | None:
@@ -171,7 +126,7 @@ class DeconzPresenceTriggerDistanceSelect(DeconzDevice[Presence], SelectEntity):
         PresenceConfigTriggerDistance.NEAR.value,
     ]
 
-    TYPE = SELECT_DOMAIN
+    TYPE = DOMAIN
 
     @property
     def current_option(self) -> str | None:

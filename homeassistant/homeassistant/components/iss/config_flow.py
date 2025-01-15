@@ -1,7 +1,5 @@
 """Config flow to configure iss component."""
 
-from __future__ import annotations
-
 import voluptuous as vol
 
 from homeassistant.config_entries import (
@@ -25,12 +23,16 @@ class ISSConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: ConfigEntry,
-    ) -> OptionsFlowHandler:
+    ) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
+        # Check if already configured
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
+
         if user_input is not None:
             return self.async_create_entry(
                 title=DEFAULT_NAME,
@@ -44,10 +46,16 @@ class ISSConfigFlow(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Config flow options handler for iss."""
 
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+        self.options = dict(config_entry.options)
+
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
-            return self.async_create_entry(data=self.config_entry.options | user_input)
+            self.options.update(user_input)
+            return self.async_create_entry(title="", data=self.options)
 
         return self.async_show_form(
             step_id="init",

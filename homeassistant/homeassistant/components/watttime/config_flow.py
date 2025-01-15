@@ -126,11 +126,9 @@ class WattTimeConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: ConfigEntry,
-    ) -> WattTimeOptionsFlowHandler:
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Define the config flow to handle options."""
-        return WattTimeOptionsFlowHandler()
+        return WattTimeOptionsFlowHandler(config_entry)
 
     async def async_step_coordinates(
         self, user_input: dict[str, Any] | None = None
@@ -243,6 +241,10 @@ class WattTimeConfigFlow(ConfigFlow, domain=DOMAIN):
 class WattTimeOptionsFlowHandler(OptionsFlow):
     """Handle a WattTime options flow."""
 
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialize."""
+        self.entry = entry
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -256,7 +258,7 @@ class WattTimeOptionsFlowHandler(OptionsFlow):
                 {
                     vol.Required(
                         CONF_SHOW_ON_MAP,
-                        default=self.config_entry.options.get(CONF_SHOW_ON_MAP, True),
+                        default=self.entry.options.get(CONF_SHOW_ON_MAP, True),
                     ): bool
                 }
             ),

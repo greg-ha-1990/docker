@@ -21,7 +21,8 @@ from .const import (
     HMIPC_HAPID,
     HMIPC_NAME,
 )
-from .hap import HomematicipHAP
+from .generic_entity import HomematicipGenericEntity  # noqa: F401
+from .hap import HomematicipAuth, HomematicipHAP  # noqa: F401
 from .services import async_setup_services, async_unload_services
 
 CONFIG_SCHEMA = vol.Schema(

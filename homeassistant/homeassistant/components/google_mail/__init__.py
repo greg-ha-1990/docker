@@ -16,8 +16,6 @@ from .api import AsyncConfigEntryAuth
 from .const import DATA_AUTH, DATA_HASS_CONFIG, DOMAIN
 from .services import async_setup_services
 
-type GoogleMailConfigEntry = ConfigEntry[AsyncConfigEntryAuth]
-
 PLATFORMS = [Platform.NOTIFY, Platform.SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -30,13 +28,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: GoogleMailConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Google Mail from a config entry."""
     implementation = await async_get_config_entry_implementation(hass, entry)
     session = OAuth2Session(hass, entry, implementation)
     auth = AsyncConfigEntryAuth(hass, session)
     await auth.check_and_refresh_token()
-    entry.runtime_data = auth
+    hass.data[DOMAIN][entry.entry_id] = auth
 
     hass.async_create_task(
         discovery.async_load_platform(
@@ -57,8 +55,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: GoogleMailConfigEntry) -
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: GoogleMailConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
     loaded_entries = [
         entry
         for entry in hass.config_entries.async_entries(DOMAIN)
@@ -68,4 +68,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: GoogleMailConfigEntry) 
         for service_name in hass.services.async_services_for_domain(DOMAIN):
             hass.services.async_remove(DOMAIN, service_name)
 
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return unload_ok

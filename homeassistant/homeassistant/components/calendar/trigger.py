@@ -23,8 +23,7 @@ from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from . import CalendarEntity, CalendarEvent
-from .const import DATA_COMPONENT, DOMAIN
+from . import DOMAIN, CalendarEntity, CalendarEvent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ type QueuedEventFetcher = Callable[[Timespan], Awaitable[list[QueuedCalendarEven
 
 def get_entity(hass: HomeAssistant, entity_id: str) -> CalendarEntity:
     """Get the calendar entity for the provided entity_id."""
-    component: EntityComponent[CalendarEntity] = hass.data[DATA_COMPONENT]
+    component: EntityComponent[CalendarEntity] = hass.data[DOMAIN]
     if not (entity := component.get_entity(entity_id)) or not isinstance(
         entity, CalendarEntity
     ):

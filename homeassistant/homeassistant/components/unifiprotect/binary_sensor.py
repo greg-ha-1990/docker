@@ -2,48 +2,51 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 import dataclasses
+import logging
+from typing import Any
 
-from uiprotect.data import (
+from pyunifiprotect.data import (
     NVR,
     Camera,
+    Light,
     ModelType,
     MountType,
     ProtectAdoptableDeviceModel,
+    ProtectModelWithId,
     Sensor,
-    SmartDetectObjectType,
 )
-from uiprotect.data.nvr import UOSDisk
+from pyunifiprotect.data.nvr import UOSDisk
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .data import ProtectData, ProtectDeviceType, UFPConfigEntry
+from .const import DISPATCH_ADOPT, DOMAIN
+from .data import ProtectData
 from .entity import (
-    BaseProtectEntity,
     EventEntityMixin,
-    PermRequired,
     ProtectDeviceEntity,
-    ProtectEntityDescription,
-    ProtectEventMixin,
-    ProtectIsOnEntity,
     ProtectNVREntity,
     async_all_device_entities,
 )
+from .models import PermRequired, ProtectEventMixin, ProtectRequiredKeysMixin
+from .utils import async_dispatch_id as _ufpd
 
+_LOGGER = logging.getLogger(__name__)
 _KEY_DOOR = "door"
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class ProtectBinaryEntityDescription(
-    ProtectEntityDescription, BinarySensorEntityDescription
+    ProtectRequiredKeysMixin, BinarySensorEntityDescription
 ):
     """Describes UniFi Protect Binary Sensor entity."""
 
@@ -65,13 +68,13 @@ MOUNT_DEVICE_CLASS_MAP = {
 CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ProtectBinaryEntityDescription(
         key="dark",
-        name="Is dark",
+        name="Is Dark",
         icon="mdi:brightness-6",
         ufp_value="is_dark",
     ),
     ProtectBinaryEntityDescription(
         key="ssh",
-        name="SSH enabled",
+        name="SSH Enabled",
         icon="mdi:lock",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -80,7 +83,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="status_light",
-        name="Status light on",
+        name="Status Light On",
         icon="mdi:led-on",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="feature_flags.has_led_status",
@@ -89,7 +92,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="hdr_mode",
-        name="HDR mode",
+        name="HDR Mode",
         icon="mdi:brightness-7",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="feature_flags.has_hdr",
@@ -107,7 +110,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="system_sounds",
-        name="System sounds",
+        name="System Sounds",
         icon="mdi:speaker",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="has_speaker",
@@ -117,7 +120,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="osd_name",
-        name="Overlay: show name",
+        name="Overlay: Show Name",
         icon="mdi:fullscreen",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="osd_settings.is_name_enabled",
@@ -125,7 +128,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="osd_date",
-        name="Overlay: show date",
+        name="Overlay: Show Date",
         icon="mdi:fullscreen",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="osd_settings.is_date_enabled",
@@ -133,7 +136,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="osd_logo",
-        name="Overlay: show logo",
+        name="Overlay: Show Logo",
         icon="mdi:fullscreen",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="osd_settings.is_logo_enabled",
@@ -141,7 +144,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="osd_bitrate",
-        name="Overlay: show bitrate",
+        name="Overlay: Show Bitrate",
         icon="mdi:fullscreen",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="osd_settings.is_debug_enabled",
@@ -149,14 +152,14 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="motion_enabled",
-        name="Detections: motion",
+        name="Detections: Motion",
         icon="mdi:run-fast",
         ufp_value="recording_settings.enable_motion_detection",
         ufp_perm=PermRequired.NO_WRITE,
     ),
     ProtectBinaryEntityDescription(
         key="smart_person",
-        name="Detections: person",
+        name="Detections: Person",
         icon="mdi:walk",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_person",
@@ -165,7 +168,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_vehicle",
-        name="Detections: vehicle",
+        name="Detections: Vehicle",
         icon="mdi:car",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_vehicle",
@@ -173,17 +176,8 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
         ufp_perm=PermRequired.NO_WRITE,
     ),
     ProtectBinaryEntityDescription(
-        key="smart_animal",
-        name="Detections: animal",
-        icon="mdi:paw",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        ufp_required_field="can_detect_animal",
-        ufp_value="is_animal_detection_on",
-        ufp_perm=PermRequired.NO_WRITE,
-    ),
-    ProtectBinaryEntityDescription(
         key="smart_package",
-        name="Detections: package",
+        name="Detections: Package",
         icon="mdi:package-variant-closed",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_package",
@@ -192,7 +186,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_licenseplate",
-        name="Detections: license plate",
+        name="Detections: License Plate",
         icon="mdi:car",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_license_plate",
@@ -201,7 +195,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_smoke",
-        name="Detections: smoke",
+        name="Detections: Smoke",
         icon="mdi:fire",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_smoke",
@@ -219,7 +213,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_siren",
-        name="Detections: siren",
+        name="Detections: Siren",
         icon="mdi:alarm-bell",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_siren",
@@ -228,7 +222,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_baby_cry",
-        name="Detections: baby cry",
+        name="Detections: Baby Cry",
         icon="mdi:cradle",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_baby_cry",
@@ -237,7 +231,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_speak",
-        name="Detections: speaking",
+        name="Detections: Speaking",
         icon="mdi:account-voice",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_speaking",
@@ -246,7 +240,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_bark",
-        name="Detections: barking",
+        name="Detections: Barking",
         icon="mdi:dog",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_bark",
@@ -255,7 +249,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_car_alarm",
-        name="Detections: car alarm",
+        name="Detections: Car Alarm",
         icon="mdi:car",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_car_alarm",
@@ -264,7 +258,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_car_horn",
-        name="Detections: car horn",
+        name="Detections: Car Horn",
         icon="mdi:bugle",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_car_horn",
@@ -273,7 +267,7 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="smart_glass_break",
-        name="Detections: glass break",
+        name="Detections: Glass Break",
         icon="mdi:glass-fragile",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_required_field="can_detect_glass_break",
@@ -282,10 +276,10 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="track_person",
-        name="Tracking: person",
+        name="Tracking: Person",
         icon="mdi:walk",
         entity_category=EntityCategory.DIAGNOSTIC,
-        ufp_required_field="feature_flags.is_ptz",
+        ufp_required_field="is_ptz",
         ufp_value="is_person_tracking_enabled",
         ufp_perm=PermRequired.NO_WRITE,
     ),
@@ -294,19 +288,19 @@ CAMERA_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
 LIGHT_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ProtectBinaryEntityDescription(
         key="dark",
-        name="Is dark",
+        name="Is Dark",
         icon="mdi:brightness-6",
         ufp_value="is_dark",
     ),
     ProtectBinaryEntityDescription(
         key="motion",
-        name="Motion detected",
+        name="Motion Detected",
         device_class=BinarySensorDeviceClass.MOTION,
         ufp_value="is_pir_motion_detected",
     ),
     ProtectBinaryEntityDescription(
         key="light",
-        name="Flood light",
+        name="Flood Light",
         icon="mdi:spotlight-beam",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="is_light_on",
@@ -314,7 +308,7 @@ LIGHT_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="ssh",
-        name="SSH enabled",
+        name="SSH Enabled",
         icon="mdi:lock",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -323,7 +317,7 @@ LIGHT_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="status_light",
-        name="Status light on",
+        name="Status Light On",
         icon="mdi:led-on",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="light_device_settings.is_indicator_enabled",
@@ -331,9 +325,7 @@ LIGHT_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
 )
 
-# The mountable sensors can be remounted at run-time which
-# means they can change their device class at run-time.
-MOUNTABLE_SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
+SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ProtectBinaryEntityDescription(
         key=_KEY_DOOR,
         name="Contact",
@@ -341,9 +333,6 @@ MOUNTABLE_SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
         ufp_value="is_opened",
         ufp_enabled="is_contact_sensor_enabled",
     ),
-)
-
-SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ProtectBinaryEntityDescription(
         key="leak",
         name="Leak",
@@ -360,20 +349,20 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="motion",
-        name="Motion detected",
+        name="Motion Detected",
         device_class=BinarySensorDeviceClass.MOTION,
         ufp_value="is_motion_detected",
         ufp_enabled="is_motion_sensor_enabled",
     ),
     ProtectBinaryEntityDescription(
         key="tampering",
-        name="Tampering detected",
+        name="Tampering Detected",
         device_class=BinarySensorDeviceClass.TAMPER,
         ufp_value="is_tampering_detected",
     ),
     ProtectBinaryEntityDescription(
         key="status_light",
-        name="Status light on",
+        name="Status Light On",
         icon="mdi:led-on",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="led_settings.is_enabled",
@@ -381,7 +370,7 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="motion_enabled",
-        name="Motion detection",
+        name="Motion Detection",
         icon="mdi:walk",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="motion_settings.is_enabled",
@@ -389,7 +378,7 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="temperature",
-        name="Temperature sensor",
+        name="Temperature Sensor",
         icon="mdi:thermometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="temperature_settings.is_enabled",
@@ -397,7 +386,7 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="humidity",
-        name="Humidity sensor",
+        name="Humidity Sensor",
         icon="mdi:water-percent",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="humidity_settings.is_enabled",
@@ -405,7 +394,7 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="light",
-        name="Light sensor",
+        name="Light Sensor",
         icon="mdi:brightness-5",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="light_settings.is_enabled",
@@ -413,7 +402,7 @@ SENSE_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="alarm",
-        name="Alarm sound detection",
+        name="Alarm Sound Detection",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="alarm_settings.is_enabled",
         ufp_perm=PermRequired.NO_WRITE,
@@ -427,145 +416,138 @@ EVENT_SENSORS: tuple[ProtectBinaryEventEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.OCCUPANCY,
         icon="mdi:doorbell-video",
         ufp_required_field="feature_flags.is_doorbell",
+        ufp_value="is_ringing",
         ufp_event_obj="last_ring_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="motion",
         name="Motion",
         device_class=BinarySensorDeviceClass.MOTION,
+        ufp_value="is_motion_currently_detected",
         ufp_enabled="is_motion_detection_on",
         ufp_event_obj="last_motion_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_obj_any",
-        name="Object detected",
+        name="Object Detected",
         icon="mdi:eye",
+        ufp_value="is_smart_currently_detected",
         ufp_required_field="feature_flags.has_smart_detect",
         ufp_event_obj="last_smart_detect_event",
-        entity_registry_enabled_default=False,
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_obj_person",
-        name="Person detected",
+        name="Person Detected",
         icon="mdi:walk",
-        ufp_obj_type=SmartDetectObjectType.PERSON,
+        ufp_value="is_person_currently_detected",
         ufp_required_field="can_detect_person",
         ufp_enabled="is_person_detection_on",
         ufp_event_obj="last_person_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_obj_vehicle",
-        name="Vehicle detected",
+        name="Vehicle Detected",
         icon="mdi:car",
-        ufp_obj_type=SmartDetectObjectType.VEHICLE,
+        ufp_value="is_vehicle_currently_detected",
         ufp_required_field="can_detect_vehicle",
         ufp_enabled="is_vehicle_detection_on",
         ufp_event_obj="last_vehicle_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
-        key="smart_obj_animal",
-        name="Animal detected",
-        icon="mdi:paw",
-        ufp_obj_type=SmartDetectObjectType.ANIMAL,
-        ufp_required_field="can_detect_animal",
-        ufp_enabled="is_animal_detection_on",
-        ufp_event_obj="last_animal_detect_event",
-    ),
-    ProtectBinaryEventEntityDescription(
         key="smart_obj_package",
-        name="Package detected",
+        name="Package Detected",
         icon="mdi:package-variant-closed",
+        ufp_value="is_package_currently_detected",
         entity_registry_enabled_default=False,
-        ufp_obj_type=SmartDetectObjectType.PACKAGE,
         ufp_required_field="can_detect_package",
         ufp_enabled="is_package_detection_on",
         ufp_event_obj="last_package_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_any",
-        name="Audio object detected",
+        name="Audio Object Detected",
         icon="mdi:eye",
+        ufp_value="is_audio_currently_detected",
         ufp_required_field="feature_flags.has_smart_detect",
         ufp_event_obj="last_smart_audio_detect_event",
-        entity_registry_enabled_default=False,
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_smoke",
-        name="Smoke alarm detected",
+        name="Smoke Alarm Detected",
         icon="mdi:fire",
-        ufp_obj_type=SmartDetectObjectType.SMOKE,
+        ufp_value="is_smoke_currently_detected",
         ufp_required_field="can_detect_smoke",
         ufp_enabled="is_smoke_detection_on",
         ufp_event_obj="last_smoke_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_cmonx",
-        name="CO alarm detected",
+        name="CO Alarm Detected",
         icon="mdi:molecule-co",
+        ufp_value="is_cmonx_currently_detected",
         ufp_required_field="can_detect_co",
         ufp_enabled="is_co_detection_on",
         ufp_event_obj="last_cmonx_detect_event",
-        ufp_obj_type=SmartDetectObjectType.CMONX,
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_siren",
-        name="Siren detected",
+        name="Siren Detected",
         icon="mdi:alarm-bell",
-        ufp_obj_type=SmartDetectObjectType.SIREN,
+        ufp_value="is_siren_currently_detected",
         ufp_required_field="can_detect_siren",
         ufp_enabled="is_siren_detection_on",
         ufp_event_obj="last_siren_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_baby_cry",
-        name="Baby cry detected",
+        name="Baby Cry Detected",
         icon="mdi:cradle",
-        ufp_obj_type=SmartDetectObjectType.BABY_CRY,
+        ufp_value="is_baby_cry_currently_detected",
         ufp_required_field="can_detect_baby_cry",
         ufp_enabled="is_baby_cry_detection_on",
         ufp_event_obj="last_baby_cry_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_speak",
-        name="Speaking detected",
+        name="Speaking Detected",
         icon="mdi:account-voice",
-        ufp_obj_type=SmartDetectObjectType.SPEAK,
+        ufp_value="is_speaking_currently_detected",
         ufp_required_field="can_detect_speaking",
         ufp_enabled="is_speaking_detection_on",
         ufp_event_obj="last_speaking_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_bark",
-        name="Barking detected",
+        name="Barking Detected",
         icon="mdi:dog",
-        ufp_obj_type=SmartDetectObjectType.BARK,
+        ufp_value="is_bark_currently_detected",
         ufp_required_field="can_detect_bark",
         ufp_enabled="is_bark_detection_on",
         ufp_event_obj="last_bark_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_car_alarm",
-        name="Car alarm detected",
+        name="Car Alarm Detected",
         icon="mdi:car",
-        ufp_obj_type=SmartDetectObjectType.BURGLAR,
+        ufp_value="is_car_alarm_currently_detected",
         ufp_required_field="can_detect_car_alarm",
         ufp_enabled="is_car_alarm_detection_on",
         ufp_event_obj="last_car_alarm_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_car_horn",
-        name="Car horn detected",
+        name="Car Horn Detected",
         icon="mdi:bugle",
-        ufp_obj_type=SmartDetectObjectType.CAR_HORN,
+        ufp_value="is_car_horn_currently_detected",
         ufp_required_field="can_detect_car_horn",
         ufp_enabled="is_car_horn_detection_on",
         ufp_event_obj="last_car_horn_detect_event",
     ),
     ProtectBinaryEventEntityDescription(
         key="smart_audio_glass_break",
-        name="Glass break detected",
+        name="Glass Break Detected",
         icon="mdi:glass-fragile",
-        ufp_obj_type=SmartDetectObjectType.GLASS_BREAK,
+        ufp_value="last_glass_break_detect",
         ufp_required_field="can_detect_glass_break",
         ufp_enabled="is_glass_break_detection_on",
         ufp_event_obj="last_glass_break_detect_event",
@@ -582,7 +564,7 @@ DOORLOCK_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
     ProtectBinaryEntityDescription(
         key="status_light",
-        name="Status light on",
+        name="Status Light On",
         icon="mdi:led-on",
         entity_category=EntityCategory.DIAGNOSTIC,
         ufp_value="led_settings.is_enabled",
@@ -593,7 +575,7 @@ DOORLOCK_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
 VIEWER_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ProtectBinaryEntityDescription(
         key="ssh",
-        name="SSH enabled",
+        name="SSH Enabled",
         icon="mdi:lock",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -611,40 +593,125 @@ DISK_SENSORS: tuple[ProtectBinaryEntityDescription, ...] = (
     ),
 )
 
-_MODEL_DESCRIPTIONS: dict[ModelType, Sequence[ProtectEntityDescription]] = {
-    ModelType.CAMERA: CAMERA_SENSORS,
-    ModelType.LIGHT: LIGHT_SENSORS,
-    ModelType.SENSOR: SENSE_SENSORS,
-    ModelType.DOORLOCK: DOORLOCK_SENSORS,
-    ModelType.VIEWPORT: VIEWER_SENSORS,
-}
 
-_MOUNTABLE_MODEL_DESCRIPTIONS: dict[ModelType, Sequence[ProtectEntityDescription]] = {
-    ModelType.SENSOR: MOUNTABLE_SENSE_SENSORS,
-}
-
-
-class ProtectDeviceBinarySensor(
-    ProtectIsOnEntity, ProtectDeviceEntity, BinarySensorEntity
-):
-    """A UniFi Protect Device Binary Sensor."""
-
-    entity_description: ProtectBinaryEntityDescription
-
-
-class MountableProtectDeviceBinarySensor(ProtectDeviceBinarySensor):
-    """A UniFi Protect Device Binary Sensor that can change device class at runtime."""
-
-    device: Sensor
-    _state_attrs = ("_attr_available", "_attr_is_on", "_attr_device_class")
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up binary sensors for UniFi Protect integration."""
+    data: ProtectData = hass.data[DOMAIN][entry.entry_id]
 
     @callback
-    def _async_update_device_from_protect(self, device: ProtectDeviceType) -> None:
-        super()._async_update_device_from_protect(device)
-        # UP Sense can be any of the 3 contact sensor device classes
-        self._attr_device_class = MOUNT_DEVICE_CLASS_MAP.get(
-            self.device.mount_type, BinarySensorDeviceClass.DOOR
+    def _add_new_device(device: ProtectAdoptableDeviceModel) -> None:
+        entities: list[ProtectDeviceEntity] = async_all_device_entities(
+            data,
+            ProtectDeviceBinarySensor,
+            camera_descs=CAMERA_SENSORS,
+            light_descs=LIGHT_SENSORS,
+            sense_descs=SENSE_SENSORS,
+            lock_descs=DOORLOCK_SENSORS,
+            viewer_descs=VIEWER_SENSORS,
+            ufp_device=device,
         )
+        if device.is_adopted and isinstance(device, Camera):
+            entities += _async_event_entities(data, ufp_device=device)
+        async_add_entities(entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, _ufpd(entry, DISPATCH_ADOPT), _add_new_device)
+    )
+
+    entities: list[ProtectDeviceEntity] = async_all_device_entities(
+        data,
+        ProtectDeviceBinarySensor,
+        camera_descs=CAMERA_SENSORS,
+        light_descs=LIGHT_SENSORS,
+        sense_descs=SENSE_SENSORS,
+        lock_descs=DOORLOCK_SENSORS,
+        viewer_descs=VIEWER_SENSORS,
+    )
+    entities += _async_event_entities(data)
+    entities += _async_nvr_entities(data)
+
+    async_add_entities(entities)
+
+
+@callback
+def _async_event_entities(
+    data: ProtectData,
+    ufp_device: ProtectAdoptableDeviceModel | None = None,
+) -> list[ProtectDeviceEntity]:
+    entities: list[ProtectDeviceEntity] = []
+    devices = (
+        data.get_by_types({ModelType.CAMERA}) if ufp_device is None else [ufp_device]
+    )
+    for device in devices:
+        for description in EVENT_SENSORS:
+            if not description.has_required(device):
+                continue
+            entities.append(ProtectEventBinarySensor(data, device, description))
+            _LOGGER.debug(
+                "Adding binary sensor entity %s for %s",
+                description.name,
+                device.display_name,
+            )
+
+    return entities
+
+
+@callback
+def _async_nvr_entities(
+    data: ProtectData,
+) -> list[ProtectDeviceEntity]:
+    entities: list[ProtectDeviceEntity] = []
+    device = data.api.bootstrap.nvr
+    if device.system_info.ustorage is None:
+        return entities
+
+    for disk in device.system_info.ustorage.disks:
+        for description in DISK_SENSORS:
+            if not disk.has_disk:
+                continue
+
+            entities.append(ProtectDiskBinarySensor(data, device, description, disk))
+            _LOGGER.debug(
+                "Adding binary sensor entity %s",
+                f"{disk.type} {disk.slot}",
+            )
+
+    return entities
+
+
+class ProtectDeviceBinarySensor(ProtectDeviceEntity, BinarySensorEntity):
+    """A UniFi Protect Device Binary Sensor."""
+
+    device: Camera | Light | Sensor
+    entity_description: ProtectBinaryEntityDescription
+
+    @callback
+    def _async_update_device_from_protect(self, device: ProtectModelWithId) -> None:
+        super()._async_update_device_from_protect(device)
+        entity_description = self.entity_description
+        updated_device = self.device
+        self._attr_is_on = entity_description.get_ufp_value(updated_device)
+        # UP Sense can be any of the 3 contact sensor device classes
+        if entity_description.key == _KEY_DOOR and isinstance(updated_device, Sensor):
+            self._attr_device_class = MOUNT_DEVICE_CLASS_MAP.get(
+                updated_device.mount_type, BinarySensorDeviceClass.DOOR
+            )
+        else:
+            self._attr_device_class = self.entity_description.device_class
+
+    @callback
+    def _async_get_state_attrs(self) -> tuple[Any, ...]:
+        """Retrieve data that goes into the current state of the entity.
+
+        Called before and after updating entity and state is only written if there
+        is a change.
+        """
+
+        return (self._attr_available, self._attr_is_on, self._attr_device_class)
 
 
 class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
@@ -652,7 +719,6 @@ class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
 
     _disk: UOSDisk
     entity_description: ProtectBinaryEntityDescription
-    _state_attrs = ("_attr_available", "_attr_is_on")
 
     def __init__(
         self,
@@ -665,6 +731,7 @@ class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
         self._disk = disk
         # backwards compat with old unique IDs
         index = self._disk.slot - 1
+
         description = dataclasses.replace(
             description,
             key=f"{description.key}_{index}",
@@ -673,11 +740,11 @@ class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
         super().__init__(data, device, description)
 
     @callback
-    def _async_update_device_from_protect(self, device: ProtectDeviceType) -> None:
+    def _async_update_device_from_protect(self, device: ProtectModelWithId) -> None:
         super()._async_update_device_from_protect(device)
+
         slot = self._disk.slot
         self._attr_available = False
-        available = self.data.last_update_success
 
         # should not be possible since it would require user to
         # _downgrade_ to make ustorage disppear
@@ -685,112 +752,46 @@ class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
         for disk in self.device.system_info.ustorage.disks:
             if disk.slot == slot:
                 self._disk = disk
-                self._attr_available = available
+                self._attr_available = True
                 break
 
         self._attr_is_on = not self._disk.is_healthy
+
+    @callback
+    def _async_get_state_attrs(self) -> tuple[Any, ...]:
+        """Retrieve data that goes into the current state of the entity.
+
+        Called before and after updating entity and state is only written if there
+        is a change.
+        """
+
+        return (self._attr_available, self._attr_is_on)
 
 
 class ProtectEventBinarySensor(EventEntityMixin, BinarySensorEntity):
     """A UniFi Protect Device Binary Sensor for events."""
 
     entity_description: ProtectBinaryEventEntityDescription
-    _state_attrs = ("_attr_available", "_attr_is_on", "_attr_extra_state_attributes")
 
     @callback
-    def _set_event_done(self) -> None:
-        self._attr_is_on = False
-        self._attr_extra_state_attributes = {}
-
-    @callback
-    def _async_update_device_from_protect(self, device: ProtectDeviceType) -> None:
-        description = self.entity_description
-
-        prev_event = self._event
-        prev_event_end = self._event_end
+    def _async_update_device_from_protect(self, device: ProtectModelWithId) -> None:
         super()._async_update_device_from_protect(device)
-        if event := description.get_event_obj(device):
-            self._event = event
-            self._event_end = event.end if event else None
-
-        if not (
-            event
-            and (
-                description.ufp_obj_type is None
-                or description.has_matching_smart(event)
-            )
-            and not self._event_already_ended(prev_event, prev_event_end)
-        ):
-            self._set_event_done()
-            return
-
-        self._attr_is_on = True
-        self._set_event_attrs(event)
-        if event.end:
-            self._async_event_with_immediate_end()
-
-
-MODEL_DESCRIPTIONS_WITH_CLASS = (
-    (_MODEL_DESCRIPTIONS, ProtectDeviceBinarySensor),
-    (_MOUNTABLE_MODEL_DESCRIPTIONS, MountableProtectDeviceBinarySensor),
-)
-
-
-@callback
-def _async_event_entities(
-    data: ProtectData,
-    ufp_device: ProtectAdoptableDeviceModel | None = None,
-) -> list[ProtectDeviceEntity]:
-    entities: list[ProtectDeviceEntity] = []
-    for device in data.get_cameras() if ufp_device is None else [ufp_device]:
-        entities.extend(
-            ProtectEventBinarySensor(data, device, description)
-            for description in EVENT_SENSORS
-            if description.has_required(device)
-        )
-    return entities
-
-
-@callback
-def _async_nvr_entities(
-    data: ProtectData,
-) -> list[BaseProtectEntity]:
-    device = data.api.bootstrap.nvr
-    if (ustorage := device.system_info.ustorage) is None:
-        return []
-    return [
-        ProtectDiskBinarySensor(data, device, description, disk)
-        for disk in ustorage.disks
-        for description in DISK_SENSORS
-        if disk.has_disk
-    ]
-
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: UFPConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up binary sensors for UniFi Protect integration."""
-    data = entry.runtime_data
+        is_on = self.entity_description.get_is_on(self.device, self._event)
+        self._attr_is_on: bool | None = is_on
+        if not is_on:
+            self._event = None
+            self._attr_extra_state_attributes = {}
 
     @callback
-    def _add_new_device(device: ProtectAdoptableDeviceModel) -> None:
-        entities: list[BaseProtectEntity] = []
-        for model_descriptions, klass in MODEL_DESCRIPTIONS_WITH_CLASS:
-            entities += async_all_device_entities(
-                data, klass, model_descriptions=model_descriptions, ufp_device=device
-            )
-        if device.is_adopted and isinstance(device, Camera):
-            entities += _async_event_entities(data, ufp_device=device)
-        async_add_entities(entities)
+    def _async_get_state_attrs(self) -> tuple[Any, ...]:
+        """Retrieve data that goes into the current state of the entity.
 
-    data.async_subscribe_adopt(_add_new_device)
-    entities: list[BaseProtectEntity] = []
-    for model_descriptions, klass in MODEL_DESCRIPTIONS_WITH_CLASS:
-        entities += async_all_device_entities(
-            data, klass, model_descriptions=model_descriptions
+        Called before and after updating entity and state is only written if there
+        is a change.
+        """
+
+        return (
+            self._attr_available,
+            self._attr_is_on,
+            self._attr_extra_state_attributes,
         )
-    entities += _async_event_entities(data)
-    entities += _async_nvr_entities(data)
-    async_add_entities(entities)

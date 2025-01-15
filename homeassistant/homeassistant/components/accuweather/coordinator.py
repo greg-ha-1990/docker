@@ -1,9 +1,6 @@
 """The AccuWeather coordinator."""
 
-from __future__ import annotations
-
 from asyncio import timeout
-from dataclasses import dataclass
 from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Any
@@ -11,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from accuweather import AccuWeather, ApiError, InvalidApiKeyError, RequestsExceededError
 from aiohttp.client_exceptions import ClientConnectorError
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import (
@@ -27,17 +23,6 @@ EXCEPTIONS = (ApiError, ClientConnectorError, InvalidApiKeyError, RequestsExceed
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class AccuWeatherData:
-    """Data for AccuWeather integration."""
-
-    coordinator_observation: AccuWeatherObservationDataUpdateCoordinator
-    coordinator_daily_forecast: AccuWeatherDailyForecastDataUpdateCoordinator
-
-
-type AccuWeatherConfigEntry = ConfigEntry[AccuWeatherData]
-
-
 class AccuWeatherObservationDataUpdateCoordinator(
     DataUpdateCoordinator[dict[str, Any]]
 ):
@@ -46,7 +31,6 @@ class AccuWeatherObservationDataUpdateCoordinator(
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: AccuWeatherConfigEntry,
         accuweather: AccuWeather,
         name: str,
         coordinator_type: str,
@@ -64,7 +48,6 @@ class AccuWeatherObservationDataUpdateCoordinator(
         super().__init__(
             hass,
             _LOGGER,
-            config_entry=config_entry,
             name=f"{name} ({coordinator_type})",
             update_interval=update_interval,
         )
@@ -90,7 +73,6 @@ class AccuWeatherDailyForecastDataUpdateCoordinator(
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: AccuWeatherConfigEntry,
         accuweather: AccuWeather,
         name: str,
         coordinator_type: str,
@@ -108,7 +90,6 @@ class AccuWeatherDailyForecastDataUpdateCoordinator(
         super().__init__(
             hass,
             _LOGGER,
-            config_entry=config_entry,
             name=f"{name} ({coordinator_type})",
             update_interval=update_interval,
         )

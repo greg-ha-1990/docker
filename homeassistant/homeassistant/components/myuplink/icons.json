@@ -26,9 +26,6 @@
       "priority": {
         "default": "mdi:priority-high"
       },
-      "rpm": {
-        "default": "mdi:rotate-right"
-      },
       "status_compressor": {
         "default": "mdi:heat-pump-outline"
       }

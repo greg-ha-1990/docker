@@ -8,14 +8,8 @@
     }
   },
   "services": {
-    "clear_skipped": {
-      "service": "mdi:package"
-    },
-    "install": {
-      "service": "mdi:package-down"
-    },
-    "skip": {
-      "service": "mdi:package-check"
-    }
+    "clear_skipped": "mdi:package",
+    "install": "mdi:package-down",
+    "skip": "mdi:package-check"
   }
 }

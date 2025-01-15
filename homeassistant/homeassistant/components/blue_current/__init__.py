@@ -22,8 +22,6 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, EVSE_ID, LOGGER, MODEL_TYPE
 
-type BlueCurrentConfigEntry = ConfigEntry[Connector]
-
 PLATFORMS = [Platform.SENSOR]
 CHARGE_POINTS = "CHARGE_POINTS"
 DATA = "data"
@@ -34,10 +32,9 @@ OBJECT = "object"
 VALUE_TYPES = ["CH_STATUS"]
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, config_entry: BlueCurrentConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up Blue Current as a config entry."""
+    hass.data.setdefault(DOMAIN, {})
     client = Client()
     api_token = config_entry.data[CONF_API_TOKEN]
     connector = Connector(hass, config_entry, client)
@@ -53,25 +50,29 @@ async def async_setup_entry(
     )
 
     await client.wait_for_charge_points()
-    config_entry.runtime_data = connector
+    hass.data[DOMAIN][config_entry.entry_id] = connector
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, config_entry: BlueCurrentConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Unload the Blue Current config entry."""
 
-    return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        config_entry, PLATFORMS
+    )
+    if unload_ok:
+        hass.data[DOMAIN].pop(config_entry.entry_id)
+
+    return unload_ok
 
 
 class Connector:
     """Define a class that connects to the Blue Current websocket API."""
 
     def __init__(
-        self, hass: HomeAssistant, config: BlueCurrentConfigEntry, client: Client
+        self, hass: HomeAssistant, config: ConfigEntry, client: Client
     ) -> None:
         """Initialize."""
         self.config = config

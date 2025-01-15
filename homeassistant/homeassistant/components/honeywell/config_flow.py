@@ -38,11 +38,14 @@ class HoneywellConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a honeywell config flow."""
 
     VERSION = 1
+    entry: ConfigEntry | None
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle re-authentication with Honeywell."""
+
+        self.entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -50,8 +53,8 @@ class HoneywellConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Confirm re-authentication with Honeywell."""
         errors: dict[str, str] = {}
+        assert self.entry is not None
 
-        reauth_entry = self._get_reauth_entry()
         if user_input:
             try:
                 await self.is_valid(
@@ -69,14 +72,18 @@ class HoneywellConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             else:
                 return self.async_update_reload_and_abort(
-                    reauth_entry,
-                    data_updates=user_input,
+                    self.entry,
+                    data={
+                        **self.entry.data,
+                        **user_input,
+                    },
                 )
 
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=self.add_suggested_values_to_schema(
-                REAUTH_SCHEMA, reauth_entry.data
+                REAUTH_SCHEMA,
+                self.entry.data,
             ),
             errors=errors,
             description_placeholders={"name": "Honeywell"},
@@ -129,11 +136,15 @@ class HoneywellConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> HoneywellOptionsFlowHandler:
         """Options callback for Honeywell."""
-        return HoneywellOptionsFlowHandler()
+        return HoneywellOptionsFlowHandler(config_entry)
 
 
 class HoneywellOptionsFlowHandler(OptionsFlow):
     """Config flow options for Honeywell."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialize Honeywell options flow."""
+        self.config_entry = entry
 
     async def async_step_init(self, user_input=None) -> ConfigFlowResult:
         """Manage the options."""

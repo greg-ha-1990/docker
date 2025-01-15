@@ -57,8 +57,6 @@
     }
   },
   "services": {
-    "add_product": {
-      "service": "mdi:cart-plus"
-    }
+    "add_product": "mdi:cart-plus"
   }
 }

@@ -23,10 +23,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import TessieConfigEntry
 from .const import TessieClimateKeeper
+from .coordinator import TessieStateUpdateCoordinator
 from .entity import TessieEntity
-from .models import TessieVehicleData
-
-PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -60,13 +58,14 @@ class TessieClimateEntity(TessieEntity, ClimateEntity):
         TessieClimateKeeper.DOG,
         TessieClimateKeeper.CAMP,
     ]
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self,
-        vehicle: TessieVehicleData,
+        coordinator: TessieStateUpdateCoordinator,
     ) -> None:
         """Initialize the Climate entity."""
-        super().__init__(vehicle, "primary")
+        super().__init__(coordinator, "primary")
 
     @property
     def hvac_mode(self) -> HVACMode | None:

@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Mapping
 from functools import partial
 from typing import Any, Protocol, cast
 
 from homeassistant.config import config_per_platform
 from homeassistant.const import CONF_DESCRIPTION, CONF_NAME
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
 from homeassistant.helpers.service import async_set_service_schema
+from homeassistant.helpers.template import Template
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.loader import async_get_integration, bind_hass
 from homeassistant.setup import (
@@ -21,7 +22,6 @@ from homeassistant.setup import (
     async_start_setup,
 )
 from homeassistant.util import slugify
-from homeassistant.util.hass_dict import HassKey
 from homeassistant.util.yaml import load_yaml_dict
 
 from .const import (
@@ -36,12 +36,8 @@ from .const import (
 )
 
 CONF_FIELDS = "fields"
-NOTIFY_SERVICES: HassKey[dict[str, list[BaseNotificationService]]] = HassKey(
-    f"{DOMAIN}_services"
-)
-NOTIFY_DISCOVERY_DISPATCHER: HassKey[CALLBACK_TYPE | None] = HassKey(
-    f"{DOMAIN}_discovery_dispatcher"
-)
+NOTIFY_SERVICES = "notify_services"
+NOTIFY_DISCOVERY_DISPATCHER = "notify_discovery_dispatcher"
 
 
 class LegacyNotifyPlatform(Protocol):
@@ -109,7 +105,7 @@ def async_setup_legacy(
                         platform.get_service, hass, p_config, discovery_info
                     )
                 else:
-                    raise HomeAssistantError("Invalid notify platform.")  # noqa: TRY301
+                    raise HomeAssistantError("Invalid notify platform.")
 
                 if notify_service is None:
                     # Platforms can decide not to create a service based
@@ -159,15 +155,30 @@ def async_setup_legacy(
     ]
 
 
+@callback
+def check_templates_warn(hass: HomeAssistant, tpl: Template) -> None:
+    """Warn user that passing templates to notify service is deprecated."""
+    if tpl.is_static or hass.data.get("notify_template_warned"):
+        return
+
+    hass.data["notify_template_warned"] = True
+    LOGGER.warning(
+        "Passing templates to notify service is deprecated and will be removed in"
+        " 2021.12. Automations and scripts handle templates automatically"
+    )
+
+
 @bind_hass
 async def async_reload(hass: HomeAssistant, integration_name: str) -> None:
     """Register notify services for an integration."""
     if not _async_integration_has_notify_services(hass, integration_name):
         return
 
+    notify_services: list[BaseNotificationService] = hass.data[NOTIFY_SERVICES][
+        integration_name
+    ]
     tasks = [
-        notify_service.async_register_services()
-        for notify_service in hass.data[NOTIFY_SERVICES][integration_name]
+        notify_service.async_register_services() for notify_service in notify_services
     ]
 
     await asyncio.gather(*tasks)
@@ -176,16 +187,20 @@ async def async_reload(hass: HomeAssistant, integration_name: str) -> None:
 @bind_hass
 async def async_reset_platform(hass: HomeAssistant, integration_name: str) -> None:
     """Unregister notify services for an integration."""
-    notify_discovery_dispatcher = hass.data.get(NOTIFY_DISCOVERY_DISPATCHER)
+    notify_discovery_dispatcher: Callable[[], None] | None = hass.data.get(
+        NOTIFY_DISCOVERY_DISPATCHER
+    )
     if notify_discovery_dispatcher:
         notify_discovery_dispatcher()
         hass.data[NOTIFY_DISCOVERY_DISPATCHER] = None
     if not _async_integration_has_notify_services(hass, integration_name):
         return
 
+    notify_services: list[BaseNotificationService] = hass.data[NOTIFY_SERVICES][
+        integration_name
+    ]
     tasks = [
-        notify_service.async_unregister_services()
-        for notify_service in hass.data[NOTIFY_SERVICES][integration_name]
+        notify_service.async_unregister_services() for notify_service in notify_services
     ]
 
     await asyncio.gather(*tasks)
@@ -240,17 +255,21 @@ class BaseNotificationService:
     async def _async_notify_message_service(self, service: ServiceCall) -> None:
         """Handle sending notification message service calls."""
         kwargs = {}
-        message: str = service.data[ATTR_MESSAGE]
-        title: str | None
+        message: Template = service.data[ATTR_MESSAGE]
+        title: Template | None
         if title := service.data.get(ATTR_TITLE):
-            kwargs[ATTR_TITLE] = title
+            check_templates_warn(self.hass, title)
+            title.hass = self.hass
+            kwargs[ATTR_TITLE] = title.async_render(parse_result=False)
 
         if self.registered_targets.get(service.service) is not None:
             kwargs[ATTR_TARGET] = [self.registered_targets[service.service]]
         elif service.data.get(ATTR_TARGET) is not None:
             kwargs[ATTR_TARGET] = service.data.get(ATTR_TARGET)
 
-        kwargs[ATTR_MESSAGE] = message
+        check_templates_warn(self.hass, message)
+        message.hass = self.hass
+        kwargs[ATTR_MESSAGE] = message.async_render(parse_result=False)
         kwargs[ATTR_DATA] = service.data.get(ATTR_DATA)
 
         await self.async_send_message(**kwargs)

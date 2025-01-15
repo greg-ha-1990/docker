@@ -60,9 +60,7 @@ class RadioThermConfigFlow(ConfigFlow, domain=DOMAIN):
         self.discovered_ip = discovery_info.ip
         return await self.async_step_confirm()
 
-    async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_confirm(self, user_input=None):
         """Attempt to confirm."""
         ip_address = self.discovered_ip
         init_data = self.discovered_init_data
@@ -77,7 +75,7 @@ class RadioThermConfigFlow(ConfigFlow, domain=DOMAIN):
         self._set_confirm_only()
         placeholders = {
             "name": init_data.name,
-            "host": ip_address,
+            "host": self.discovered_ip,
             "model": init_data.model or "Unknown",
         }
         self.context["title_placeholders"] = placeholders

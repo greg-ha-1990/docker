@@ -11,7 +11,6 @@ CONF_DEVICE_NAME = "name"
 CONF_DEVICE_OWNER_ID = "drop_device_owner_id"
 
 # Values for DROP device types
-DEV_ALERT = "alrt"
 DEV_FILTER = "filt"
 DEV_HUB = "hub"
 DEV_LEAK_DETECTOR = "leak"

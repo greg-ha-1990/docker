@@ -10,21 +10,23 @@ from typing import Any, Generic
 from pylitterbot import FeederRobot, LitterRobot3
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import LitterRobotConfigEntry
+from .const import DOMAIN
 from .entity import LitterRobotEntity, _RobotT
+from .hub import LitterRobotHub
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: LitterRobotConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Litter-Robot cleaner using config entry."""
-    hub = entry.runtime_data
+    hub: LitterRobotHub = hass.data[DOMAIN][entry.entry_id]
     entities: list[LitterRobotButtonEntity] = list(
         itertools.chain(
             (

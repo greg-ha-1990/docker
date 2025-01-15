@@ -7,6 +7,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "loggers": ["accuweather"],
-  "requirements": ["accuweather==4.0.0"],
+  "quality_scale": "platinum",
+  "requirements": ["accuweather==3.0.0"],
   "single_config_entry": true
 }

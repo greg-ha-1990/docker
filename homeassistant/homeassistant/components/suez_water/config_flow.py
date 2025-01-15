@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pysuez import PySuezError, SuezClient
+from pysuez import SuezClient
+from pysuez.client import PySuezError
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -20,36 +21,27 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_COUNTER_ID): str,
+        vol.Required(CONF_COUNTER_ID): str,
     }
 )
 
 
-async def validate_input(data: dict[str, Any]) -> None:
+def validate_input(data: dict[str, Any]) -> None:
     """Validate the user input allows us to connect.
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
     try:
-        counter_id = data.get(CONF_COUNTER_ID)
         client = SuezClient(
             data[CONF_USERNAME],
             data[CONF_PASSWORD],
-            counter_id,
+            data[CONF_COUNTER_ID],
+            provider=None,
         )
-        try:
-            if not await client.check_credentials():
-                raise InvalidAuth
-        except PySuezError as ex:
-            raise CannotConnect from ex
-
-        if counter_id is None:
-            try:
-                data[CONF_COUNTER_ID] = await client.find_counter()
-            except PySuezError as ex:
-                raise CounterNotFound from ex
-    finally:
-        await client.close_session()
+        if not client.check_credentials():
+            raise InvalidAuth
+    except PySuezError as ex:
+        raise CannotConnect from ex
 
 
 class SuezWaterConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -66,13 +58,11 @@ class SuezWaterConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(user_input[CONF_USERNAME])
             self._abort_if_unique_id_configured()
             try:
-                await validate_input(user_input)
+                await self.hass.async_add_executor_job(validate_input, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except CounterNotFound:
-                errors["base"] = "counter_not_found"
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -82,11 +72,23 @@ class SuezWaterConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
-            errors=errors,
-            description_placeholders={"tout_sur_mon_eau": "Tout sur mon Eau"},
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
+
+    async def async_step_import(self, user_input: dict[str, Any]) -> ConfigFlowResult:
+        """Import the yaml config."""
+        await self.async_set_unique_id(user_input[CONF_USERNAME])
+        self._abort_if_unique_id_configured()
+        try:
+            await self.hass.async_add_executor_job(validate_input, user_input)
+        except CannotConnect:
+            return self.async_abort(reason="cannot_connect")
+        except InvalidAuth:
+            return self.async_abort(reason="invalid_auth")
+        except Exception:
+            _LOGGER.exception("Unexpected exception")
+            return self.async_abort(reason="unknown")
+        return self.async_create_entry(title=user_input[CONF_USERNAME], data=user_input)
 
 
 class CannotConnect(HomeAssistantError):
@@ -95,7 +97,3 @@ class CannotConnect(HomeAssistantError):
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""
-
-
-class CounterNotFound(HomeAssistantError):
-    """Error to indicate we cannot automatically found the counter id."""

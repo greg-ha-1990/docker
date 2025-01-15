@@ -10,7 +10,7 @@ from typing import Final
 from easyenergy import Electricity, Gas, VatOption
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -23,7 +23,7 @@ from homeassistant.helpers import selector
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .coordinator import EasyEnergyConfigEntry, EasyEnergyDataUpdateCoordinator
+from .coordinator import EasyEnergyDataUpdateCoordinator
 
 ATTR_CONFIG_ENTRY: Final = "config_entry"
 ATTR_START: Final = "start"
@@ -86,12 +86,12 @@ def __serialize_prices(prices: list[dict[str, float | datetime]]) -> ServiceResp
     }
 
 
-def __get_coordinator(call: ServiceCall) -> EasyEnergyDataUpdateCoordinator:
+def __get_coordinator(
+    hass: HomeAssistant, call: ServiceCall
+) -> EasyEnergyDataUpdateCoordinator:
     """Get the coordinator from the entry."""
     entry_id: str = call.data[ATTR_CONFIG_ENTRY]
-    entry: EasyEnergyConfigEntry | None = call.hass.config_entries.async_get_entry(
-        entry_id
-    )
+    entry: ConfigEntry | None = hass.config_entries.async_get_entry(entry_id)
 
     if not entry:
         raise ServiceValidationError(
@@ -110,16 +110,18 @@ def __get_coordinator(call: ServiceCall) -> EasyEnergyDataUpdateCoordinator:
             },
         )
 
-    return entry.runtime_data
+    coordinator: EasyEnergyDataUpdateCoordinator = hass.data[DOMAIN][entry_id]
+    return coordinator
 
 
 async def __get_prices(
     call: ServiceCall,
     *,
+    hass: HomeAssistant,
     price_type: PriceType,
 ) -> ServiceResponse:
     """Get prices from easyEnergy."""
-    coordinator = __get_coordinator(call)
+    coordinator = __get_coordinator(hass, call)
 
     start = __get_date(call.data.get(ATTR_START))
     end = __get_date(call.data.get(ATTR_END))
@@ -155,21 +157,21 @@ def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN,
         GAS_SERVICE_NAME,
-        partial(__get_prices, price_type=PriceType.GAS),
+        partial(__get_prices, hass=hass, price_type=PriceType.GAS),
         schema=SERVICE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
         DOMAIN,
         ENERGY_USAGE_SERVICE_NAME,
-        partial(__get_prices, price_type=PriceType.ENERGY_USAGE),
+        partial(__get_prices, hass=hass, price_type=PriceType.ENERGY_USAGE),
         schema=SERVICE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
         DOMAIN,
         ENERGY_RETURN_SERVICE_NAME,
-        partial(__get_prices, price_type=PriceType.ENERGY_RETURN),
+        partial(__get_prices, hass=hass, price_type=PriceType.ENERGY_RETURN),
         schema=SERVICE_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )

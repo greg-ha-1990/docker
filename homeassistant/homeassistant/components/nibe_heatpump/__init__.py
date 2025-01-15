@@ -30,7 +30,7 @@ from .const import (
     CONF_WORD_SWAP,
     DOMAIN,
 )
-from .coordinator import CoilCoordinator
+from .coordinator import Coordinator
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -81,7 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_stop)
     )
 
-    coordinator = CoilCoordinator(hass, heatpump, connection)
+    coordinator = Coordinator(hass, heatpump, connection)
 
     data = hass.data.setdefault(DOMAIN, {})
     data[entry.entry_id] = coordinator

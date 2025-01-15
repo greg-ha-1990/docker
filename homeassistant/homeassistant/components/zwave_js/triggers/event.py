@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 import functools
 
-from pydantic.v1 import ValidationError
+from pydantic import ValidationError
 import voluptuous as vol
 from zwave_js_server.client import Client
 from zwave_js_server.model.controller import CONTROLLER_EVENT_MODEL_MAP
@@ -80,8 +80,10 @@ def validate_event_data(obj: dict) -> dict:
     except ValidationError as exc:
         # Filter out required field errors if keys can be missing, and if there are
         # still errors, raise an exception
-        if [error for error in exc.errors() if error["type"] != "value_error.missing"]:
-            raise vol.MultipleInvalid from exc
+        if errors := [
+            error for error in exc.errors() if error["type"] != "value_error.missing"
+        ]:
+            raise vol.MultipleInvalid(errors) from exc
     return obj
 
 

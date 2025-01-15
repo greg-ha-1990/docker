@@ -8,7 +8,7 @@ from smhi.smhi_lib import Smhi, SmhiForecastException
 import voluptuous as vol
 
 from homeassistant.components.weather import DOMAIN as WEATHER_DOMAIN
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_LATITUDE, CONF_LOCATION, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
@@ -39,6 +39,7 @@ class SmhiFlowHandler(ConfigFlow, domain=DOMAIN):
     """Config flow for SMHI component."""
 
     VERSION = 2
+    config_entry: ConfigEntry | None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -84,8 +85,17 @@ class SmhiFlowHandler(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle a reconfiguration flow initialized by the user."""
+        self.config_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        return await self.async_step_reconfigure_confirm()
+
+    async def async_step_reconfigure_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle a reconfiguration flow initialized by the user."""
         errors: dict[str, str] = {}
-        reconfigure_entry = self._get_reconfigure_entry()
+        assert self.config_entry
 
         if user_input is not None:
             lat: float = user_input[CONF_LOCATION][CONF_LATITUDE]
@@ -95,8 +105,8 @@ class SmhiFlowHandler(ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
 
-                old_lat = reconfigure_entry.data[CONF_LOCATION][CONF_LATITUDE]
-                old_lon = reconfigure_entry.data[CONF_LOCATION][CONF_LONGITUDE]
+                old_lat = self.config_entry.data[CONF_LOCATION][CONF_LATITUDE]
+                old_lon = self.config_entry.data[CONF_LOCATION][CONF_LONGITUDE]
 
                 entity_reg = er.async_get(self.hass)
                 if entity := entity_reg.async_get_entity_id(
@@ -115,16 +125,17 @@ class SmhiFlowHandler(ConfigFlow, domain=DOMAIN):
                     )
 
                 return self.async_update_reload_and_abort(
-                    reconfigure_entry,
+                    self.config_entry,
                     unique_id=unique_id,
-                    data_updates=user_input,
+                    data={**self.config_entry.data, **user_input},
+                    reason="reconfigure_successful",
                 )
             errors["base"] = "wrong_location"
 
         schema = self.add_suggested_values_to_schema(
             vol.Schema({vol.Required(CONF_LOCATION): LocationSelector()}),
-            reconfigure_entry.data,
+            self.config_entry.data,
         )
         return self.async_show_form(
-            step_id="reconfigure", data_schema=schema, errors=errors
+            step_id="reconfigure_confirm", data_schema=schema, errors=errors
         )

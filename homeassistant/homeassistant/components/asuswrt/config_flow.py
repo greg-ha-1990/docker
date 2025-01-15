@@ -32,7 +32,6 @@ from homeassistant.helpers.schema_config_entry_flow import (
     SchemaOptionsFlowHandler,
 )
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
-from homeassistant.helpers.typing import VolDictType
 
 from .bridge import AsusWrtBridge
 from .const import (
@@ -144,7 +143,6 @@ class AsusWrtFlowHandler(ConfigFlow, domain=DOMAIN):
 
         user_input = self._config_data
 
-        add_schema: VolDictType
         if self.show_advanced_options:
             add_schema = {
                 vol.Exclusive(CONF_PASSWORD, PASS_KEY, PASS_KEY_MSG): str,

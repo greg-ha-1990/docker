@@ -15,7 +15,6 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     ATTR_MANUFACTURER,
     ATTR_MODEL,
-    ATTR_SERIAL_NUMBER,
     ATTR_SW_VERSION,
     PERCENTAGE,
     STATE_UNKNOWN,
@@ -43,7 +42,6 @@ NUT_DEV_INFO_TO_DEV_INFO: dict[str, str] = {
     "manufacturer": ATTR_MANUFACTURER,
     "model": ATTR_MODEL,
     "firmware": ATTR_SW_VERSION,
-    "serial": ATTR_SERIAL_NUMBER,
 }
 
 _LOGGER = logging.getLogger(__name__)
@@ -660,6 +658,7 @@ SENSOR_TYPES: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
     ),
     "input.L1.current": SensorEntityDescription(
@@ -928,7 +927,6 @@ SENSOR_TYPES: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.HUMIDITY,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "ambient.temperature": SensorEntityDescription(
         key="ambient.temperature",
@@ -936,7 +934,6 @@ SENSOR_TYPES: Final[dict[str, SensorEntityDescription]] = {
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "watts": SensorEntityDescription(
         key="watts",

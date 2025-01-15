@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from songpal import Device, SongpalException
@@ -21,11 +20,9 @@ _LOGGER = logging.getLogger(__name__)
 class SongpalConfig:
     """Device Configuration."""
 
-    def __init__(self, name: str, host: str | None, endpoint: str) -> None:
+    def __init__(self, name, host, endpoint):
         """Initialize Configuration."""
         self.name = name
-        if TYPE_CHECKING:
-            assert host is not None
         self.host = host
         self.endpoint = endpoint
 
@@ -35,11 +32,11 @@ class SongpalConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    conf: SongpalConfig
+    def __init__(self) -> None:
+        """Initialize the flow."""
+        self.conf: SongpalConfig | None = None
 
-    async def async_step_user(
-        self, user_input: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user."""
         if user_input is None:
             return self.async_show_form(
@@ -75,9 +72,7 @@ class SongpalConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_init(user_input)
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input=None):
         """Handle a flow start."""
         # Check if already configured
         self._async_abort_entries_match({CONF_ENDPOINT: self.conf.endpoint})
@@ -108,7 +103,7 @@ class SongpalConfigFlow(ConfigFlow, domain=DOMAIN):
         _LOGGER.debug("Discovered: %s", discovery_info)
 
         friendly_name = discovery_info.upnp[ssdp.ATTR_UPNP_FRIENDLY_NAME]
-        hostname = urlparse(discovery_info.ssdp_location).hostname
+        parsed_url = urlparse(discovery_info.ssdp_location)
         scalarweb_info = discovery_info.upnp["X_ScalarWebAPI_DeviceInfo"]
         endpoint = scalarweb_info["X_ScalarWebAPI_BaseURL"]
         service_types = scalarweb_info["X_ScalarWebAPI_ServiceList"][
@@ -116,27 +111,22 @@ class SongpalConfigFlow(ConfigFlow, domain=DOMAIN):
         ]
 
         # Ignore Bravia TVs
-        if "videoScreen" in service_types or "video" in service_types:
+        if "videoScreen" in service_types:
             return self.async_abort(reason="not_songpal_device")
-
-        if TYPE_CHECKING:
-            # the hostname must be str because the ssdp_location is not bytes and
-            # not a relative url
-            assert isinstance(hostname, str)
 
         self.context["title_placeholders"] = {
             CONF_NAME: friendly_name,
-            CONF_HOST: hostname,
+            CONF_HOST: parsed_url.hostname,
         }
 
-        self.conf = SongpalConfig(friendly_name, hostname, endpoint)
+        self.conf = SongpalConfig(friendly_name, parsed_url.hostname, endpoint)
 
         return await self.async_step_init()
 
-    async def async_step_import(self, import_data: dict[str, str]) -> ConfigFlowResult:
+    async def async_step_import(self, user_input=None):
         """Import a config entry."""
-        name = import_data.get(CONF_NAME)
-        endpoint = import_data[CONF_ENDPOINT]
+        name = user_input.get(CONF_NAME)
+        endpoint = user_input.get(CONF_ENDPOINT)
         parsed_url = urlparse(endpoint)
 
         # Try to connect to test the endpoint
@@ -153,4 +143,4 @@ class SongpalConfigFlow(ConfigFlow, domain=DOMAIN):
 
         self.conf = SongpalConfig(name, parsed_url.hostname, endpoint)
 
-        return await self.async_step_init(import_data)
+        return await self.async_step_init(user_input)

@@ -64,7 +64,7 @@ async def async_setup_platform(
             keba,
             "session_energy",
             SensorEntityDescription(
-                key="E pres",  # codespell:ignore pres
+                key="E pres",
                 name="Session Energy",
                 native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
                 device_class=SensorDeviceClass.ENERGY,

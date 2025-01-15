@@ -9,7 +9,6 @@ from collections import namedtuple
 from contextlib import suppress
 import itertools
 import os
-from pathlib import Path
 import re
 import shlex
 import sys
@@ -21,7 +20,7 @@ except ImportError:
 
 
 RE_ASCII = re.compile(r"\033\[[^m]*m")
-Error = namedtuple("Error", ["file", "line", "col", "msg", "skip"])  # noqa: PYI024
+Error = namedtuple("Error", ["file", "line", "col", "msg", "skip"])
 
 PASS = "green"
 FAIL = "bold_red"
@@ -64,7 +63,7 @@ async def async_exec(*args, display=False):
     """Execute, return code & log."""
     argsp = []
     for arg in args:
-        if Path(arg).is_file():
+        if os.path.isfile(arg):
             argsp.append(f"\\\n  {shlex.quote(arg)}")
         else:
             argsp.append(shlex.quote(arg))
@@ -133,7 +132,7 @@ async def ruff(files):
 
 async def lint(files):
     """Perform lint."""
-    files = [file for file in files if Path(file).is_file()]
+    files = [file for file in files if os.path.isfile(file)]
     res = sorted(
         itertools.chain(
             *await asyncio.gather(
@@ -165,7 +164,7 @@ async def lint(files):
 async def main():
     """Run the main loop."""
     # Ensure we are in the homeassistant root
-    os.chdir(Path(__file__).parent.parent)
+    os.chdir(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
     files = await git()
     if not files:
@@ -195,7 +194,7 @@ async def main():
             gen_req = True  # requirements script for components
         # Find test files...
         if fname.startswith("tests/"):
-            if "/test_" in fname and Path(fname).is_file():
+            if "/test_" in fname and os.path.isfile(fname):
                 # All test helpers should be excluded
                 test_files.add(fname)
         else:
@@ -208,7 +207,7 @@ async def main():
             else:
                 parts[-1] = f"test_{parts[-1]}"
             fname = "/".join(parts)
-            if Path(fname).is_file():
+            if os.path.isfile(fname):
                 test_files.add(fname)
 
     if gen_req:

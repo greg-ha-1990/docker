@@ -1,7 +1,5 @@
 {
   "services": {
-    "order": {
-      "service": "mdi:pizza"
-    }
+    "order": "mdi:pizza"
   }
 }

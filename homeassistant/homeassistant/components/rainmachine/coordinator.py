@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -18,20 +19,17 @@ from .const import LOGGER
 SIGNAL_REBOOT_COMPLETED = "rainmachine_reboot_completed_{0}"
 SIGNAL_REBOOT_REQUESTED = "rainmachine_reboot_requested_{0}"
 
-if TYPE_CHECKING:
-    from . import RainMachineConfigEntry
-
 
 class RainMachineDataUpdateCoordinator(DataUpdateCoordinator[dict]):
     """Define an extended DataUpdateCoordinator."""
 
-    config_entry: RainMachineConfigEntry
+    config_entry: ConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
         *,
-        entry: RainMachineConfigEntry,
+        entry: ConfigEntry,
         name: str,
         api_category: str,
         update_interval: timedelta,

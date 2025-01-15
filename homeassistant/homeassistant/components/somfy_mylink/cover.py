@@ -3,8 +3,9 @@
 import logging
 from typing import Any
 
-from homeassistant.components.cover import CoverDeviceClass, CoverEntity, CoverState
+from homeassistant.components.cover import CoverDeviceClass, CoverEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_CLOSED, STATE_OPEN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -51,7 +52,7 @@ async def async_setup_entry(
 
         cover_list.append(SomfyShade(somfy_mylink, **cover_config))
 
-        _LOGGER.debug(
+        _LOGGER.info(
             "Adding Somfy Cover: %s with targetID %s",
             cover_config["name"],
             cover_config["target_id"],
@@ -130,7 +131,7 @@ class SomfyShade(RestoreEntity, CoverEntity):
         last_state = await self.async_get_last_state()
 
         if last_state is not None and last_state.state in (
-            CoverState.OPEN,
-            CoverState.CLOSED,
+            STATE_OPEN,
+            STATE_CLOSED,
         ):
-            self._attr_is_closed = last_state.state == CoverState.CLOSED
+            self._attr_is_closed = last_state.state == STATE_CLOSED

@@ -9,7 +9,7 @@ import datetime
 from functools import partial
 import logging
 import socket
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 from aiohttp import ClientError
@@ -372,11 +372,12 @@ class SonosDiscoveryManager:
                 (SonosAlarms, self.data.alarms),
                 (SonosFavorites, self.data.favorites),
             ):
-                c_dict: dict[str, Any] = coord_dict
-                if soco.household_id not in c_dict:
+                if TYPE_CHECKING:
+                    coord_dict = cast(dict[str, Any], coord_dict)
+                if soco.household_id not in coord_dict:
                     new_coordinator = coordinator(self.hass, soco.household_id)
                     new_coordinator.setup(soco)
-                    c_dict[soco.household_id] = new_coordinator
+                    coord_dict[soco.household_id] = new_coordinator
             speaker.setup(self.entry)
         except (OSError, SoCoException, Timeout) as ex:
             _LOGGER.warning("Failed to add SonosSpeaker using %s: %s", soco, ex)
@@ -413,7 +414,7 @@ class SonosDiscoveryManager:
                 continue
 
             if self.hosts_in_error.pop(ip_addr, None):
-                _LOGGER.warning("Connection reestablished to Sonos device %s", ip_addr)
+                _LOGGER.info("Connection reestablished to Sonos device %s", ip_addr)
             # Each speaker has the topology for other online speakers, so add them in here if they were not
             # configured. The metadata is already in Soco for these.
             if new_hosts := {

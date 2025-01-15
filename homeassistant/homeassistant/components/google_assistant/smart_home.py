@@ -262,13 +262,9 @@ async def handle_devices_execute(
             ),
             EXECUTE_LIMIT,
         )
-        results.update(
-            {
-                entity_id: result
-                for entity_id, result in zip(executions, execute_results, strict=False)
-                if result is not None
-            }
-        )
+        for entity_id, result in zip(executions, execute_results, strict=False):
+            if result is not None:
+                results[entity_id] = result
     except TimeoutError:
         pass
 

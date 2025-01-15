@@ -3,13 +3,8 @@
   "config": {
     "step": {
       "user": {
-        "description": "Select a garage from the list",
-        "data": {
-          "garage_name": "Garage name"
-        },
-        "data_description": {
-          "garage_name": "The name of the garage you want to monitor."
-        }
+        "title": "Pick a garage to monitor",
+        "data": { "garage_name": "Garage name" }
       }
     },
     "abort": {
@@ -21,25 +16,16 @@
   "entity": {
     "sensor": {
       "free_space_short": {
-        "name": "Short parking free space",
-        "unit_of_measurement": "cars"
+        "name": "Short parking free space"
       },
       "free_space_long": {
-        "name": "Long parking free space",
-        "unit_of_measurement": "cars"
+        "name": "Long parking free space"
       },
       "short_capacity": {
-        "name": "Short parking capacity",
-        "unit_of_measurement": "cars"
+        "name": "Short parking capacity"
       },
       "long_capacity": {
-        "name": "Long parking capacity",
-        "unit_of_measurement": "cars"
-      }
-    },
-    "binary_sensor": {
-      "state": {
-        "name": "State"
+        "name": "Long parking capacity"
       }
     }
   }

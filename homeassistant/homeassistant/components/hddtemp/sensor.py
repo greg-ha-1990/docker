@@ -6,12 +6,11 @@ from datetime import timedelta
 import logging
 import socket
 from telnetlib import Telnet  # pylint: disable=deprecated-module
-from typing import Any
 
 import voluptuous as vol
 
 from homeassistant.components.sensor import (
-    PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
+    PLATFORM_SCHEMA,
     SensorDeviceClass,
     SensorEntity,
 )
@@ -39,7 +38,7 @@ DEFAULT_TIMEOUT = 5
 
 SCAN_INTERVAL = timedelta(minutes=1)
 
-PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_DISKS, default=[]): vol.All(cv.ensure_list, [cv.string]),
         vol.Optional(CONF_HOST, default=DEFAULT_HOST): cv.string,
@@ -83,11 +82,10 @@ class HddTempSensor(SensorEntity):
         self._details = None
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
+    def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
         if self._details is not None:
             return {ATTR_DEVICE: self._details[0], ATTR_MODEL: self._details[1]}
-        return None
 
     def update(self) -> None:
         """Get the latest data from HDDTemp daemon and updates the state."""

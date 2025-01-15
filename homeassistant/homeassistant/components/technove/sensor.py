@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
@@ -24,7 +25,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from . import TechnoVEConfigEntry
+from .const import DOMAIN
 from .coordinator import TechnoVEDataUpdateCoordinator
 from .entity import TechnoVEEntity
 
@@ -121,12 +122,13 @@ SENSORS: tuple[TechnoVESensorEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: TechnoVEConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
+    coordinator: TechnoVEDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
-        TechnoVESensorEntity(entry.runtime_data, description) for description in SENSORS
+        TechnoVESensorEntity(coordinator, description) for description in SENSORS
     )
 
 

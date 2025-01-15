@@ -10,8 +10,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, TELLDUS_DISCOVERY_NEW
-from .entity import TelldusLiveEntity
+from .. import tellduslive
+from .entry import TelldusLiveEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +25,12 @@ async def async_setup_entry(
 
     async def async_discover_light(device_id):
         """Discover and add a discovered sensor."""
-        client = hass.data[DOMAIN]
+        client = hass.data[tellduslive.DOMAIN]
         async_add_entities([TelldusLiveLight(client, device_id)])
 
     async_dispatcher_connect(
         hass,
-        TELLDUS_DISCOVERY_NEW.format(light.DOMAIN, DOMAIN),
+        tellduslive.TELLDUS_DISCOVERY_NEW.format(light.DOMAIN, tellduslive.DOMAIN),
         async_discover_light,
     )
 
@@ -67,7 +67,7 @@ class TelldusLiveLight(TelldusLiveEntity, LightEntity):
         brightness = kwargs.get(ATTR_BRIGHTNESS, self._last_brightness)
         if brightness == 0:
             fallback_brightness = 100
-            _LOGGER.debug(
+            _LOGGER.info(
                 "Setting brightness to %d%%, because it was 0", fallback_brightness
             )
             brightness = int(fallback_brightness * 255 / 100)

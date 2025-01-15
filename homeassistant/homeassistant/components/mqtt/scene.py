@@ -17,11 +17,9 @@ from homeassistant.helpers.typing import ConfigType
 
 from .config import MQTT_BASE_SCHEMA
 from .const import CONF_COMMAND_TOPIC, CONF_RETAIN
-from .entity import MqttEntity, async_setup_entity_entry_helper
+from .mixins import MqttEntity, async_setup_entity_entry_helper
 from .schemas import MQTT_ENTITY_COMMON_SCHEMA
 from .util import valid_publish_topic
-
-PARALLEL_UPDATES = 0
 
 DEFAULT_NAME = "MQTT Scene"
 DEFAULT_RETAIN = False

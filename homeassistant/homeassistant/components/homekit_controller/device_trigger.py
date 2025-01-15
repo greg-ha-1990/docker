@@ -88,7 +88,7 @@ class TriggerSource:
             for event_handler in self._callbacks.get(trigger_key, []):
                 event_handler(ev)
 
-    def async_get_triggers(self) -> Generator[tuple[str, str]]:
+    def async_get_triggers(self) -> Generator[tuple[str, str], None, None]:
         """List device triggers for HomeKit devices."""
         yield from self._triggers
 

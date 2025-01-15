@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from aioshelly.block_device import BlockDevice
 from aioshelly.common import ConnectionOptions, get_info
@@ -12,7 +12,6 @@ from aioshelly.exceptions import (
     CustomPortNotSupported,
     DeviceConnectionError,
     InvalidAuthError,
-    MacAddressMismatchError,
 )
 from aioshelly.rpc_device import RpcDevice
 import voluptuous as vol
@@ -103,11 +102,10 @@ async def validate_input(
             ws_context,
             options,
         )
-        try:
-            await rpc_device.initialize()
-            sleep_period = get_rpc_device_wakeup_period(rpc_device.status)
-        finally:
-            await rpc_device.shutdown()
+        await rpc_device.initialize()
+        await rpc_device.shutdown()
+
+        sleep_period = get_rpc_device_wakeup_period(rpc_device.status)
 
         return {
             "title": rpc_device.name,
@@ -123,15 +121,11 @@ async def validate_input(
         coap_context,
         options,
     )
-    try:
-        await block_device.initialize()
-        sleep_period = get_block_device_sleep_period(block_device.settings)
-    finally:
-        await block_device.shutdown()
-
+    await block_device.initialize()
+    await block_device.shutdown()
     return {
         "title": block_device.name,
-        CONF_SLEEP_PERIOD: sleep_period,
+        CONF_SLEEP_PERIOD: get_block_device_sleep_period(block_device.settings),
         "model": block_device.model,
         CONF_GEN: gen,
     }
@@ -147,6 +141,7 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
     port: int = DEFAULT_HTTP_PORT
     info: dict[str, Any] = {}
     device_info: dict[str, Any] = {}
+    entry: ConfigEntry | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -177,8 +172,6 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                 except DeviceConnectionError:
                     errors["base"] = "cannot_connect"
-                except MacAddressMismatchError:
-                    errors["base"] = "mac_address_mismatch"
                 except CustomPortNotSupported:
                     errors["base"] = "custom_port_not_supported"
                 except Exception:  # noqa: BLE001
@@ -218,8 +211,6 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except DeviceConnectionError:
                 errors["base"] = "cannot_connect"
-            except MacAddressMismatchError:
-                errors["base"] = "mac_address_mismatch"
             except Exception:  # noqa: BLE001
                 LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -283,8 +274,6 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: ZeroconfServiceInfo
     ) -> ConfigFlowResult:
         """Handle zeroconf discovery."""
-        if discovery_info.ip_address.version == 6:
-            return self.async_abort(reason="ipv6_not_supported")
         host = discovery_info.host
         # First try to get the mac address from the name
         # so we can avoid making another connection to the
@@ -360,6 +349,7 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle configuration by re-auth."""
+        self.entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -367,9 +357,9 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Dialog that informs the user that reauth is required."""
         errors: dict[str, str] = {}
-        reauth_entry = self._get_reauth_entry()
-        host = reauth_entry.data[CONF_HOST]
-        port = get_http_port(reauth_entry.data)
+        assert self.entry is not None
+        host = self.entry.data[CONF_HOST]
+        port = get_http_port(self.entry.data)
 
         if user_input is not None:
             try:
@@ -377,20 +367,18 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
             except (DeviceConnectionError, InvalidAuthError):
                 return self.async_abort(reason="reauth_unsuccessful")
 
-            if get_device_entry_gen(reauth_entry) != 1:
+            if get_device_entry_gen(self.entry) != 1:
                 user_input[CONF_USERNAME] = "admin"
             try:
                 await validate_input(self.hass, host, port, info, user_input)
             except (DeviceConnectionError, InvalidAuthError):
                 return self.async_abort(reason="reauth_unsuccessful")
-            except MacAddressMismatchError:
-                return self.async_abort(reason="mac_address_mismatch")
 
             return self.async_update_reload_and_abort(
-                reauth_entry, data_updates=user_input
+                self.entry, data={**self.entry.data, **user_input}
             )
 
-        if get_device_entry_gen(reauth_entry) in BLOCK_GENERATIONS:
+        if get_device_entry_gen(self.entry) in BLOCK_GENERATIONS:
             schema = {
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
@@ -405,13 +393,28 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure(
+        self, _: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle a reconfiguration flow initialized by the user."""
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+
+        if TYPE_CHECKING:
+            assert entry is not None
+
+        self.host = entry.data[CONF_HOST]
+        self.port = entry.data.get(CONF_PORT, DEFAULT_HTTP_PORT)
+        self.entry = entry
+
+        return await self.async_step_reconfigure_confirm()
+
+    async def async_step_reconfigure_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle a reconfiguration flow initialized by the user."""
         errors = {}
-        reconfigure_entry = self._get_reconfigure_entry()
-        self.host = reconfigure_entry.data[CONF_HOST]
-        self.port = reconfigure_entry.data.get(CONF_PORT, DEFAULT_HTTP_PORT)
+
+        if TYPE_CHECKING:
+            assert self.entry is not None
 
         if user_input is not None:
             host = user_input[CONF_HOST]
@@ -423,23 +426,23 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
             except CustomPortNotSupported:
                 errors["base"] = "custom_port_not_supported"
             else:
-                await self.async_set_unique_id(info[CONF_MAC])
-                self._abort_if_unique_id_mismatch(reason="another_device")
+                if info[CONF_MAC] != self.entry.unique_id:
+                    return self.async_abort(reason="another_device")
 
-                return self.async_update_reload_and_abort(
-                    reconfigure_entry,
-                    data_updates={CONF_HOST: host, CONF_PORT: port},
-                )
+                data = {**self.entry.data, CONF_HOST: host, CONF_PORT: port}
+                self.hass.config_entries.async_update_entry(self.entry, data=data)
+                await self.hass.config_entries.async_reload(self.entry.entry_id)
+                return self.async_abort(reason="reconfigure_successful")
 
         return self.async_show_form(
-            step_id="reconfigure",
+            step_id="reconfigure_confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_HOST, default=self.host): str,
                     vol.Required(CONF_PORT, default=self.port): vol.Coerce(int),
                 }
             ),
-            description_placeholders={"device_name": reconfigure_entry.title},
+            description_placeholders={"device_name": self.entry.title},
             errors=errors,
         )
 
@@ -451,7 +454,7 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
     @classmethod
     @callback
@@ -466,6 +469,10 @@ class ShellyConfigFlow(ConfigFlow, domain=DOMAIN):
 
 class OptionsFlowHandler(OptionsFlow):
     """Handle the option flow for shelly."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

@@ -8,7 +8,7 @@ import contextlib
 from functools import partial
 from itertools import chain
 import logging
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+import logging.handlers
 import mimetypes
 from operator import contains, itemgetter
 import os
@@ -70,7 +70,6 @@ from .const import (
     REQUIRED_NEXT_PYTHON_VER,
     SIGNAL_BOOTSTRAP_INTEGRATIONS,
 )
-from .core_config import async_process_ha_core_config
 from .exceptions import HomeAssistantError
 from .helpers import (
     area_registry,
@@ -105,8 +104,7 @@ from .setup import (
 from .util.async_ import create_eager_task
 from .util.hass_dict import HassKey
 from .util.logging import async_activate_log_queue_handler
-from .util.package import async_get_user_site, is_docker_env, is_virtual_env
-from .util.system_info import is_official_image
+from .util.package import async_get_user_site, is_virtual_env
 
 with contextlib.suppress(ImportError):
     # Ensure anyio backend is imported to avoid it being imported in the event loop
@@ -225,10 +223,8 @@ CRITICAL_INTEGRATIONS = {
 SETUP_ORDER = (
     # Load logging and http deps as soon as possible
     ("logging, http deps", LOGGING_AND_HTTP_DEPS_INTEGRATIONS),
-    # Setup frontend
-    ("frontend", FRONTEND_INTEGRATIONS),
-    # Setup recorder
-    ("recorder", RECORDER_INTEGRATIONS),
+    # Setup frontend and recorder
+    ("frontend, recorder", {*FRONTEND_INTEGRATIONS, *RECORDER_INTEGRATIONS}),
     # Start up debuggers. Start these first in case they want to wait.
     ("debugger", DEBUGGER_INTEGRATIONS),
 )
@@ -253,7 +249,6 @@ PRELOAD_STORAGE = [
     "assist_pipeline.pipelines",
     "core.analytics",
     "auth_module.totp",
-    "backup",
 ]
 
 
@@ -261,39 +256,22 @@ async def async_setup_hass(
     runtime_config: RuntimeConfig,
 ) -> core.HomeAssistant | None:
     """Set up Home Assistant."""
+    hass = core.HomeAssistant(runtime_config.config_dir)
 
-    async def create_hass() -> core.HomeAssistant:
-        """Create the hass object and do basic setup."""
-        hass = core.HomeAssistant(runtime_config.config_dir)
-        loader.async_setup(hass)
+    async_enable_logging(
+        hass,
+        runtime_config.verbose,
+        runtime_config.log_rotate_days,
+        runtime_config.log_file,
+        runtime_config.log_no_color,
+    )
 
-        await async_enable_logging(
-            hass,
-            runtime_config.verbose,
-            runtime_config.log_rotate_days,
-            runtime_config.log_file,
-            runtime_config.log_no_color,
-        )
+    if runtime_config.debug or hass.loop.get_debug():
+        hass.config.debug = True
 
-        if runtime_config.debug or hass.loop.get_debug():
-            hass.config.debug = True
-
-        hass.config.safe_mode = runtime_config.safe_mode
-        hass.config.skip_pip = runtime_config.skip_pip
-        hass.config.skip_pip_packages = runtime_config.skip_pip_packages
-
-        return hass
-
-    async def stop_hass(hass: core.HomeAssistant) -> None:
-        """Stop hass."""
-        # Ask integrations to shut down. It's messy but we can't
-        # do a clean stop without knowing what is broken
-        with contextlib.suppress(TimeoutError):
-            async with hass.timeout.async_timeout(10):
-                await hass.async_stop()
-
-    hass = await create_hass()
-
+    hass.config.safe_mode = runtime_config.safe_mode
+    hass.config.skip_pip = runtime_config.skip_pip
+    hass.config.skip_pip_packages = runtime_config.skip_pip_packages
     if runtime_config.skip_pip or runtime_config.skip_pip_packages:
         _LOGGER.warning(
             "Skipping pip installation of required modules. This may cause issues"
@@ -305,6 +283,7 @@ async def async_setup_hass(
 
     _LOGGER.info("Config directory: %s", runtime_config.config_dir)
 
+    loader.async_setup(hass)
     block_async_io.enable()
 
     config_dict = None
@@ -330,28 +309,27 @@ async def async_setup_hass(
 
     if config_dict is None:
         recovery_mode = True
-        await stop_hass(hass)
-        hass = await create_hass()
 
     elif not basic_setup_success:
         _LOGGER.warning("Unable to set up core integrations. Activating recovery mode")
         recovery_mode = True
-        await stop_hass(hass)
-        hass = await create_hass()
 
     elif any(domain not in hass.config.components for domain in CRITICAL_INTEGRATIONS):
         _LOGGER.warning(
             "Detected that %s did not load. Activating recovery mode",
             ",".join(CRITICAL_INTEGRATIONS),
         )
+        # Ask integrations to shut down. It's messy but we can't
+        # do a clean stop without knowing what is broken
+        with contextlib.suppress(TimeoutError):
+            async with hass.timeout.async_timeout(10):
+                await hass.async_stop()
 
+        recovery_mode = True
         old_config = hass.config
         old_logging = hass.data.get(DATA_LOGGING)
 
-        recovery_mode = True
-        await stop_hass(hass)
-        hass = await create_hass()
-
+        hass = core.HomeAssistant(old_config.config_dir)
         if old_logging:
             hass.data[DATA_LOGGING] = old_logging
         hass.config.debug = old_config.debug
@@ -412,10 +390,6 @@ def _init_blocking_io_modules_in_executor() -> None:
     # Initialize the mimetypes module to avoid blocking calls
     # to the filesystem to load the mime.types file.
     mimetypes.init()
-    # Initialize is_official_image and is_docker_env to avoid blocking calls
-    # to the filesystem.
-    is_official_image()
-    is_docker_env()
 
 
 async def async_load_base_functionality(hass: core.HomeAssistant) -> None:
@@ -482,7 +456,7 @@ async def async_from_config_dict(
     core_config = config.get(core.DOMAIN, {})
 
     try:
-        await async_process_ha_core_config(hass, core_config)
+        await conf_util.async_process_ha_core_config(hass, core_config)
     except vol.Invalid as config_err:
         conf_util.async_log_schema_error(config_err, core.DOMAIN, core_config, hass)
         async_notify_setup_error(hass, core.DOMAIN)
@@ -517,7 +491,7 @@ async def async_from_config_dict(
         issue_registry.async_create_issue(
             hass,
             core.DOMAIN,
-            f"python_version_{required_python_version}",
+            "python_version",
             is_fixable=False,
             severity=issue_registry.IssueSeverity.WARNING,
             breaks_in_ha_version=REQUIRED_NEXT_PYTHON_HA_RELEASE,
@@ -532,7 +506,8 @@ async def async_from_config_dict(
     return hass
 
 
-async def async_enable_logging(
+@core.callback
+def async_enable_logging(
     hass: core.HomeAssistant,
     verbose: bool = False,
     log_rotate_days: int | None = None,
@@ -589,10 +564,10 @@ async def async_enable_logging(
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    sys.excepthook = lambda *args: logging.getLogger().exception(
+    sys.excepthook = lambda *args: logging.getLogger(None).exception(
         "Uncaught exception", exc_info=args
     )
-    threading.excepthook = lambda args: logging.getLogger().exception(
+    threading.excepthook = lambda args: logging.getLogger(None).exception(
         "Uncaught thread exception",
         exc_info=(  # type: ignore[arg-type]
             args.exc_type,
@@ -615,13 +590,28 @@ async def async_enable_logging(
     if (err_path_exists and os.access(err_log_path, os.W_OK)) or (
         not err_path_exists and os.access(err_dir, os.W_OK)
     ):
-        err_handler = await hass.async_add_executor_job(
-            _create_log_file, err_log_path, log_rotate_days
+        err_handler: (
+            logging.handlers.RotatingFileHandler
+            | logging.handlers.TimedRotatingFileHandler
         )
+        if log_rotate_days:
+            err_handler = logging.handlers.TimedRotatingFileHandler(
+                err_log_path, when="midnight", backupCount=log_rotate_days
+            )
+        else:
+            err_handler = _RotatingFileHandlerWithoutShouldRollOver(
+                err_log_path, backupCount=1
+            )
 
+        try:
+            err_handler.doRollover()
+        except OSError as err:
+            _LOGGER.error("Error rolling over log file: %s", err)
+
+        err_handler.setLevel(logging.INFO if verbose else logging.WARNING)
         err_handler.setFormatter(logging.Formatter(fmt, datefmt=FORMAT_DATETIME))
 
-        logger = logging.getLogger()
+        logger = logging.getLogger("")
         logger.addHandler(err_handler)
         logger.setLevel(logging.INFO if verbose else logging.WARNING)
 
@@ -633,29 +623,7 @@ async def async_enable_logging(
     async_activate_log_queue_handler(hass)
 
 
-def _create_log_file(
-    err_log_path: str, log_rotate_days: int | None
-) -> RotatingFileHandler | TimedRotatingFileHandler:
-    """Create log file and do roll over."""
-    err_handler: RotatingFileHandler | TimedRotatingFileHandler
-    if log_rotate_days:
-        err_handler = TimedRotatingFileHandler(
-            err_log_path, when="midnight", backupCount=log_rotate_days
-        )
-    else:
-        err_handler = _RotatingFileHandlerWithoutShouldRollOver(
-            err_log_path, backupCount=1
-        )
-
-    try:
-        err_handler.doRollover()
-    except OSError as err:
-        _LOGGER.error("Error rolling over log file: %s", err)
-
-    return err_handler
-
-
-class _RotatingFileHandlerWithoutShouldRollOver(RotatingFileHandler):
+class _RotatingFileHandlerWithoutShouldRollOver(logging.handlers.RotatingFileHandler):
     """RotatingFileHandler that does not check if it should roll over on every log."""
 
     def shouldRollover(self, record: logging.LogRecord) -> bool:
@@ -910,13 +878,7 @@ async def _async_resolve_domains_to_setup(
             await asyncio.gather(*resolve_dependencies_tasks)
 
         for itg in integrations_to_process:
-            try:
-                all_deps = itg.all_dependencies
-            except RuntimeError:
-                # Integration.all_dependencies raises RuntimeError if
-                # dependencies could not be resolved
-                continue
-            for dep in all_deps:
+            for dep in itg.all_dependencies:
                 if dep in domains_to_setup:
                     continue
                 domains_to_setup.add(dep)

@@ -30,7 +30,7 @@ class SpeedTestFlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: SpeedTestConfigEntry,
     ) -> SpeedTestOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return SpeedTestOptionsFlowHandler()
+        return SpeedTestOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -48,8 +48,9 @@ class SpeedTestFlowHandler(ConfigFlow, domain=DOMAIN):
 class SpeedTestOptionsFlowHandler(OptionsFlow):
     """Handle SpeedTest options."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_entry: SpeedTestConfigEntry) -> None:
         """Initialize options flow."""
+        self.config_entry = config_entry
         self._servers: dict = {}
 
     async def async_step_init(

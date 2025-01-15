@@ -9,9 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
-from .coordinator import MusicCastDataUpdateCoordinator
-from .entity import MusicCastCapabilityEntity
+from . import DOMAIN, MusicCastCapabilityEntity, MusicCastDataUpdateCoordinator
 
 
 async def async_setup_entry(

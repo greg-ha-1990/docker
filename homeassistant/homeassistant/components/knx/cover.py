@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from xknx import XKNX
 from xknx.devices import Cover as XknxCover
 
 from homeassistant import config_entries
@@ -25,9 +26,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType
 
-from . import KNXModule
-from .const import KNX_MODULE_KEY
-from .entity import KnxYamlEntity
+from .const import DATA_KNX_CONFIG, DOMAIN
+from .knx_entity import KnxEntity
 from .schema import CoverSchema
 
 
@@ -37,23 +37,22 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up cover(s) for KNX platform."""
-    knx_module = hass.data[KNX_MODULE_KEY]
-    config: list[ConfigType] = knx_module.config_yaml[Platform.COVER]
+    xknx: XKNX = hass.data[DOMAIN].xknx
+    config: list[ConfigType] = hass.data[DATA_KNX_CONFIG][Platform.COVER]
 
-    async_add_entities(KNXCover(knx_module, entity_config) for entity_config in config)
+    async_add_entities(KNXCover(xknx, entity_config) for entity_config in config)
 
 
-class KNXCover(KnxYamlEntity, CoverEntity):
+class KNXCover(KnxEntity, CoverEntity):
     """Representation of a KNX cover."""
 
     _device: XknxCover
 
-    def __init__(self, knx_module: KNXModule, config: ConfigType) -> None:
+    def __init__(self, xknx: XKNX, config: ConfigType) -> None:
         """Initialize the cover."""
         super().__init__(
-            knx_module=knx_module,
             device=XknxCover(
-                xknx=knx_module.xknx,
+                xknx,
                 name=config[CONF_NAME],
                 group_address_long=config.get(CoverSchema.CONF_MOVE_LONG_ADDRESS),
                 group_address_short=config.get(CoverSchema.CONF_MOVE_SHORT_ADDRESS),
@@ -71,7 +70,7 @@ class KNXCover(KnxYamlEntity, CoverEntity):
                 invert_updown=config[CoverSchema.CONF_INVERT_UPDOWN],
                 invert_position=config[CoverSchema.CONF_INVERT_POSITION],
                 invert_angle=config[CoverSchema.CONF_INVERT_ANGLE],
-            ),
+            )
         )
         self._unsubscribe_auto_updater: Callable[[], None] | None = None
 

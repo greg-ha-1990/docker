@@ -15,11 +15,13 @@ from homeassistant.components.switch import (
     SwitchEntity,
     SwitchEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import OverkizDataConfigEntry
+from . import HomeAssistantOverkizData
+from .const import DOMAIN
 from .entity import OverkizDescriptiveEntity
 
 
@@ -109,11 +111,11 @@ SUPPORTED_DEVICES = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: OverkizDataConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Overkiz switch from a config entry."""
-    data = entry.runtime_data
+    data: HomeAssistantOverkizData = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
         OverkizSwitch(

@@ -1,4 +1,4 @@
-"""The Ruckus integration."""
+"""The Ruckus Unleashed integration."""
 
 import logging
 
@@ -24,13 +24,13 @@ from .const import (
     PLATFORMS,
     UNDO_UPDATE_LISTENERS,
 )
-from .coordinator import RuckusDataUpdateCoordinator
+from .coordinator import RuckusUnleashedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__package__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Ruckus from a config entry."""
+    """Set up Ruckus Unleashed from a config entry."""
 
     ruckus = AjaxSession.async_create(
         entry.data[CONF_HOST],
@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await ruckus.close()
         raise ConfigEntryAuthFailed from autherr
 
-    coordinator = RuckusDataUpdateCoordinator(hass, ruckus=ruckus)
+    coordinator = RuckusUnleashedDataUpdateCoordinator(hass, ruckus=ruckus)
 
     await coordinator.async_config_entry_first_refresh()
 

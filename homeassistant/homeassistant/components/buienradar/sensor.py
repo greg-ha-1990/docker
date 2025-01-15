@@ -28,6 +28,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
     CONF_LATITUDE,
@@ -48,10 +49,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import BuienRadarConfigEntry
 from .const import (
     CONF_TIMEFRAME,
     DEFAULT_TIMEFRAME,
+    DOMAIN,
     STATE_CONDITION_CODES,
     STATE_CONDITIONS,
     STATE_DETAILED_CONDITIONS,
@@ -689,9 +690,7 @@ SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: BuienRadarConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Create the buienradar sensor."""
     config = entry.data
@@ -724,7 +723,7 @@ async def async_setup_entry(
 
     # create weather data:
     data = BrData(hass, coordinates, timeframe, entities)
-    entry.runtime_data[Platform.SENSOR] = data
+    hass.data[DOMAIN][entry.entry_id][Platform.SENSOR] = data
     await data.async_update()
 
     async_add_entities(entities)
@@ -742,7 +741,6 @@ class BrSensor(SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         self.entity_description = description
-        self._data: BrData | None = None
         self._measured = None
         self._attr_unique_id = (
             f"{coordinates[CONF_LATITUDE]:2.6f}{coordinates[CONF_LONGITUDE]:2.6f}"
@@ -757,29 +755,17 @@ class BrSensor(SensorEntity):
         if description.key.startswith(PRECIPITATION_FORECAST):
             self._timeframe = None
 
-    async def async_added_to_hass(self) -> None:
-        """Handle entity being added to hass."""
-        if self._data is None:
-            return
-        self._update()
-
     @callback
     def data_updated(self, data: BrData):
-        """Handle data update."""
-        self._data = data
-        if not self.hass:
-            return
-        self._update()
-
-    def _update(self):
-        """Update sensor data."""
-        _LOGGER.debug("Updating sensor %s", self.entity_id)
-        if self._load_data(self._data.data):
+        """Update data."""
+        if self._load_data(data.data) and self.hass:
             self.async_write_ha_state()
 
     @callback
     def _load_data(self, data):  # noqa: C901
         """Load the sensor with relevant data."""
+        # Find sensor
+
         # Check if we have a new measurement,
         # otherwise we do not have to update the sensor
         if self._measured == data.get(MEASURED):
@@ -902,7 +888,7 @@ class BrSensor(SensorEntity):
         if sensor_type.startswith(PRECIPITATION_FORECAST):
             result = {ATTR_ATTRIBUTION: data.get(ATTRIBUTION)}
             if self._timeframe is not None:
-                result[TIMEFRAME_LABEL] = f"{self._timeframe} min"
+                result[TIMEFRAME_LABEL] = "%d min" % (self._timeframe)
 
             self._attr_extra_state_attributes = result
 

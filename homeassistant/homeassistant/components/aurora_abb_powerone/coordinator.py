@@ -6,16 +6,12 @@ from time import sleep
 from aurorapy.client import AuroraError, AuroraSerialClient, AuroraTimeoutError
 from serial import SerialException
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
-
-
-type AuroraAbbConfigEntry = ConfigEntry[AuroraAbbDataUpdateCoordinator]
 
 
 class AuroraAbbDataUpdateCoordinator(DataUpdateCoordinator[dict[str, float]]):
@@ -82,9 +78,9 @@ class AuroraAbbDataUpdateCoordinator(DataUpdateCoordinator[dict[str, float]]):
             finally:
                 if self.available != self.available_prev:
                     if self.available:
-                        _LOGGER.warning("Communication with %s back online", self.name)
+                        _LOGGER.info("Communication with %s back online", self.name)
                     else:
-                        _LOGGER.warning(
+                        _LOGGER.info(
                             "Communication with %s lost",
                             self.name,
                         )

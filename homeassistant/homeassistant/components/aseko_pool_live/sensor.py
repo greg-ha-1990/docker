@@ -2,109 +2,77 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-
-from aioaseko import Unit
+from aioaseko import Unit, Variable
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
-    SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfElectricPotential, UnitOfTemperature
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import StateType
 
-from .coordinator import AsekoConfigEntry
+from .const import DOMAIN
+from .coordinator import AsekoDataUpdateCoordinator
 from .entity import AsekoEntity
-
-
-@dataclass(frozen=True, kw_only=True)
-class AsekoSensorEntityDescription(SensorEntityDescription):
-    """Describes an Aseko sensor entity."""
-
-    value_fn: Callable[[Unit], StateType]
-
-
-SENSORS: list[AsekoSensorEntityDescription] = [
-    AsekoSensorEntityDescription(
-        key="airTemp",
-        translation_key="air_temperature",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.air_temperature,
-    ),
-    AsekoSensorEntityDescription(
-        key="electrolyzer",
-        translation_key="electrolyzer",
-        native_unit_of_measurement="g/h",
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.electrolyzer,
-    ),
-    AsekoSensorEntityDescription(
-        key="free_chlorine",
-        translation_key="free_chlorine",
-        native_unit_of_measurement="mg/l",
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.cl_free,
-    ),
-    AsekoSensorEntityDescription(
-        key="ph",
-        device_class=SensorDeviceClass.PH,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.ph,
-    ),
-    AsekoSensorEntityDescription(
-        key="rx",
-        translation_key="redox",
-        native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.redox,
-    ),
-    AsekoSensorEntityDescription(
-        key="salinity",
-        translation_key="salinity",
-        native_unit_of_measurement="kg/m³",
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.salinity,
-    ),
-    AsekoSensorEntityDescription(
-        key="waterTemp",
-        translation_key="water_temperature",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda unit: unit.water_temperature,
-    ),
-]
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: AsekoConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Aseko Pool Live sensors."""
-    coordinator = config_entry.runtime_data
-    units = coordinator.data.values()
+    data: list[tuple[Unit, AsekoDataUpdateCoordinator]] = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
+
     async_add_entities(
-        AsekoSensorEntity(unit, coordinator, description)
-        for description in SENSORS
-        for unit in units
-        if description.value_fn(unit) is not None
+        VariableSensorEntity(unit, variable, coordinator)
+        for unit, coordinator in data
+        for variable in unit.variables
     )
 
 
-class AsekoSensorEntity(AsekoEntity, SensorEntity):
-    """Representation of an Aseko unit sensor entity."""
+class VariableSensorEntity(AsekoEntity, SensorEntity):
+    """Representation of a unit variable sensor entity."""
 
-    entity_description: AsekoSensorEntityDescription
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, unit: Unit, variable: Variable, coordinator: AsekoDataUpdateCoordinator
+    ) -> None:
+        """Initialize the variable sensor."""
+        super().__init__(unit, coordinator)
+        self._variable = variable
+
+        translation_key = {
+            "Air temp.": "air_temperature",
+            "Cl free": "free_chlorine",
+            "Water temp.": "water_temperature",
+        }.get(self._variable.name)
+        if translation_key is not None:
+            self._attr_translation_key = translation_key
+        else:
+            self._attr_name = self._variable.name
+
+        self._attr_unique_id = f"{self._unit.serial_number}{self._variable.type}"
+        self._attr_native_unit_of_measurement = self._variable.unit
+
+        self._attr_icon = {
+            "rx": "mdi:test-tube",
+            "waterLevel": "mdi:waves",
+        }.get(self._variable.type)
+
+        self._attr_device_class = {
+            "airTemp": SensorDeviceClass.TEMPERATURE,
+            "waterTemp": SensorDeviceClass.TEMPERATURE,
+            "ph": SensorDeviceClass.PH,
+        }.get(self._variable.type)
 
     @property
-    def native_value(self) -> StateType:
+    def native_value(self) -> int | None:
         """Return the state of the sensor."""
-        return self.entity_description.value_fn(self.unit)
+        variable = self.coordinator.data[self._variable.type]
+        return variable.current_value

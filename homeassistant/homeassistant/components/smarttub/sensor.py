@@ -10,7 +10,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import VolDictType
 
 from .const import DOMAIN, SMARTTUB_CONTROLLER
 from .entity import SmartTubSensorBase
@@ -32,7 +31,7 @@ SET_PRIMARY_FILTRATION_SCHEMA = vol.All(
     ),
 )
 
-SET_SECONDARY_FILTRATION_SCHEMA: VolDictType = {
+SET_SECONDARY_FILTRATION_SCHEMA = {
     vol.Required(ATTR_MODE): vol.In(
         {
             mode.name.lower()

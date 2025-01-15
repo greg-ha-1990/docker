@@ -17,23 +17,24 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import OmadaConfigEntry
-from .controller import OmadaGatewayCoordinator
+from .const import DOMAIN
+from .controller import OmadaGatewayCoordinator, OmadaSiteController
 from .entity import OmadaDeviceEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: OmadaConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up binary sensors."""
-    controller = config_entry.runtime_data
+    controller: OmadaSiteController = hass.data[DOMAIN][config_entry.entry_id]
 
-    gateway_coordinator = controller.gateway_coordinator
+    gateway_coordinator = await controller.get_gateway_coordinator()
     if not gateway_coordinator:
         return
 
@@ -99,6 +100,7 @@ class OmadaGatewayPortBinarySensor(
     """Binary status of a property on an internet gateway."""
 
     entity_description: GatewayPortBinarySensorEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,

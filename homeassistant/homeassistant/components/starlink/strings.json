@@ -70,12 +70,6 @@
       },
       "ping_drop_rate": {
         "name": "Ping drop rate"
-      },
-      "upload": {
-        "name": "Upload"
-      },
-      "download": {
-        "name": "Download"
       }
     },
     "switch": {

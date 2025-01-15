@@ -138,7 +138,7 @@ class SynoApi:
             except SYNOLOGY_CONNECTION_EXCEPTIONS:
                 self._with_surveillance_station = False
                 self.dsm.reset(SynoSurveillanceStation.API_KEY)
-                LOGGER.warning(
+                LOGGER.info(
                     "Surveillance Station found, but disabled due to missing user"
                     " permissions"
                 )

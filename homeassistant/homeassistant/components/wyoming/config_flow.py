@@ -8,10 +8,9 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 
-from homeassistant.components import zeroconf
+from homeassistant.components import hassio, zeroconf
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.helpers.service_info.hassio import HassioServiceInfo
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 
 from .const import DOMAIN
 from .data import WyomingService
@@ -31,7 +30,7 @@ class WyomingConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _hassio_discovery: HassioServiceInfo
+    _hassio_discovery: hassio.HassioServiceInfo
     _service: WyomingService | None = None
     _name: str | None = None
 
@@ -62,7 +61,7 @@ class WyomingConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_abort(reason="no_services")
 
     async def async_step_hassio(
-        self, discovery_info: HassioServiceInfo
+        self, discovery_info: hassio.HassioServiceInfo
     ) -> ConfigFlowResult:
         """Handle Supervisor add-on discovery."""
         _LOGGER.debug("Supervisor discovery info: %s", discovery_info)
@@ -124,6 +123,7 @@ class WyomingConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
 
+        self.context[CONF_NAME] = self._name
         self.context["title_placeholders"] = {"name": self._name}
 
         self._service = service

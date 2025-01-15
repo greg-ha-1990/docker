@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time
-
 from open_meteo import Forecast as OpenMeteoForecast
 
 from homeassistant.components.weather import (
@@ -109,9 +107,8 @@ class OpenMeteoWeatherEntity(
 
         daily = self.coordinator.data.daily
         for index, date in enumerate(self.coordinator.data.daily.time):
-            _datetime = datetime.combine(date=date, time=time(0), tzinfo=dt_util.UTC)
             forecast = Forecast(
-                datetime=_datetime.isoformat(),
+                datetime=date.isoformat(),
             )
 
             if daily.weathercode is not None:
@@ -158,14 +155,12 @@ class OpenMeteoWeatherEntity(
         today = dt_util.utcnow()
 
         hourly = self.coordinator.data.hourly
-        for index, _datetime in enumerate(self.coordinator.data.hourly.time):
-            if _datetime.tzinfo is None:
-                _datetime = _datetime.replace(tzinfo=dt_util.UTC)
-            if _datetime < today:
+        for index, datetime in enumerate(self.coordinator.data.hourly.time):
+            if dt_util.as_utc(datetime) < today:
                 continue
 
             forecast = Forecast(
-                datetime=_datetime.isoformat(),
+                datetime=datetime.isoformat(),
             )
 
             if hourly.weather_code is not None:

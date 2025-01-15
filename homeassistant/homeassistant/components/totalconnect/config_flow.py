@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from total_connect_client.client import TotalConnectClient
 from total_connect_client.exceptions import AuthenticationError
@@ -17,9 +17,8 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_LOCATION, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
-from homeassistant.helpers.typing import VolDictType
 
-from .const import AUTO_BYPASS, CODE_REQUIRED, CONF_USERCODES, DOMAIN
+from .const import AUTO_BYPASS, CONF_USERCODES, DOMAIN
 
 PASSWORD_DATA_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
 
@@ -29,17 +28,14 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    client: TotalConnectClient
-
-    def __init__(self) -> None:
+    def __init__(self):
         """Initialize the config flow."""
-        self.username: str | None = None
-        self.password: str | None = None
-        self.usercodes: dict[int, str | None] = {}
+        self.username = None
+        self.password = None
+        self.usercodes = {}
+        self.client = None
 
-    async def async_step_user(
-        self, user_input: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user."""
         errors = {}
 
@@ -72,20 +68,18 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=data_schema, errors=errors
         )
 
-    async def async_step_locations(
-        self, user_input: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_locations(self, user_entry=None):
         """Handle the user locations and associated usercodes."""
         errors = {}
-        if user_input is not None:
+        if user_entry is not None:
             for location_id in self.usercodes:
                 if self.usercodes[location_id] is None:
                     valid = await self.hass.async_add_executor_job(
                         self.client.locations[location_id].set_usercode,
-                        user_input[CONF_USERCODES],
+                        user_entry[CONF_USERCODES],
                     )
                     if valid:
-                        self.usercodes[location_id] = user_input[CONF_USERCODES]
+                        self.usercodes[location_id] = user_entry[CONF_USERCODES]
                     else:
                         errors[CONF_LOCATION] = "usercode"
                     break
@@ -115,11 +109,11 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.usercodes[location_id] = None
 
         # show the next location that needs a usercode
-        location_codes: VolDictType = {}
+        location_codes = {}
         location_for_user = ""
         for location_id in self.usercodes:
             if self.usercodes[location_id] is None:
-                location_for_user = str(location_id)
+                location_for_user = location_id
                 location_codes[
                     vol.Required(
                         CONF_USERCODES,
@@ -145,9 +139,7 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_reauth_confirm()
 
-    async def async_step_reauth_confirm(
-        self, user_input: dict[str, str] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_reauth_confirm(self, user_input=None):
         """Dialog that informs the user that reauth is required."""
         errors = {}
         if user_input is None:
@@ -172,8 +164,6 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         existing_entry = await self.async_set_unique_id(self.username)
-        if TYPE_CHECKING:
-            assert existing_entry is not None
         new_entry = {
             CONF_USERNAME: self.username,
             CONF_PASSWORD: user_input[CONF_PASSWORD],
@@ -193,15 +183,17 @@ class TotalConnectConfigFlow(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> TotalConnectOptionsFlowHandler:
         """Get options flow."""
-        return TotalConnectOptionsFlowHandler()
+        return TotalConnectOptionsFlowHandler(config_entry)
 
 
 class TotalConnectOptionsFlowHandler(OptionsFlow):
     """TotalConnect options flow handler."""
 
-    async def async_step_init(
-        self, user_input: dict[str, bool] | None = None
-    ) -> ConfigFlowResult:
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -213,11 +205,7 @@ class TotalConnectOptionsFlowHandler(OptionsFlow):
                     vol.Required(
                         AUTO_BYPASS,
                         default=self.config_entry.options.get(AUTO_BYPASS, False),
-                    ): bool,
-                    vol.Required(
-                        CODE_REQUIRED,
-                        default=self.config_entry.options.get(CODE_REQUIRED, False),
-                    ): bool,
+                    ): bool
                 }
             ),
         )

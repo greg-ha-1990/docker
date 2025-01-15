@@ -13,11 +13,12 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithConfigEntry,
 )
 from homeassistant.const import (
     CONF_LATITUDE,
     CONF_LONGITUDE,
+    CONF_NAME,
     CONF_PASSWORD,
     CONF_RADIUS,
     CONF_USERNAME,
@@ -44,7 +45,7 @@ class OpenSkyConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> OpenSkyOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return OpenSkyOptionsFlowHandler()
+        return OpenSkyOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -82,7 +83,7 @@ class OpenSkyConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         )
 
 
-class OpenSkyOptionsFlowHandler(OptionsFlow):
+class OpenSkyOptionsFlowHandler(OptionsFlowWithConfigEntry):
     """OpenSky Options flow handler."""
 
     async def async_step_init(
@@ -111,7 +112,10 @@ class OpenSkyOptionsFlowHandler(OptionsFlow):
                 except OpenSkyUnauthenticatedError:
                     errors["base"] = "invalid_auth"
             if not errors:
-                return self.async_create_entry(data=user_input)
+                return self.async_create_entry(
+                    title=self.options.get(CONF_NAME, "OpenSky"),
+                    data=user_input,
+                )
 
         return self.async_show_form(
             step_id="init",
@@ -126,6 +130,6 @@ class OpenSkyOptionsFlowHandler(OptionsFlow):
                         vol.Optional(CONF_CONTRIBUTING_USER, default=False): bool,
                     }
                 ),
-                user_input or self.config_entry.options,
+                user_input or self.options,
             ),
         )

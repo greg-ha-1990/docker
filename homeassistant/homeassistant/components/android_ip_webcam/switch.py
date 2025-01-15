@@ -9,11 +9,13 @@ from typing import Any
 from pydroid_ipcam import PyDroidIPCam
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import AndroidIPCamConfigEntry, AndroidIPCamDataUpdateCoordinator
+from .const import DOMAIN
+from .coordinator import AndroidIPCamDataUpdateCoordinator
 from .entity import AndroidIPCamBaseEntity
 
 
@@ -111,12 +113,14 @@ SWITCH_TYPES: tuple[AndroidIPWebcamSwitchEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: AndroidIPCamConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the IP Webcam switches from config entry."""
 
-    coordinator = config_entry.runtime_data
+    coordinator: AndroidIPCamDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
     switch_types = [
         switch
         for switch in SWITCH_TYPES

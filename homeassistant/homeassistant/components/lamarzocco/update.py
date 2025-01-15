@@ -1,10 +1,11 @@
 """Support for La Marzocco update entities."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from pylamarzocco.const import FirmwareType
-from pylamarzocco.exceptions import RequestNotSuccessful
+from lmcloud import LMCloud as LaMarzoccoClient
+from lmcloud.const import LaMarzoccoUpdateableComponent
 
 from homeassistant.components.update import (
     UpdateDeviceClass,
@@ -12,16 +13,14 @@ from homeassistant.components.update import (
     UpdateEntityDescription,
     UpdateEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .coordinator import LaMarzoccoConfigEntry
 from .entity import LaMarzoccoEntity, LaMarzoccoEntityDescription
-
-PARALLEL_UPDATES = 1
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -31,7 +30,9 @@ class LaMarzoccoUpdateEntityDescription(
 ):
     """Description of a La Marzocco update entities."""
 
-    component: FirmwareType
+    current_fw_fn: Callable[[LaMarzoccoClient], str]
+    latest_fw_fn: Callable[[LaMarzoccoClient], str]
+    component: LaMarzoccoUpdateableComponent
 
 
 ENTITIES: tuple[LaMarzoccoUpdateEntityDescription, ...] = (
@@ -39,14 +40,18 @@ ENTITIES: tuple[LaMarzoccoUpdateEntityDescription, ...] = (
         key="machine_firmware",
         translation_key="machine_firmware",
         device_class=UpdateDeviceClass.FIRMWARE,
-        component=FirmwareType.MACHINE,
+        current_fw_fn=lambda lm: lm.firmware_version,
+        latest_fw_fn=lambda lm: lm.latest_firmware_version,
+        component=LaMarzoccoUpdateableComponent.MACHINE,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     LaMarzoccoUpdateEntityDescription(
         key="gateway_firmware",
         translation_key="gateway_firmware",
         device_class=UpdateDeviceClass.FIRMWARE,
-        component=FirmwareType.GATEWAY,
+        current_fw_fn=lambda lm: lm.gateway_version,
+        latest_fw_fn=lambda lm: lm.latest_gateway_version,
+        component=LaMarzoccoUpdateableComponent.GATEWAY,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
@@ -54,12 +59,12 @@ ENTITIES: tuple[LaMarzoccoUpdateEntityDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: LaMarzoccoConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Create update entities."""
 
-    coordinator = entry.runtime_data.firmware_coordinator
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities(
         LaMarzoccoUpdateEntity(coordinator, description)
         for description in ENTITIES
@@ -76,21 +81,12 @@ class LaMarzoccoUpdateEntity(LaMarzoccoEntity, UpdateEntity):
     @property
     def installed_version(self) -> str | None:
         """Return the current firmware version."""
-        return self.coordinator.device.firmware[
-            self.entity_description.component
-        ].current_version
+        return self.entity_description.current_fw_fn(self.coordinator.lm)
 
     @property
     def latest_version(self) -> str:
         """Return the latest firmware version."""
-        return self.coordinator.device.firmware[
-            self.entity_description.component
-        ].latest_version
-
-    @property
-    def release_url(self) -> str | None:
-        """Return the release notes URL."""
-        return "https://support-iot.lamarzocco.com/firmware-updates/"
+        return self.entity_description.latest_fw_fn(self.coordinator.lm)
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
@@ -98,25 +94,10 @@ class LaMarzoccoUpdateEntity(LaMarzoccoEntity, UpdateEntity):
         """Install an update."""
         self._attr_in_progress = True
         self.async_write_ha_state()
-        try:
-            success = await self.coordinator.device.update_firmware(
-                self.entity_description.component
-            )
-        except RequestNotSuccessful as exc:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="update_failed",
-                translation_placeholders={
-                    "key": self.entity_description.key,
-                },
-            ) from exc
+        success = await self.coordinator.lm.update_firmware(
+            self.entity_description.component
+        )
         if not success:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="update_failed",
-                translation_placeholders={
-                    "key": self.entity_description.key,
-                },
-            )
+            raise HomeAssistantError("Update failed")
         self._attr_in_progress = False
         await self.coordinator.async_request_refresh()

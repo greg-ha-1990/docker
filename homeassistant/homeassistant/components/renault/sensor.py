@@ -40,9 +40,6 @@ from .coordinator import T
 from .entity import RenaultDataEntity, RenaultDataEntityDescription
 from .renault_vehicle import RenaultVehicleProxy
 
-# Coordinator is used to centralize the data updates
-PARALLEL_UPDATES = 0
-
 
 @dataclass(frozen=True, kw_only=True)
 class RenaultSensorEntityDescription(
@@ -200,13 +197,7 @@ SENSOR_TYPES: tuple[RenaultSensorEntityDescription[Any], ...] = (
         translation_key="plug_state",
         device_class=SensorDeviceClass.ENUM,
         entity_class=RenaultSensor[KamereonVehicleBatteryStatusData],
-        options=[
-            "unplugged",
-            "plugged",
-            "plugged_waiting_for_charge",
-            "plug_error",
-            "plug_unknown",
-        ],
+        options=["unplugged", "plugged", "plug_error", "plug_unknown"],
         value_lambda=_get_plug_state_formatted,
     ),
     RenaultSensorEntityDescription(

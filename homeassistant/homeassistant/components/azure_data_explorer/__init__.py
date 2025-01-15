@@ -16,18 +16,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import MATCH_ALL
 from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.exceptions import ConfigEntryError
-from homeassistant.helpers.entityfilter import FILTER_SCHEMA, EntityFilter
+from homeassistant.helpers.entityfilter import FILTER_SCHEMA
 from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.json import ExtendedJSONEncoder
+from homeassistant.helpers.json import JSONEncoder
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util.dt import utcnow
-from homeassistant.util.hass_dict import HassKey
 
 from .client import AzureDataExplorerClient
 from .const import (
     CONF_APP_REG_SECRET,
     CONF_FILTER,
     CONF_SEND_INTERVAL,
+    DATA_FILTER,
+    DATA_HUB,
     DEFAULT_MAX_DELAY,
     DOMAIN,
     FILTER_STATES,
@@ -45,7 +46,6 @@ CONFIG_SCHEMA = vol.Schema(
     },
     extra=vol.ALLOW_EXTRA,
 )
-DATA_COMPONENT: HassKey[EntityFilter] = HassKey(DOMAIN)
 
 
 # fixtures for both init and config flow tests
@@ -62,12 +62,13 @@ async def async_setup(hass: HomeAssistant, yaml_config: ConfigType) -> bool:
 
     Adds an empty filter to hass data.
     Tries to get a filter from yaml, if present set to hass data.
+    If config is empty after getting the filter, return, otherwise emit
+    deprecated warning and pass the rest to the config flow.
     """
-    if DOMAIN in yaml_config:
-        hass.data[DATA_COMPONENT] = yaml_config[DOMAIN].pop(CONF_FILTER)
-    else:
-        hass.data[DATA_COMPONENT] = FILTER_SCHEMA({})
 
+    hass.data.setdefault(DOMAIN, {DATA_FILTER: {}})
+    if DOMAIN in yaml_config:
+        hass.data[DOMAIN][DATA_FILTER] = yaml_config[DOMAIN][CONF_FILTER]
     return True
 
 
@@ -83,13 +84,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except KustoAuthenticationError:
         return False
 
-    entry.async_on_unload(adx.async_stop)
+    hass.data[DOMAIN][DATA_HUB] = adx
     await adx.async_start()
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    adx = hass.data[DOMAIN].pop(DATA_HUB)
+    await adx.async_stop()
     return True
 
 
@@ -105,7 +108,7 @@ class AzureDataExplorer:
 
         self.hass = hass
         self._entry = entry
-        self._entities_filter = hass.data[DATA_COMPONENT]
+        self._entities_filter = hass.data[DOMAIN][DATA_FILTER]
 
         self._client = AzureDataExplorerClient(entry.data)
 
@@ -201,7 +204,9 @@ class AzureDataExplorer:
             return None, dropped
         if (utcnow() - time_fired).seconds > DEFAULT_MAX_DELAY + self._send_interval:
             return None, dropped + 1
+        if "\n" in state.state:
+            return None, dropped + 1
 
-        json_event = json.dumps(obj=state, cls=ExtendedJSONEncoder)
+        json_event = str(json.dumps(obj=state, cls=JSONEncoder).encode("utf-8"))
 
         return (json_event, dropped)

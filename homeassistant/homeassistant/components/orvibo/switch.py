@@ -8,10 +8,7 @@ from typing import Any
 from orvibo.s20 import S20, S20Exception, discover
 import voluptuous as vol
 
-from homeassistant.components.switch import (
-    PLATFORM_SCHEMA as SWITCH_PLATFORM_SCHEMA,
-    SwitchEntity,
-)
+from homeassistant.components.switch import PLATFORM_SCHEMA, SwitchEntity
 from homeassistant.const import (
     CONF_DISCOVERY,
     CONF_HOST,
@@ -29,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = "Orvibo S20 Switch"
 DEFAULT_DISCOVERY = True
 
-PLATFORM_SCHEMA = SWITCH_PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_SWITCHES, default=[]): vol.All(
             cv.ensure_list,
@@ -59,7 +56,7 @@ def setup_platform(
     switch_conf = config.get(CONF_SWITCHES, [config])
 
     if config.get(CONF_DISCOVERY):
-        _LOGGER.debug("Discovering S20 switches")
+        _LOGGER.info("Discovering S20 switches")
         switch_data.update(discover())
 
     for switch in switch_conf:
@@ -70,7 +67,7 @@ def setup_platform(
             switches.append(
                 S20Switch(data.get(CONF_NAME), S20(host, mac=data.get(CONF_MAC)))
             )
-            _LOGGER.debug("Initialized S20 at %s", host)
+            _LOGGER.info("Initialized S20 at %s", host)
         except S20Exception:
             _LOGGER.error("S20 at %s couldn't be initialized", host)
 
